@@ -5,17 +5,23 @@
         <button type="button" class="z-20 add-icon" v-on:click="addToOwned($event)">
           <fa :icon="['fa', 'plus']"  />
         </button>
-        <!-- <button type="button" class="z-20 add-icon" v-on:click="removeFromOwned($event)">
+        <button type="button" v-if="user" class="z-20 add-icon" v-on:click="removeFromOwned($event)">
           <fa :icon="['fa', 'minus']"  />
-        </button> -->
+        </button>
       </div>
       <h3>{{ game.name }}</h3>
     </article>
 </template>
 
 <script>
+import { mapGetters } from 'vuex'
 
 export default {
+  computed: {
+    ...mapGetters({
+      user: 'users/getUser',
+    })
+  },
   props: [
     'game'
   ],

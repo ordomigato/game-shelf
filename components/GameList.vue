@@ -15,8 +15,18 @@
 
 <script>
 import GameTile from '~/components/GameTile.vue'
+import { mapGetters } from 'vuex'
 
 export default {
+  mounted() {
+    let user = this.$store.getters['users/getUser']
+    if (user) {
+      let loadedGames = this.games
+      let ownedGamesArray = this.$store.getters['users/getOwnedGames']
+      console.log(loadedGames)
+      console.log(ownedGamesArray)
+    }
+  },
   data() {
     return {
       swiperOption: {
@@ -30,10 +40,6 @@ export default {
         }
       }
     }
-  },
-  mounted() {
-    console.log('Current Swiper instance object', this.mySwiper)
-    // this.mySwiper.slideTo(3, 1000, false)
   },
   components: {
     GameTile

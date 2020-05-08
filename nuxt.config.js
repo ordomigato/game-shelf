@@ -66,7 +66,11 @@ export default {
           measurementId: "G-CCCTVVRWFM"
         },
         services: {
-          auth: true,
+          auth: {
+            initialize: {
+              onAuthStateChangedAction: 'users/onAuthStateChangedAction'
+            },
+          },
           firestore: true,
         }
       }

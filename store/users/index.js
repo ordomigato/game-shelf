@@ -10,7 +10,7 @@ export const getters = {
     if(!state.user.owned_games) {
       return 0
     } else {
-      return state.user.owned_games.length
+      return state.user.owned_games
     }
   }
 }
@@ -18,7 +18,6 @@ export const getters = {
 export const mutations = {
   setUser (state, user) {
     state.user = user
-    // rootState.setLoginModalOpenState(false);
   },
   removeUser (state) {
     state.user = null
@@ -39,10 +38,9 @@ export const actions = {
       Cookie.set('access_token', token)
 
       // grab user info from firestore
-      this.$fireStore.collection('users').doc(uid).onSnapshot( snapshot => {
+      await this.$fireStore.collection('users').doc(uid).onSnapshot( snapshot => {
         let userInfo = snapshot.data()
         commit('setUser', userInfo )
-        console.log(user)
       })
     }catch(err) {
       console.log(err)

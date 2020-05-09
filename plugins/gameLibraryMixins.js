@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { EffectCoverflow } from 'swiper/js/swiper.esm'
 
 export default({ app }, inject) =>  {
-  inject('addGame', gameId => {
+  inject('addGame', (gameId, gameImageId) => {
     let userId = app.store.state.users.user.uid
     // add game reference to users owned_games array
     if(userId == null || userId == undefined) {
@@ -21,8 +22,10 @@ export default({ app }, inject) =>  {
           // add game data to firebase
           axios.get(`/games/${gameId}?fields=*`)
             .then(response => {
+              let data = response.data[0]
+              data.image_id = gameImageId
               gameRef.set(
-                response.data[0]
+                data
               )
             })
             .catch(err => {

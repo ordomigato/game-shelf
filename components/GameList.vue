@@ -23,7 +23,6 @@ export default {
         slidesPerView: 5,
         spaceBetween: 5,
         slidesPerGroup: 1,
-        loop: true,
         navigation: {
           nextEl: '.swiper-button-next',
           prevEl: '.swiper-button-prev'
@@ -49,7 +48,8 @@ export default {
 .swiper-button-prev {
 color: white;
 background-color: rgba(0, 0, 0, 0.80);
-padding: 4rem 2rem;
+width: 3rem;
+padding: 4rem 0;
 transform: translateY(-50%);
 font-size: 2rem;
 }

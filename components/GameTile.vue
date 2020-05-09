@@ -1,7 +1,7 @@
 <template>
     <article class="single-game" :data-game-id="game.id">
       <div class="cover-container">
-        <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${game.cover.image_id}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
+        <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${game.cover.image_id || game.image_id}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
         <button type="button" class="z-20 add-icon" v-on:click="addToOwned($event)">
           <fa :icon="['fa', 'plus']"  />
         </button>
@@ -20,6 +20,7 @@ export default {
   computed: {
     // Check if game is owned
     isOwned: function () {
+      if (!this.user) return
       let ownedGames = this.$store.state.users.user.owned_games
       if (!ownedGames) {
         return false
@@ -38,14 +39,17 @@ export default {
   ],
   methods: {
     async addToOwned($event) {
-      // grab game id
-      let gameId = await event.currentTarget.parentElement.parentElement.getAttribute('data-game-id')
+      if (!this.user) return
+      // grab game id and image id
+      let gameId = this.game.id.toString()
+      let gameImageId = this.game.cover.image_id
       // add game to firestore (using gameLibraryMixins.js custom plugin)
-      this.$addGame(gameId)
+      this.$addGame(gameId, gameImageId)
     },
     async removeFromOwned($event) {
+      if (!this.user) return
       // grab game id
-      let gameId = await event.currentTarget.parentElement.parentElement.getAttribute('data-game-id')
+      let gameId = this.game.id.toString()
       // remove game from firestore
       this.$removeGame(gameId)
     }

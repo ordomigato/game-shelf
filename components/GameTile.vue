@@ -30,6 +30,7 @@ export default {
     },
     ...mapGetters({
       user: 'users/getUser',
+      ownedGames: 'users/ownedGames'
     }),
   },
   props: [
@@ -42,9 +43,12 @@ export default {
       // add game to firestore (using gameLibraryMixins.js custom plugin)
       this.$addGame(gameId)
     },
-    // removeFromOwned($event) {
-
-    // }
+    async removeFromOwned($event) {
+      // grab game id
+      let gameId = await event.currentTarget.parentElement.parentElement.getAttribute('data-game-id')
+      // remove game from firestore
+      this.$removeGame(gameId)
+    }
   }
 }
 </script>

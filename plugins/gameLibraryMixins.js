@@ -30,5 +30,21 @@ export default({ app }, inject) =>  {
             })
         }
       })
+  }),
+  inject('removeGame', gameId => {
+    let userId = app.store.state.users.user.uid
+    // remove game reference from used owned_games array
+    if(userId == null || userId == undefined) {
+      console.log('user ID is not available')
+    }
+    app.$fireStore.collection('users').doc(userId).update({
+      owned_games: app.$fireStoreObj.FieldValue.arrayRemove(gameId)
+    })
+    // remove game from database
+    const gameRef = app.$fireStore.collection('games').doc(gameId)
+
+    gameRef.update({
+      owned_games: app.$fireStoreObj.FieldValue.arrayRemove(gameId)
+    })
   })
 }

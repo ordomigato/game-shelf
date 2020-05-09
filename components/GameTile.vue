@@ -1,11 +1,11 @@
 <template>
-    <article :data-game-id="game.id">
+    <article class="single-game" :data-game-id="game.id">
       <div class="cover-container">
         <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${game.cover.image_id}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
         <button type="button" class="z-20 add-icon" v-on:click="addToOwned($event)">
           <fa :icon="['fa', 'plus']"  />
         </button>
-        <button type="button" v-if="user" class="z-20 add-icon" v-on:click="removeFromOwned($event)">
+        <button type="button" v-if="isOwned" class="z-20 add-icon" v-on:click="removeFromOwned($event)">
           <fa :icon="['fa', 'minus']"  />
         </button>
       </div>
@@ -18,9 +18,19 @@ import { mapGetters } from 'vuex'
 
 export default {
   computed: {
+    // Check if game is owned
+    isOwned: function () {
+      let ownedGames = this.$store.state.users.user.owned_games
+      if (!ownedGames) {
+        return false
+      } else {
+        let answer = ownedGames.some(game => game == this.game.id)
+        return answer
+      }
+    },
     ...mapGetters({
       user: 'users/getUser',
-    })
+    }),
   },
   props: [
     'game'

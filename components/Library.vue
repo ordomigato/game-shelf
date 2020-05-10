@@ -2,13 +2,20 @@
   <section class="bg-gray-100 h-screen library-section">
     <div class="container">
       <div id="my-collection" class="py-8">
-        <h2 class="font-bold">My Collection</h2>
-        <div v-for="game in games">
-          <GameTile :game="game" />
+        <h2 class="font-bold pb-2">My Collection</h2>
+        <div class="flex flex-row flex-wrap">
+          <div v-for="game in games" :key="game.id" class="w-1/6 pr-2">
+            <GameTile :game="game" />
+          </div>
         </div>
       </div>
       <div id="my-wishlist" class="py-8">
-        <h2 class="font-bold">My Wishlist</h2>
+        <h2 class="font-bold pb-2">My Collection</h2>
+        <div class="flex flex-row flex-wrap">
+          <div v-for="game in games" :key="game.id" class="w-1/6 pr-2">
+            <GameTile :game="game" />
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -28,7 +35,7 @@ export default {
     GameTile,
   },
   mounted() {
-    // get owned games from user
+    // get owned games and wishlist from user
     let userRef = this.$fireStore.collection('users').doc(this.user.uid) 
     userRef.get().then(doc => {
       if(doc.exists) {

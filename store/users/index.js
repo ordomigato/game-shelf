@@ -7,6 +7,14 @@ export const state = () => ({
 export const getters = {
   getUser: state => state.user,
   getOwnedGames: state => state.user.owned_games ? state.user.owned_games : [],
+  getWishlist: state => state.user.wishlist ? state.user.wishlist : [],
+  getJoinedDate: state => {
+    const joinedDateObj = state.user.joined
+    if (!joinedDateObj) return
+    const monthsArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const joinedDate = `${monthsArray[joinedDateObj.month]} ${joinedDateObj.day}, ${joinedDateObj.year}`
+    return joinedDate
+  }
 }
 
 export const mutations = {
@@ -34,6 +42,7 @@ export const actions = {
   onAuthStateChangedAction({ commit }, { authUser }) {
     if (!authUser) {
       console.log('user is logged out')
+      commit('removeUser')
     } else {
       // Do something with the authUser and the claims object...
       console.log('user is logged in')

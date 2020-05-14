@@ -49,7 +49,14 @@ export default {
           return this.$fireStore.collection('users').doc(cred.user.uid).set({
             // add user to firestore
             uid: cred.user.uid,
-            email: cred.user.email
+            email: cred.user.email,
+            owned_games: [],
+            wishlist: [],
+            joined: {
+              year: new Date().getFullYear(),
+              month: new Date().getMonth(),
+              day: new Date().getDate(),
+            }
           })
         }).then(() => {
           // close the signup modal & reset form

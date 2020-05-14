@@ -1,7 +1,7 @@
 <template>
-    <article class="single-game" :data-game-id="game.id" :class="{'owned': isOwned}">
+    <article class="single-game" :data-game-id="this.gameId" :class="{'owned': isOwned}">
       <div class="cover-container">
-        <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${game.cover.image_id || game.image_id}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
+        <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
         <div class="button-container">
           <button type="button" v-if="!isOwned && isInWishlist" class="z-20 wishlist-remove-icon icon" v-on:click="removeFromWishlist($event)">
             <fa :icon="['fa', 'star']"  />
@@ -17,7 +17,7 @@
           </button>
         </div>
       </div>
-      <h3 class="game-name">{{ game.name }}</h3>
+      <h3 class="game-name">{{ this.gameName }}</h3>
     </article>
 </template>
 
@@ -26,6 +26,15 @@ import { mapGetters } from 'vuex'
 
 export default {
   computed: {
+    gameImageId: function () {
+      if (this.game.image_id) {
+        return  this.game.image_id
+      } else if (this.game.cover) {
+        return this.game.cover.image_id
+      } else {
+        return 'nocover_qhhlj6'
+      }
+    },
     // Check if game is owned
     isOwned: function () {
       if (!this.user) return
@@ -54,36 +63,28 @@ export default {
   props: [
     'game'
   ],
+  data() {
+    return {
+      gameId: this.game.id.toString(),
+      gameName: this.game.name,
+    }
+  },
   methods: {
     async addToOwned($event) {
       if (!this.user) return
-      // grab game id and image id
-      let gameId = this.game.id.toString()
-      let gameImageId = this.game.cover.image_id
-      // add game to firestore (using gameLibraryMixins.js custom plugin)
-      this.$addGame(gameId, gameImageId)
+      this.$addGame(this.gameId, this.gameImageId)
     },
     async removeFromOwned($event) {
       if (!this.user) return
-      // grab game id
-      let gameId = this.game.id.toString()
-      // remove game from firestore
-      this.$removeGame(gameId)
+      this.$removeGame(this.gameId)
     },
     async addToWishlist($event) {
       if (!this.user) return
-      // grab game id and image id
-      let gameId = this.game.id.toString()
-      let gameImageId = this.game.cover.image_id
-      // add game to firestore (using gameLibraryMixins.js custom plugin)
-      this.$addToWishlist(gameId, gameImageId)
+      this.$addToWishlist(this.gameId, this.gameImageId)
     },
     async removeFromWishlist($event) {
       if (!this.user) return
-      // grab game id
-      let gameId = this.game.id.toString()
-      // remove game from firestore
-      this.$removeFromWishlist(gameId)
+      this.$removeFromWishlist(this.gameId)
     },
   }
 }
@@ -101,8 +102,14 @@ export default {
     max-height: 250px;
     overflow: hidden;
     position: relative;
+    height: 100%;
+    &:hover > .button-container {
+      transform: translateX(0%);
+      transition: transform 0.2s ease-in;
+    }
     .game-tile_cover-image {
-      object-fit: contain;
+      min-height: 250px;
+      object-fit: cover;
       transition: transform .2s ease-out;
       &:hover {
         transform: scale(1.2);
@@ -113,6 +120,7 @@ export default {
       bottom: 0;
       right: 0;
       display: flex;
+      transform: translateX(100%);
       .icon {
         background-color: black;
         padding: 1rem;
@@ -142,11 +150,16 @@ export default {
           @apply bg-yellow-400
         }
       }
+      .wishlist-remove-icon {
+        &:hover, &:focus {
+          @apply bg-red-400
+        }
+      }
     }
   }
 }
 
-#my-collection {
+#library {
   .single-game {
     &.owned {
       .game-tile_cover-image {
@@ -157,6 +170,12 @@ export default {
     .cover-container {
       max-height: 200px;
     }
+  }
+}
+
+.search-results {
+  .single-game {
+    padding-right: 5px;
   }
 }
 </style>

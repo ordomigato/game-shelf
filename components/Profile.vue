@@ -7,8 +7,8 @@
           <div class="profile-image bg-gray-400"></div>
           <div class="profile-image_container px-8">
             <p>Games Owned: {{ ownedGames == undefined ? 0 : ownedGames.length }}</p>
-            <p>Wishlist:</p>
-            <p>Joined</p>
+            <p>Wishlist: {{ wishlist == undefined ? 0 : wishlist.length }}</p>
+            <p>Joined: {{ joined }}</p>
             <p>Recently Added</p>
           </div>
         </div>
@@ -29,6 +29,8 @@ export default {
   computed: {
     ...mapGetters({
       ownedGames: 'users/getOwnedGames',
+      wishlist: 'users/getWishlist',
+      joined: 'users/getJoinedDate'
     })
   }
 }

@@ -4,7 +4,12 @@ import cookieparser from 'cookieparser'
 export const state = () => ({
   showLoginModal: false,
   showSignupModal: false,
+  searchedGames: [],
 })
+
+export const getters = {
+  getSearchedGames: state => state.searchedGames ? state.searchedGames : [],
+}
 
 export const mutations = {
   setLoginModalOpenState (state, arg) {
@@ -13,6 +18,9 @@ export const mutations = {
   setSignupModalOpenState (state, arg) {
     state.showSignupModal = arg
   },
+  setSearchedGames (state, payload) {
+    state.searchedGames = payload
+  }
 }
 
 export const actions = {
@@ -34,5 +42,25 @@ export const actions = {
         email: decoded.email
       })
     }
+  },
+  async searchForGame({commit}, queryString) {
+    await this.$axios({
+      method: 'POST',
+      url: '/games/',
+      headers: {
+        "Accept": "application/json",
+      },
+      data: `
+        search: "${queryString}";
+        fields: name, cover.image_id;
+        limit: 20;
+      `
+    })
+    .then(res => {
+        commit('setSearchedGames', res.data)
+    })
+    .catch(err => {
+      console.error(err);
+    });
   }
 }

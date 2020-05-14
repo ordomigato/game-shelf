@@ -1,9 +1,11 @@
 <template>
-  <div>
+  <div id="main-page">
     <Nav />
+    <Hero />
     <div class="container">
       <main>
-        <GameList v-if="games.length > 0" :games="games" />
+        <GameList v-if="games.length > 0 && searchedGames.length == 0" :games="games" />
+        <GameResults v-if="searchedGames.length > 0" :games="searchedGames" />
       </main>
     </div>
   </div>
@@ -12,34 +14,54 @@
 <script lang="ts">
 import Vue from 'vue'
 import axios from 'axios'
-import * as firebase from 'firebase/app'
-import 'firebase/auth'
+import { mapGetters } from 'vuex'
+
 
 import Logo from '~/components/Logo.vue'
 import Nav from '~/components/Nav.vue'
+import Hero from '~/components/Hero.vue'
 import GameList from '~/components/GameList.vue'
+import GameResults from '~/components/GameResults.vue'
 
 export default Vue.extend({
   components: {
     Logo,
     Nav,
+    Hero,
     GameList,
+    GameResults,
   },
   data() {
     return {
       games: []
     }
   },
-  // Get Popular Game Data
-  asyncData () {
-    return axios.get(`https://api-v3.igdb.com/games/?fields=name,cover.image_id,popularity&order=popularity:desc`)
-      .then((res) => {
-        return { games: res.data }
-      })
-      .catch((err) => {
-        console.log(err);
-      })
+  computed: {
+    ...mapGetters({
+      searchedGames: 'getSearchedGames'
+    })
   },
+  // Get Popular Game Data
+  // asyncData () {
+  //   return axios({
+  //     method: 'get',
+  //     url: 'https://api-v3.igdb.com/games/',
+  //     headers: {
+  //       "Accept": "application/json",
+  //     },
+  //     data: `
+  //       search: "zelda";
+  //       fields: name, cover.image_id;
+  //       limit: 10;
+  //     `
+  //   })
+  //   .then(res => {
+  //     return { games: res.data }
+  //   })
+  //   .catch(err => {
+  //     console.error(err);
+  //   });
+  // },
 })
 </script>
 

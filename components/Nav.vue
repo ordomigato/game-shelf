@@ -1,17 +1,24 @@
 <template>
-    <div class="bg-gray-500 bg-primary">
+    <div class="nav-container bg-primary fixed w-full">
         <div class="container">
             <nav class="flex flex-1 text-white">
                 <div class="flex items-center w-1/2">
-                    <Logo />
                     <nuxt-link to="/"><strong>Game</strong>Shelf</nuxt-link>
                 </div>
                 <div class="w-1/2 flex items-center justify-end">
                     <ul class="flex">
-                        <nuxt-link to="/library" v-if="user != null" class="nav-btn my-library-btn">My Library</nuxt-link>
+                        <nuxt-link to="/library" v-if="user != null" class="nav-btn my-library-btn">My Library <fa class="ml-2" :icon="['fa', 'book']"  /></nuxt-link>
                         <li class="nav-btn" v-if="user == null"><button @click="setLoginModalOpenState(true)">Login</button></li>
                         <li class="nav-btn" v-if="user == null"><button @click="setSignupModalOpenState(true)">Signup</button></li>
-                        <li class="nav-btn" v-if="user != null"><button @click="signout">Logout</button></li>
+                        <li class="nav-btn user-dropdown" v-if="user != null">
+                          {{ user.email }}
+                          <fa class="ml-1 caret" :icon="['fa', 'caret-down']" />
+                          <fa class="ml-2" :icon="['fa', 'user-circle']" />
+                          <ul class="user-dropdown-sub-1">
+                            <li>Account Settings</li>
+                            <li><button @click="signout">Logout</button></li>
+                          </ul>
+                        </li>
                     </ul>
                 </div>
             </nav>
@@ -23,7 +30,6 @@
 
 <script>
 import { mapGetters } from 'vuex'
-import Logo from '~/components/Logo.vue'
 import Cookie from 'js-cookie'
 
 import LoginModal from '~/components/LoginModal.vue'
@@ -31,7 +37,6 @@ import SignupModal from '~/components/SignupModal.vue'
 
 export default ({
   components: {
-    Logo,
     LoginModal,
     SignupModal,
   },
@@ -50,7 +55,6 @@ export default ({
     async signout() {
       await this.$fireAuth.signOut()
       await Cookie.remove('access_token')
-      this.$store.commit('users/removeUser')
 
       // hard refresh
       location.href = '/';
@@ -59,11 +63,11 @@ export default ({
 })
 </script>
 
-<style scoped>
-.NuxtLogo {
-    height: 2rem;
-    width: 2rem;
-    margin: 0 1rem 0 0;
+<style lang="scss" scoped>
+#main-page {
+  .nav-container {
+    background-color: rgba(255, 255, 255, 0);
+  }
 }
 
 .nav-btn {
@@ -73,5 +77,30 @@ export default ({
 .my-library-btn {
     background-color: var(--secondary-color);
     height: 100%;
+}
+
+.user-dropdown {
+  position: relative;
+  &:hover {
+    .caret {
+      opacity: 1;
+    }
+    .user-dropdown-sub-1 {
+      visibility: visible;
+    }
+  }
+  .caret {
+    opacity: 0.5;
+  }
+  .user-dropdown-sub-1 {
+    @apply shadow-md;
+    visibility: hidden;
+    background-color: white;
+    color: black;
+    padding: 1rem 2rem;
+    position: absolute;
+    width: 100%;
+    left: 0px;
+  }
 }
 </style>>

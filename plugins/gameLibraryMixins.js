@@ -9,7 +9,9 @@ export default({ app }, inject) =>  {
       console.log('user ID is not available')
     }
     app.$fireStore.collection('users').doc(userId).update({
-      owned_games: 	app.$fireStoreObj.FieldValue.arrayUnion(gameId)
+      owned_games: app.$fireStoreObj.FieldValue.arrayUnion(gameId),
+      // remove game from wishlist if there
+      wishlist: app.$fireStoreObj.FieldValue.arrayRemove(gameId)
     })
     // check if game exists in database already
     const gameRef = app.$fireStore.collection('games').doc(gameId)

@@ -5,19 +5,14 @@
       </transition>
       <transition name="slide-fade">
         <div class="login-modal self-center" v-if="isOpen">
-          <p>Login Modal</p>
+          <ul id="login-error-message" class="text-red-400"></ul>
+          <h4 class="text-lg mb-4 text-center">Login</h4>
           <form class="flex flex-col" @submit.prevent="login">
-            <label> Email:
-              <input type="text" placeholder="Enter email" name="email" v-model="user.email" />
-            </label>
-            <label> Password:
-              <input type="text" placeholder="Enter password" name="password" v-model="user.password" />
-            </label>
-            <button type="submit">Login</button>
-            <label>
-              <input type="checkbox" checked="checked" name="remember"> Remember me </input>
-            </label>
+            <input type="text" placeholder="Enter email" name="email" v-model="user.email" />
+            <input type="password" placeholder="Enter password" name="password" v-model="user.password" />
+            <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Login</button>
           </form>
+          <p class="text-center mt-2">Don't have an account? <button class="text-blue-400" @click="setSignupModalOpenState(true);setLoginModalOpenState(false)">Signup here</button class="text-blue-400"></p>
         </div>
       </transition>
     </section>
@@ -42,8 +37,11 @@ export default {
     }
   },
   methods: {
-    setLoginModalOpenState (arg) {
+    setLoginModalOpenState: function (arg) {
       this.$store.commit('setLoginModalOpenState', arg)
+    },
+    setSignupModalOpenState: function (arg) {
+      this.$store.commit('setSignupModalOpenState', arg)
     },
     async login() {
       // log the user in and set basic data

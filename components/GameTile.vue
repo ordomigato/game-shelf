@@ -176,6 +176,7 @@ export default {
 .search-results {
   .single-game {
     padding-right: 5px;
+    margin-bottom: 2rem;
   }
 }
 </style>

@@ -1,8 +1,8 @@
 <template>
   <div id="hero" v-bind:style="{ backgroundImage: 'url(' + heroImage + ')' }" >
     <div class="container h-full">
-      <div class="flex items-center h-full justify-center flex-col hero-inner-container">
-        <h2 class="text-white pb-2 font-bold text-4xl">Catalogy Your Video Game Collection</h2>
+      <div class="flex items-center h-full justify-center flex-col hero-inner-container px-4">
+        <h2 class="text-white pb-2 font-bold text-4xl shadow-md">Catalog Your Video Game Collection</h2>
         <SearchBar />
       </div>
     </div>

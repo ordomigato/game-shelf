@@ -4,3 +4,11 @@
     --secondary-color: #76BDF2;
     --off-white-color: #F8F8F8;
 }
+
+.nav-padding {
+    padding-top: 40px;
+}
+
+input {
+    @apply border border-gray-300 p-2 mb-2;
+}

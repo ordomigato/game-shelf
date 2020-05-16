@@ -1,14 +1,14 @@
 <template>
-  <main>
+  <div>
     <Nav />
-    <Profile />
-    <Library />
-  </main>
+    <main class="nav-padding">
+      <Profile />
+      <Library />
+    </main>
+  </div>
 </template>
 
 <script>
-import * as firebase from 'firebase/app'
-import 'firebase/auth'
 
 import Nav from '~/components/Nav.vue'
 import Profile from '~/components/Profile.vue'
@@ -22,3 +22,6 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+</style>

@@ -11,20 +11,20 @@
             <input type="text" placeholder="Change First Name" name="first-name" v-model="userInfo.firstName" />
             <input type="text" placeholder="Change Last Name" name="last-name" v-model="userInfo.lastName" />
           </div>
-          <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Submit</button>
+          <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Save Info</button>
         </form>
         <form class="account-info-form flex flex-col pt-2 w-full" @submit.prevent="changeUserEmail">
           <label class="pb-2">Change email:</label>
           <input type="text" placeholder="Enter email" name="email" v-model="userInfo.email" />
           <input type="password" placeholder="Enter current password" name="current-password" v-model="userInfo.currentPassword" />
-          <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Submit</button>
+          <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Submit Email Change</button>
         </form>
         <form class="account-info-form flex flex-col pt-2 w-full" @submit.prevent="changePassword" autocomplete="off">
           <label class="pb-2">Change password:</label>
           <input type="password" placeholder="Enter old password" name="old-password" v-model="userInfo.oldPassword" />
           <input type="password" placeholder="Enter new password" name="new-password" v-model="userInfo.password" />
           <input type="password" placeholder="Confirm new password" name="confirm-password" v-model="userInfo.passwordConfirm" />
-          <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Submit</button>
+          <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Submit Password Change</button>
         </form>
       </div>
     </main>
@@ -51,6 +51,29 @@ export default {
     }
   },
   methods: {
+    changeUserInfo: function() {
+      let currentUser = this.$fireAuth.currentUser
+      let newFirstName = () => {
+        if (this.userInfo.firstName === '') {
+          let firstName = this.user.first_name || ''
+          return firstName
+        } else {
+          return this.userInfo.firstName
+        }
+      }
+      let newLastName = () => {
+        if (this.userInfo.lastName === '') {
+          let lastName = this.user.last_name || ''
+          return lastName
+        } else {
+          return this.userInfo.lastName
+        }
+      }
+      this.$fireStore.collection('users').doc(currentUser.uid).update({
+        first_name: newFirstName(),
+        last_name: newLastName()
+      })
+    },
     reauthenticate: function(oldPassword) {
       let currentUser = this.$fireAuth.currentUser
       let cred = this.$fireAuthObj.EmailAuthProvider.credential(currentUser.email, oldPassword)

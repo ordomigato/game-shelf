@@ -16,7 +16,15 @@ export default {
   },
   methods: {
     search() {
-      this.$store.dispatch('searchForGame', this.searchQuery)
+      this.$store.commit('clearSearchQuery')
+      this.$store.dispatch('searchForGame', this.searchQuery).then(() => {
+        // handle if search query yields no results
+        let searchedGames = this.$store.getters.getSearchedGames
+        if (searchedGames.length === 0) {
+          let noResultsContainer = document.getElementById('no-results-container')
+          noResultsContainer.innerHTML = '<p class="text-xl font-medium pt-2">No results found =(</p><p>Try changing your search words</p>'
+        }
+      })
     },
   }
 }

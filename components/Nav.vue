@@ -64,9 +64,9 @@ export default ({
       this.$store.commit('setSignupModalOpenState', arg)
     },
     async signout() {
+      this.$router.push('/')
       await this.$fireAuth.signOut()
       await Cookie.remove('access_token')
-
       // hard refresh
       location.href = '/';
     },

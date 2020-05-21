@@ -52,7 +52,6 @@ export const actions = {
       url: '/games/',
       headers: {
         "Accept": "application/json",
-        "user-key": "df195682f272ee43531846b7dc35ef44",
       },
       data: `
         search: "${queryString}";

@@ -70,22 +70,28 @@ export default {
     }
   },
   methods: {
-    async addToOwned($event) {
-      if (!this.user) return
+    async addToOwned() {
+      if (this.isLoggedIn() === false) return
       this.$addGame(this.gameId, this.gameImageId)
     },
     async removeFromOwned($event) {
-      if (!this.user) return
+      if (this.isLoggedIn() === false) return
       this.$removeGame(this.gameId)
     },
     async addToWishlist($event) {
-      if (!this.user) return
+      if (this.isLoggedIn() === false) return
       this.$addToWishlist(this.gameId, this.gameImageId)
     },
     async removeFromWishlist($event) {
-      if (!this.user) return
+      if (this.isLoggedIn() === false) return
       this.$removeFromWishlist(this.gameId)
     },
+    isLoggedIn() {
+      if(!this. user) {
+        this.$store.commit('setLoginModalOpenState', true)
+        return false
+      }
+    }
   }
 }
 </script>
@@ -176,6 +182,13 @@ export default {
 .search-results {
   .single-game {
     padding-right: 5px;
+    margin-bottom: 2rem;
+  }
+}
+
+.library_games, .wishlist_games {
+  .single-game {
+    padding-right: 3px;
     margin-bottom: 2rem;
   }
 }

@@ -55,7 +55,7 @@ export default {
 <style scoped>
 
 .overlay {
-  @apply absolute inset-0 z-40;
+  @apply fixed inset-0 z-40;
   background-color: #2d3748;
   opacity: 0.75;
 }

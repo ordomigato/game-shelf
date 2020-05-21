@@ -107,7 +107,7 @@ export default {
 
 <style lang="scss" scoped>
 .overlay {
-  @apply absolute w-full h-full inset-0 z-40;
+  @apply fixed inset-0 z-40;
   background-color: #2d3748;
   opacity: 0.75;
 }

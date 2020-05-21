@@ -13,6 +13,12 @@
           </div>
           <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Save Info</button>
         </form>
+        <form enctype="multipart/form-data" class="flex flex-col pt-2 w-full">
+          <label class="pb-2">Profile Image:</label>
+          <img :src="user.profile_pic" class="profile-picture">
+          <input type="file" id="profile-image-upload" accept="image/*">
+          <button type="button" class="bg-secondary text-white p-2 focus:outline-none" @click="upload">Upload Image</button>
+        </form>
         <form class="account-info-form flex flex-col pt-2 w-full" @submit.prevent="changeUserEmail">
           <label class="pb-2">Change email:</label>
           <input type="text" placeholder="Enter email" name="email" v-model="userInfo.email" />
@@ -127,6 +133,55 @@ export default {
         messageContainer.innerHTML = `<li class="text-sm">${err}</li>`
       })
     },
+    upload: function() {
+      let currentUser = this.$fireAuth.currentUser
+      let userRef = this.$fireStore.collection('users').doc(currentUser.uid)
+      let image = document.getElementById('profile-image-upload').files[0]
+      var metadata = {
+        contentType: 'image/jpeg'
+      };
+      // firebase storage reference
+      let storageRef = this.$fireStorage.ref('profile/'+currentUser.uid)
+      // Upload file
+      let uploadTask = storageRef.put(image, metadata)
+
+      // Listen for state changes, errors, and completion of the upload
+      uploadTask.on(this.$fireStorageObj.TaskEvent.STATE_CHANGED, snapshot => {
+        // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
+        let progress  = (snapshot.byteTransferred / snapshot.totalBytes) * 100
+        console.log('Upload is ' + progress + '% done')
+        switch (snapshot.state) {
+          case this.$fireStorageObj.TaskState.PAUSED:
+            console.log('Upload is paused')
+            break
+          case this.$fireStorageObj.TaskState.RUNNING:
+            console.log('Upload is running')
+            break
+        }
+      }, error => {
+        switch (error.code) {
+          case 'storage/unauthorized':
+            // User doesn't have permission to access the object
+            break;
+
+          case 'storage/canceled':
+            // User canceled the upload
+            break;
+
+          case 'storage/unknown':
+            // Unknown error occurred, inspect error.serverResponse
+            break;
+        }
+      }, function() {
+        // Upload completed successfully, now we can get the download URL
+        uploadTask.snapshot.ref.getDownloadURL().then(downloadURL => {
+          userRef.update({
+            profile_pic: downloadURL
+          })
+          console.log('upload is complete')
+        });
+      });
+    },
     resetFields: function() {
       this.userInfo.firstName = ''
       this.userInfo.lastName = ''
@@ -136,6 +191,7 @@ export default {
       this.userInfo.password = ''
       this.userInfo.passwordConfirm = ''
     }
+    
   },
   components: {
     Nav,
@@ -150,10 +206,16 @@ export default {
 
 <style lang="scss" scoped>
 .account-settings-page {
+  .profile-picture {
+    width: 300px;
+    height: 300px;
+    object-fit: cover;
+  }
   input {
     @apply border border-gray-300 p-2 mb-2;
   }
   input, button {
+    width: 100%;
     max-width: 300px;
   }
 }

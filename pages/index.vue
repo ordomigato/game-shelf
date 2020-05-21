@@ -2,7 +2,7 @@
   <div id="main-page">
     <Nav />
     <Hero />
-    <div class="container">
+    <div class="container mx-4">
       <main>
         <GameList v-if="games.length > 0 && searchedGames.length == 0" :games="games" />
         <GameResults v-if="searchedGames.length > 0" :games="searchedGames" />

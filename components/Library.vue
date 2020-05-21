@@ -49,7 +49,7 @@ export default {
         // sort if game is owned or in wishlist
         games.forEach(game => {
           let isOwned = owned_games.some(owned_game => owned_game == game.data().id)
-          isOwned ? this.$store.commit('users/setOwnedGames', game.data()) : this.$store.commit('users/setWishlist', game.data())
+          isOwned ? this.owned.push(game.data()) : this.wishlist.push(game.data())
         })
       })
     }

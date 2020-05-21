@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 export default {
   mode: 'universal',
   /*
@@ -52,7 +54,7 @@ export default {
    ** Nuxt.js modules
    */
   modules: [
-    // Doc: https://axios.nuxtjs.org/usage
+    '@nuxtjs/dotenv',
     ['@nuxtjs/firebase',
       {
         config: {

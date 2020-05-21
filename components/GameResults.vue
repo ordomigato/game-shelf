@@ -1,5 +1,5 @@
 <template>
-  <section class="mx-4">
+  <section>
     <h2 class="text-xl font-medium pt-2">Search Results</h2>
     <p class="pb-2">Displaying {{games.length}} matches</p>
     <div class="search-results flex flex-wrap">

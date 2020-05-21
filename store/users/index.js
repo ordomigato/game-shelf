@@ -6,6 +6,7 @@ export const state = () => ({
 
 export const getters = {
   getUser: state => state.user,
+  getBio: state => state.user.bio ? state.user.bio : '',
   getOwnedGames: state => state.user.owned_games ? state.user.owned_games : [],
   getWishlist: state => state.user.wishlist ? state.user.wishlist : [],
   getJoinedDate: state => {

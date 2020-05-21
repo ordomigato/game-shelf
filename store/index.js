@@ -52,6 +52,7 @@ export const actions = {
       url: '/games/',
       headers: {
         "Accept": "application/json",
+        "user-key": process.env.gameAppId,
       },
       data: `
         search: "${queryString}";

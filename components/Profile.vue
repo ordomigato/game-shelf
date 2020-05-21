@@ -1,9 +1,9 @@
 <template>
-  <section class="pt-4 pb-8">
+  <section class="pt-4 pb-8 mx-4">
     <div class="container">
       <h2 class="font-bold pb-4">My Profile</h2>
       <div class="flex flex-col md:flex-row">
-        <div class="w-full md:w-2/3 flex">
+        <div class="w-full md:w-2/3 lg:w-1/2 flex">
           <div class="profile-image_container">
             <img :src="user.profile_pic">
           </div>
@@ -13,8 +13,11 @@
             <p>Joined: {{ joined }}</p>
           </div>
         </div>
-        <div class="">
-          <h3>My brief bio</h3>
+        <div class="w-full md:w-1/3 lg:w-1/2">
+          <h3 class="font-bold pb-2">Bio</h3>
+          <div id="update-bio_error-container"></div>
+          <textarea @change="editingHandler" @click="editProfileBio" id="profile-bio" rows="5" class="w-full" v-model="editBio" placeholder="Tell us about yourself <(^_^)>" readonly>{{bio}}</textarea>
+          <button id="update-bio-button" @click="submitBio" class="bg-secondary mt-2 text-white py-2 px-4 opacity-50 focus:outline-none cursor-default" type="button">Change Bio</button>
           <div class="favourite-games">
           </div>
         </div>
@@ -27,13 +30,58 @@
 import { mapGetters } from 'vuex'
 
 export default {
+  data() {
+    return {
+      editBio: '',
+    }
+  },
   computed: {
     ...mapGetters({
       user: 'users/getUser',
+      bio: 'users/getBio',
       ownedGames: 'users/getOwnedGames',
       wishlist: 'users/getWishlist',
       joined: 'users/getJoinedDate'
     })
+  },
+  methods: {
+    editingHandler: function() {
+      // change css of button and textarea
+      let textarea = document.getElementById('profile-bio')
+      let focused = document.hasFocus(textarea)
+      let button = document.getElementById('update-bio-button')
+      if(this.editBio !== this.bio) {
+        button.classList.remove("opacity-50","cursor-default")
+      } else {
+        button.classList.add("opacity-50","cursor-default")
+      }
+      if(this.focused = false) textarea.addAttribute('readonly')
+    },
+    editProfileBio: function() {
+      let textarea = document.getElementById('profile-bio')
+      textarea.removeAttribute('readonly')
+    },
+    submitBio: function() {
+      const errorContainer = document.getElementById('update-bio_error-container')
+      errorContainer.innerHTML = ''
+      // Check if bio is different
+      if (this.bio === this.editBio) return
+      if (this.editBio.length > 200) {
+        errorContainer.innerHTML = `<p class="text-red-400">Warning: ${this.editBio.length} characters - Bio must be under 200 characters</p>`
+        return
+      }
+      // submit new bio
+      this.$fireStore.collection('users').doc(this.user.uid).update({
+        bio: this.editBio
+      })
+      .then(() => {
+        let textarea = document.getElementById('profile-bio')
+        textarea.readOnly = true
+      })
+      .catch(err => {
+        errorContainer.innerHTML = `<p class="text-red-400">${err}</p>`
+      })
+    }
   }
 }
 </script>
@@ -44,6 +92,24 @@ export default {
           height: 260px;
     width: 260px;
           object-fit: cover;
+    }
+  }
+
+  #profile-bio {
+    @apply shadow-md px-4 py-2;
+    transition: padding 0.2s ease-in;
+    resize: none;
+    outline: none;
+    &:focus {
+      border-left: 4px solid var(--secondary-color);
+      transition: all 0.1s ease-out
+    }
+    &[readonly] {
+      @apply shadow-none p-0;
+      &:hover {
+        @apply shadow-md px-4 py-2;
+        cursor: pointer;
+      }
     }
   }
 </style>

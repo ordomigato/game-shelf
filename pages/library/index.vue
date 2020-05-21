@@ -3,12 +3,13 @@
     <Nav />
     <main class="nav-padding">
       <Profile />
-      <Library />
+      <Library v-if="user.joined" /> <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
     </main>
   </div>
 </template>
 
 <script>
+import { mapGetters } from 'vuex'
 
 import Nav from '~/components/Nav.vue'
 import Profile from '~/components/Profile.vue'
@@ -19,6 +20,11 @@ export default {
     Nav,
     Profile,
     Library
+  },
+  computed: {
+    ...mapGetters({
+      user: 'users/getUser',
+    })
   },
 }
 </script>

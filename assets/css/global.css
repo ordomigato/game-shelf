@@ -12,3 +12,8 @@
 input {
     @apply border border-gray-300 p-2 mb-2;
 }
+
+.edit-icon:hover {
+    color: var(--secondary-color);
+    cursor: pointer;
+}

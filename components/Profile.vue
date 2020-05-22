@@ -13,11 +13,15 @@
             <p>Joined: {{ joined }}</p>
           </div>
         </div>
-        <div class="w-full md:w-1/3 lg:w-1/2">
-          <h3 class="font-bold pb-2">Bio</h3>
+        <div id="bio" class="w-full md:w-1/3 lg:w-1/2 pt-4 md:pt-0">
+          <h3 class="font-bold pb-2 pr-1 inline-block">Bio</h3>
+          <div class="inline-block" id="update-bio-icon">
+            <fa v-if="!currentlyEditing" :icon="['fa', 'edit']" @click="editProfileBio" class="edit-icon" />
+            <fa v-if="currentlyEditing" :icon="['fas', 'times']" @click="stopEditProfileBio" class="stop-icon" />
+          </div>
           <div id="update-bio_error-container"></div>
-          <textarea @change="editingHandler" @click="editProfileBio" id="profile-bio" rows="5" class="w-full" v-model="editBio" placeholder="Tell us about yourself <(^_^)>" readonly>{{bio}}</textarea>
-          <button id="update-bio-button" @click="submitBio" class="bg-secondary mt-2 text-white py-2 px-4 opacity-50 focus:outline-none cursor-default" type="button">Change Bio</button>
+          <textarea @change="editingHandler" id="profile-bio" rows="5" class="w-full" v-model="editBio" placeholder="Tell us about yourself <(^_^)>" readonly></textarea>
+          <button v-if="currentlyEditing" id="update-bio-button" @click="submitBio" class="bg-secondary mt-2 text-white py-2 px-4 opacity-50 focus:outline-none cursor-default" type="button" disabled>Change Bio</button>
           <div class="favourite-games">
           </div>
         </div>
@@ -33,7 +37,11 @@ export default {
   data() {
     return {
       editBio: '',
+      currentlyEditing: false,
     }
+  },
+  mounted() {
+    this.editBio = this.bio
   },
   computed: {
     ...mapGetters({
@@ -48,18 +56,26 @@ export default {
     editingHandler: function() {
       // change css of button and textarea
       let textarea = document.getElementById('profile-bio')
-      let focused = document.hasFocus(textarea)
       let button = document.getElementById('update-bio-button')
       if(this.editBio !== this.bio) {
         button.classList.remove("opacity-50","cursor-default")
+        button.disabled = false
       } else {
         button.classList.add("opacity-50","cursor-default")
+        button.disabled = true
       }
-      if(this.focused = false) textarea.addAttribute('readonly')
     },
     editProfileBio: function() {
       let textarea = document.getElementById('profile-bio')
-      textarea.removeAttribute('readonly')
+      let button = document.getElementById('update-bio-button')
+      textarea.readOnly = false
+      textarea.focus()
+      this.currentlyEditing = true
+    },
+    stopEditProfileBio: function() {
+      let textarea = document.getElementById('profile-bio')
+      textarea.readOnly = true
+      this.currentlyEditing = false
     },
     submitBio: function() {
       const errorContainer = document.getElementById('update-bio_error-container')
@@ -87,14 +103,15 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  .profile-image_container {
-    img {
-          height: 260px;
+.profile-image_container {
+  img {
+    height: 260px;
     width: 260px;
-          object-fit: cover;
+    object-fit: cover;
     }
   }
 
+#bio {
   #profile-bio {
     @apply shadow-md px-4 py-2;
     transition: padding 0.2s ease-in;
@@ -104,12 +121,18 @@ export default {
       border-left: 4px solid var(--secondary-color);
       transition: all 0.1s ease-out
     }
+    &:hover {
+      @apply shadow-md px-4 py-2;
+      cursor: text;
+    }
     &[readonly] {
       @apply shadow-none p-0;
-      &:hover {
-        @apply shadow-md px-4 py-2;
-        cursor: pointer;
+      cursor: default;
+      &:focus {
+        border-left: 0px;
+        transition: all 0.1s ease-out
       }
     }
   }
+}
 </style>

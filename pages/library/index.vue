@@ -2,7 +2,7 @@
   <div>
     <Nav />
     <main class="nav-padding">
-      <Profile />
+      <Profile v-if="user.bio" />
       <Library v-if="user.joined" /> <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
     </main>
   </div>

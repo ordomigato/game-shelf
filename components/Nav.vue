@@ -9,8 +9,8 @@
           <div class="w-2/3 sm:w-1/2 flex items-center justify-end">
             <ul class="flex">
               <nuxt-link to="/library" v-if="user != null" class="nav-btn my-library-btn">My Library <fa class="ml-2" :icon="['fa', 'book']"  /></nuxt-link>
-              <li v-if="user == null"><button class="nav-btn" @click="setLoginModalOpenState(true)">Login</button></li>
-              <li class="signup" v-if="user == null"><button class="nav-btn" @click="setSignupModalOpenState(true)">Signup</button></li>
+              <li v-if="user == null"><button class="nav-btn login-btn" @click="setLoginModalOpenState(true)">Login</button></li>
+              <li class="signup" v-if="user == null"><button class="nav-btn signup-btn" @click="setSignupModalOpenState(true)">Signup</button></li>
               <li class="nav-btn user-dropdown" v-if="user != null">
                 {{ user.first_name || user.email }}
                 <fa class="ml-1 caret" :icon="['fa', 'caret-down']" />
@@ -82,6 +82,7 @@ export default ({
   .nav-container {
     background-color: rgba(255, 255, 255, 0);
     &.change_color {
+      @apply shadow-md;
       background-color: var(--main-color);
       transition: background-color 0.2s ease-out
     }
@@ -90,10 +91,24 @@ export default ({
 
 .nav-btn {
     @apply py-2 px-4;
+    &.login-btn {
+      &:hover, &:focus {
+        background-color: var(--secondary-color);
+        transition: background-color 0.2s ease-out;
+        outline: none;
+      }
+    }
+    &.signup-btn {
+      &:hover, &:focus {
+        background-color: var(--secondary-color);
+        transition: background-color 0.2s ease-out;
+        outline: none;
+      }
+    }
 }
 
 .my-library-btn, .signup {
-    background-color: var(--secondary-color);
+    background-color: var(--main-color);
     height: 100%;
 }
 

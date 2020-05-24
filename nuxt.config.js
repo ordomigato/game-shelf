@@ -54,6 +54,7 @@ export default {
    ** Nuxt.js modules
    */
   modules: [
+    'nuxt-lazy-load',
     '@nuxtjs/dotenv',
     ['@nuxtjs/firebase',
       {

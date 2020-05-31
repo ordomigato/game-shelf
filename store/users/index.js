@@ -1,5 +1,3 @@
-import Cookie from 'js-cookie'
-
 export const state = () => ({
   user: null,
   ownedGamesObjArray: [],
@@ -38,25 +36,22 @@ export const mutations = {
 }
 
 export const actions = {
-  async login({}, user ) {
-    try {
-      // login the user
-      await this.$fireAuth.signInWithEmailAndPassword(user.email, user.password)
-      // Get JWT from firebase
-      const token = await this.$fireAuth.currentUser.getIdToken()
-      // Set JWT to the token
-      Cookie.set('access_token', token)
-    }catch(err) {
-      console.log(err)
-    }
+  login({}, user ) {
+    return new Promise((resolve, reject) => {
+      this.$fireAuth.signInWithEmailAndPassword(user.email, user.password).then(() => {
+        resolve('Succesfully logged in!')
+      }).catch(err => {
+        reject(err)
+      })
+    })
   },
   onAuthStateChangedAction({ commit }, { authUser }) {
     if (!authUser) {
-      console.log('user is logged out')
+      console.log('user is logged out', authUser)
       commit('removeUser')
     } else {
       // Do something with the authUser and the claims object...
-      console.log('user is logged in')
+      console.log('user is logged in', authUser.uid)
       this.$fireStore.collection('users').doc(authUser.uid).onSnapshot( snapshot => {
         let userInfo = snapshot.data()
         commit('setUser', userInfo)

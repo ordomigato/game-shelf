@@ -1,6 +1,3 @@
-import JWTDecode from 'jwt-decode'
-import cookieparser from 'cookieparser'
-
 export const state = () => ({
   showLoginModal: false,
   showSignupModal: false,
@@ -14,9 +11,15 @@ export const getters = {
 export const mutations = {
   setLoginModalOpenState (state, arg) {
     state.showLoginModal = arg
+    if (state.showSignupModal === true) {
+      state.showSignupModal = false
+    }
   },
   setSignupModalOpenState (state, arg) {
-    state.showSignupModal = arg
+    state.showSignupModal = arg 
+    if (state.showLoginModal === true) {
+      state.showLoginModal = false
+    }
   },
   setSearchedGames (state, payload) {
     state.searchedGames = payload
@@ -27,25 +30,6 @@ export const mutations = {
 }
 
 export const actions = {
-  // Set user everytime server inits
-  nuxtServerInit({commit}, { req }) {
-    if(process.server && process.static) return
-    if(!req.headers.cookie) return
-
-    const parsed = cookieparser.parse(req.headers.cookie)
-    const accessTokenCookie = parsed.access_token
-
-    if(!accessTokenCookie) return
-
-    const decoded =JWTDecode(accessTokenCookie)
-
-    if(decoded) {
-      commit('users/setUser', {
-        uid: decoded.user_id,
-        email: decoded.email
-      })
-    }
-  },
   async searchForGame({commit}, queryString) {
     await this.$axios({
       method: 'POST',

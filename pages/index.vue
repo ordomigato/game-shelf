@@ -6,7 +6,6 @@
       <main>
         <GameList v-if="games.length > 0 && searchedGames.length == 0" :games="games" />
         <GameResults v-if="searchedGames.length > 0" :games="searchedGames" />
-        <div id="no-results-container" v-if="searchedGames.length === 0"></div>
       </main>
     </div>
   </div>

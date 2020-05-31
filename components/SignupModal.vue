@@ -7,7 +7,7 @@
         <div class="signup-modal self-center" v-if="isOpen">
           <ul id="signup-error-message" class="text-red-400"></ul>
           <h4 class="text-lg text-center">Signup</h4>
-          <p class="text-sm mb-4">* means it is required</p>
+          <p class="text-sm text-center mb-4">Fill out the required* fields</p>
           <form class="flex flex-col" @submit.prevent="onSubmit">
             <div class="flex flex-col sm:flex-row">
               <input class="flex-1" type="text" placeholder="Enter First Name*" name="first-name" v-model="user.firstName" />
@@ -81,6 +81,7 @@ export default {
               email: cred.user.email,
               owned_games: [],
               wishlist: [],
+              profile_pic: 'https://firebasestorage.googleapis.com/v0/b/gameshelf-510ba.appspot.com/o/profile%2Fdefault-image.jpg?alt=media&token=87dbe8ab-445f-4487-8f30-40a24b494e21',
               joined: {
                 year: new Date().getFullYear(),
                 month: new Date().getMonth(),

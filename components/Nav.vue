@@ -135,16 +135,15 @@ export default ({
     color: black;
     position: absolute;
     right: 0px;
-    top: 100%;
+    top: 110%;
     transition: opacity 0.2s ease-out;
     li {
       white-space: nowrap;
-      padding: 1rem 2rem 0 2rem;
+      padding: 0.5rem 1.5rem;
       &:hover {
         @apply text-blue-400;
       }
       &:last-of-type {
-        padding-bottom: 1rem;
       }
     }
   }

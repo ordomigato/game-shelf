@@ -5,14 +5,14 @@
       </transition>
       <transition name="slide-fade">
         <div class="login-modal self-center" v-if="isOpen">
-          <ul id="login-error-message" class="text-red-400"></ul>
-          <h4 class="text-lg mb-4 text-center">Login</h4>
+          <div id="login-message" class="text-sm text-red-400"></div>
+          <h4 class="text-lg text-center mb-4">Login</h4>
           <form class="flex flex-col" @submit.prevent="login">
             <input type="text" placeholder="Enter email" name="email" v-model="user.email" />
             <input type="password" placeholder="Enter password" name="password" v-model="user.password" />
             <button class="bg-secondary text-white p-2 focus:outline-none" type="submit">Login</button>
           </form>
-          <p class="text-center mt-2">Don't have an account? <button class="text-blue-400" @click="setSignupModalOpenState(true);setLoginModalOpenState(false)">Signup here</button class="text-blue-400"></p>
+          <p class="text-center mt-2">Don't have an account? <button class="text-blue-400" @click="setLoginModalOpenState(false);setSignupModalOpenState(true)">Signup here</button class="text-blue-400"></p>
         </div>
       </transition>
     </section>
@@ -43,10 +43,14 @@ export default {
     setSignupModalOpenState: function (arg) {
       this.$store.commit('setSignupModalOpenState', arg)
     },
-    async login() {
+    login() {
       // log the user in and set basic data
-      await this.$store.dispatch('users/login', this.user)
-      this.setLoginModalOpenState(false)
+      this.$store.dispatch('users/login', this.user).then(() => {
+        this.$store.commit('setLoginModalOpenState', false)
+      }).catch(err => {
+        let messageContainer = document.getElementById('login-message')
+        messageContainer.innerHTML = `<p>${err}</p>`
+      })
     },
   }
 }

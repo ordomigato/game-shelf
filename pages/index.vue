@@ -2,11 +2,13 @@
   <div id="main-page">
     <Nav />
     <Hero />
-    <div class="container mx-4">
-      <main>
-        <GameList v-if="games.length > 0 && searchedGames.length == 0" :games="games" />
-        <GameResults v-if="searchedGames.length > 0" :games="searchedGames" />
-      </main>
+    <div class="bg-gray-200">
+      <div class="container mx-4">
+        <main>
+          <GameList v-if="games.length > 0 && searchedGames.length == 0" :games="games" />
+          <GameResults v-if="searchedGames.length > 0" :games="searchedGames" />
+        </main>
+      </div>
     </div>
   </div>
 </template>

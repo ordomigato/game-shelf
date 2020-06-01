@@ -60,9 +60,9 @@ export default {
       transition: transform 1.5s ease-in-out;
       &.lazyLoad {
         transform: translateX(0%);
-        transition: transform 1.5s ease-in-out;
+        transition: transform 1.5s ease-in-out 0.5s;
         & ~ .hero-background__overlay {
-          transition: transform 1.5s ease-in-out;
+          transition: transform 1.5s ease-in-out 0.5s;
           transform-origin: center right;
           transform: scaleX(0);
         }

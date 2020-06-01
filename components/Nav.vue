@@ -137,6 +137,20 @@ export default ({
     right: 0px;
     top: 110%;
     transition: opacity 0.2s ease-out;
+    &:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -7px;
+      width: 14px;
+      height: 14px;
+      margin: auto;
+      border: solid white;
+      border-width: 5px 5px 0 0;
+      transform: rotate(-45deg);
+      background-color: white;
+    }
     li {
       white-space: nowrap;
       padding: 0.5rem 1.5rem;

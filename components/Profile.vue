@@ -1,24 +1,26 @@
 <template>
   <section class="pt-4 pb-8 mx-4">
     <div class="container">
-      <h2 class="font-bold pb-4 invisible md:visible">My Profile</h2>
-      <div class="flex flex-col md:flex-row">
-        <div class="w-full flex flex-col md:w-2/3 lg:w-1/2">
+      <h2 class="font-bold pb-4 text-center">{{user.first_name}} {{user.last_name}}</h2>
+      <div class="flex flex-col">
+        <div class="w-full flex flex-col md:flex-row md:w-2/3 lg:w-1/2 md:inline mx-auto">
           <div class="profile-image_container">
             <img :src="user.profile_pic" class="mx-auto">
           </div>
-          <div class="profile-image_container px-8 pt-4 text-center">
+          <div class="profile-info_container px-8 pt-4 text-center">
             <p>Games Owned: {{ ownedGames == undefined ? 0 : ownedGames.length }}</p>
             <p>Wishlist: {{ wishlist == undefined ? 0 : wishlist.length }}</p>
             <p>Joined: {{ joined }}</p>
           </div>
         </div>
-        <div id="bio" class="w-full md:w-1/3 lg:w-1/2 pt-4 md:pt-0">
-          <div id="update-bio-icon">
-            <fa v-if="!currentlyEditing" :icon="['fa', 'edit']" @click="editProfileBio" class="edit-icon icon" />
-            <fa v-if="currentlyEditing" :icon="['fas', 'times']" @click="stopEditProfileBio" class="stop-icon icon" />
-          </div>
-          <h3 class="font-bold pb-2 pr-1 inline-block">Bio</h3>
+        <div id="bio" class="max-w-screen-sm w-full 2 pt-4 mx-auto">
+          <header class="pl-6">
+            <div id="update-bio-icon">
+              <fa v-if="!currentlyEditing" :icon="['fa', 'edit']" @click="editProfileBio" class="edit-icon icon" />
+              <fa v-if="currentlyEditing" :icon="['fas', 'times']" @click="stopEditProfileBio" class="stop-icon icon" />
+            </div>
+            <h3 class="font-bold pb-2 pr-1 inline-block">Bio</h3>
+          </header>
           <div id="update-bio_error-container"></div>
           <textarea @change="editingHandler" id="profile-bio" rows="5" class="w-full" v-model="editBio" placeholder="Tell us about yourself <(^_^)>" readonly></textarea>
           <button v-if="currentlyEditing" id="update-bio-button" @click="submitBio" class="bg-secondary mt-2 text-white py-2 px-4 opacity-50 focus:outline-none cursor-default" type="button" disabled>Change Bio</button>
@@ -110,8 +112,12 @@ export default {
     width: 100px;
     border-radius: 50%;
     object-fit: cover;
-    }
   }
+}
+
+.profile-info_container {
+  line-height: 1.8;
+}
 
 #bio {
   #profile-bio {

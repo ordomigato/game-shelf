@@ -1,23 +1,31 @@
 <template>
     <article class="single-game" :data-game-id="this.gameId" :class="{'owned': isOwned}">
-      <div class="cover-container">
-        <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
-        <div class="button-container">
-          <button type="button" v-if="!isOwned && isInWishlist" class="z-20 wishlist-remove-icon icon" v-on:click="removeFromWishlist($event)">
-            <fa :icon="['fa', 'star']"  />
-          </button>
-          <button type="button" v-if="!isOwned && !isInWishlist" class="z-20 wishlist-icon icon" v-on:click="addToWishlist($event)">
-            <fa :icon="['far', 'star']"  />
-          </button>
-          <button type="button" v-if="!isOwned" class="z-20 add-icon icon" v-on:click="addToOwned($event)">
-            <fa :icon="['fa', 'plus']"  />
-          </button>
-          <button type="button" v-if="isOwned" class="z-20 remove-icon icon" v-on:click="removeFromOwned($event)">
-            <fa :icon="['fa', 'minus']"  />
-          </button>
+      <div class="shadow-md">
+        <div class="cover-container">
+          <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
+          <div class="single-game__tag flex items-center">
+            <p v-if='isOwned' class="px-4">Owned</p>
+            <p v-if='isInWishlist' class="px-4">In wishlist</p>
+          </div>
+          <div class="button-container">
+            <button type="button" v-if="!isOwned && isInWishlist" class="z-20 wishlist-remove-icon icon" v-on:click="removeFromWishlist($event)">
+              <fa :icon="['fa', 'star']"  />
+            </button>
+            <button type="button" v-if="!isOwned && !isInWishlist" class="z-20 wishlist-icon icon" v-on:click="addToWishlist($event)">
+              <fa :icon="['far', 'star']"  />
+            </button>
+            <button type="button" v-if="!isOwned" class="z-20 add-icon icon" v-on:click="addToOwned($event)">
+              <fa :icon="['fas', 'plus-circle']"  />
+            </button>
+            <button type="button" v-if="isOwned" class="z-20 remove-icon icon" v-on:click="removeFromOwned($event)">
+              <fa :icon="['fas', 'minus-circle']"  />
+            </button>
+          </div>
         </div>
+        <footer class="game-name__container">
+          <h3 class="game-name">{{ this.gameName }}</h3>
+        </footer>
       </div>
-      <h3 class="game-name">{{ this.gameName }}</h3>
     </article>
 </template>
 
@@ -98,10 +106,42 @@ export default {
 
 <style lang="scss" scoped>
 .single-game {
+  &:hover {
+    .game-name__container {
+      background-color: white;
+      .game-name {
+        color: black;
+        cursor: default;
+      }
+    }
+  }
   &.owned {
     .game-tile_cover-image {
       -webkit-filter: grayscale(1) brightness(0.6);
       filter: grayscale(1) brightness(0.6);
+    }
+  }
+  .single-game__tag {
+    @apply text-sm;
+    position: absolute;
+    bottom: 0;
+    height: 2rem;
+    background-color: var(--secondary-color);
+    color: white;
+    transform: translateX(0);
+    transition: transform 0.2s ease-in;
+  }
+  .game-name__container {
+      position: relative;
+      background-color: var(--main-color);
+      padding: 0.5rem 1rem;
+
+    .game-name {
+      @apply text-sm;
+      overflow: hidden;
+      line-height: 1.5em;
+      height: 3em;
+      color: white;
     }
   }
   .cover-container {
@@ -127,16 +167,18 @@ export default {
       right: 0;
       display: flex;
       transform: translateX(100%);
+      transition: transform 0.2s ease-in;
       .icon {
-        background-color: black;
-        padding: 1rem;
+        background-color: white;
+        height: 2rem;
+        width: 2rem;
         outline: none;
         &:hover, &:focus {
           cursor: pointer;
           transition: 0.2s ease-out;
         }
         svg {
-          color: white;
+          color: black;
           height: 1rem;
           width: 1rem;
         }
@@ -183,6 +225,12 @@ export default {
   .single-game {
     padding-right: 5px;
     margin-bottom: 2rem;
+    .cover-container {
+      &:hover > .single-game__tag {
+        transform: translateX(-100%);
+        transition: transform 0.2s ease-in;
+      }
+    }
   }
 }
 

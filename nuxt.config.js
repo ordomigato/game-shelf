@@ -76,6 +76,7 @@ export default {
           },
           firestore: true,
           storage: true,
+          functions: true,
         }
       }
     ],

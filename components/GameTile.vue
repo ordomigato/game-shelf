@@ -84,7 +84,10 @@ export default {
     },
     async removeFromOwned($event) {
       if (this.isLoggedIn() === false) return
-      this.$removeGame(this.gameId)
+      const removeGame = this.$fireFunc.httpsCallable('removeGame')
+      removeGame({id: this.gameId}).then(result => {
+        console.log(result.data)
+      })
     },
     async addToWishlist($event) {
       if (this.isLoggedIn() === false) return
@@ -92,7 +95,10 @@ export default {
     },
     async removeFromWishlist($event) {
       if (this.isLoggedIn() === false) return
-      this.$removeFromWishlist(this.gameId)
+      const removeFromWishlist = this.$fireFunc.httpsCallable('removeFromWishlist')
+      removeFromWishlist({id: this.gameId}).then(result => {
+        console.log(result.data)
+      })
     },
     isLoggedIn() {
       if(!this. user) {
@@ -109,9 +115,11 @@ export default {
   &:hover {
     .game-name__container {
       background-color: white;
+      transition: background-color 0s ease-out;
       .game-name {
         color: black;
         cursor: default;
+        transition: color 0s ease-out;
       }
     }
   }
@@ -135,13 +143,14 @@ export default {
       position: relative;
       background-color: var(--main-color);
       padding: 0.5rem 1rem;
-
+      transition: background-color 0.2s ease-out 0.2s;
     .game-name {
       @apply text-sm;
       overflow: hidden;
       line-height: 1.5em;
       height: 3em;
       color: white;
+      transition: color 0.1s ease-out 0.2s;
     }
   }
   .cover-container {

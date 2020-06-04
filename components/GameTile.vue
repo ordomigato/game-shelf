@@ -46,20 +46,24 @@ export default {
     // Check if game is owned
     isOwned: function () {
       if (!this.user) return
-      let ownedGames = this.$store.state.users.user.owned_games
+
+      let ownedGames = this.$store.state.users.ownedGamesObjArray
       if (!ownedGames) {
         return false
       } else {
-        let result = ownedGames.some(game => game == this.game.id)
+        let gamesArray = ownedGames.map(game => game.id)
+        let result = gamesArray.some(game => game == this.game.id)
         return result
       }
     },
     isInWishlist: function () {
       if (!this.user) return
-      let wishlist = this.$store.state.users.user.wishlist
-      if (!wishlist) return false
-      else {
-        let result = wishlist.some(game => game == this.game.id)
+      let wishlist = this.$store.state.users.wishlistGamesObjArray
+      if (!wishlist) {
+        return false
+      } else {
+        let gamesArray = wishlist.map(game => game.id)
+        let result = gamesArray.some(game => game == this.game.id)
         return result
       }
     },
@@ -80,25 +84,39 @@ export default {
   methods: {
     async addToOwned() {
       if (this.isLoggedIn() === false) return
-      this.$addGame(this.gameId, this.gameImageId)
+      let gameObj = {
+        title: this.gameName,
+        id: this.gameId,
+        image_url: this.gameImageId
+      }
+      this.$addGame(gameObj)
     },
-    async removeFromOwned($event) {
+    async removeFromOwned() {
       if (this.isLoggedIn() === false) return
-      const removeGame = this.$fireFunc.httpsCallable('removeGame')
-      removeGame({id: this.gameId}).then(result => {
-        console.log(result.data)
-      })
+      let gameObj = {
+        title: this.gameName,
+        id: this.gameId,
+        image_url: this.gameImageId
+      }
+      this.$removeGame(gameObj)
     },
     async addToWishlist($event) {
       if (this.isLoggedIn() === false) return
-      this.$addToWishlist(this.gameId, this.gameImageId)
+      let gameObj = {
+        title: this.gameName,
+        id: this.gameId,
+        image_url: this.gameImageId
+      }
+      this.$addToWishlist(gameObj)
     },
     async removeFromWishlist($event) {
       if (this.isLoggedIn() === false) return
-      const removeFromWishlist = this.$fireFunc.httpsCallable('removeFromWishlist')
-      removeFromWishlist({id: this.gameId}).then(result => {
-        console.log(result.data)
-      })
+      let gameObj = {
+        title: this.gameName,
+        id: this.gameId,
+        image_url: this.gameImageId
+      }
+      this.$removeFromWishlist(gameObj)
     },
     isLoggedIn() {
       if(!this. user) {
@@ -223,6 +241,9 @@ export default {
         -webkit-filter: grayscale(0) brightness(1);
         filter: grayscale(0) brightness(1);
       }
+    }
+    .single-game__tag {
+      visibility: hidden;
     }
     .cover-container {
       max-height: 200px;

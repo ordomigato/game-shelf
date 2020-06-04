@@ -43,27 +43,10 @@ export default Vue.extend({
       searchedGames: 'getSearchedGames'
     })
   },
-  // Get Popular Game Data
-  // asyncData () {
-  //   return axios({
-  //     method: 'get',
-  //     url: 'https://api-v3.igdb.com/games/',
-  //     headers: {
-  //       "Accept": "application/json",
-  //     },
-  //     data: `
-  //       search: "zelda";
-  //       fields: name, cover.image_id;
-  //       limit: 10;
-  //     `
-  //   })
-  //   .then(res => {
-  //     return { games: res.data }
-  //   })
-  //   .catch(err => {
-  //     console.error(err);
-  //   });
-  // },
+  mounted() {
+    this.$store.dispatch('users/getLibrary')
+    this.$store.dispatch('users/getWishlist')
+  },
 })
 </script>
 

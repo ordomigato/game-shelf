@@ -6,9 +6,6 @@ export const state = () => ({
 
 export const getters = {
   getUser: state => state.user,
-  getBio: state => state.user.bio ? state.user.bio : '',
-  getOwnedGames: state => state.user.owned_games ? state.user.owned_games : [],
-  getWishlist: state => state.user.wishlist ? state.user.wishlist : [],
   getOwnedGamesObjArray: state => state.ownedGamesObjArray ? state.ownedGamesObjArray : [],
   getWishlistGamesObjArray: state => state.wishlistGamesObjArray ? state.wishlistGamesObjArray : [],
   getJoinedDate: state => {
@@ -58,28 +55,18 @@ export const actions = {
       })
     }
   },
-  getGameObjects({ state, commit }) {
-        // get owned games and wishlist from user
-        let user = state.user
-        console.log(user.owned_games)
-        let { owned_games, wishlist } = user
-        let gamesArray = []
-        if (owned_games && owned_games.length > 0) gamesArray = gamesArray.concat(owned_games)
-        if (wishlist && wishlist.length > 0) gamesArray = gamesArray.concat(wishlist)
-        if (gamesArray && gamesArray.length > 0) {
-          // create a query string to target all games and pull
-          let query = this.$fireStore.collection('games').where(this.$fireStoreObj.FieldPath.documentId(), 'in', gamesArray)
-          query.get().then(games => {
-            // sort if game is owned or in wishlist
-            let ownedGamesObjArray = []
-            let wishlistGamesObjArray = []
-            games.forEach(game => {
-              let isOwned = owned_games.some(owned_game => owned_game == game.data().id)
-              isOwned ? ownedGamesObjArray.push(game.data()) : wishlistGamesObjArray.push(game.data())
-            })
-            commit('setOwnedGamesObjArray', ownedGamesObjArray)
-            commit('setWishlistGamesObjArray', wishlistGamesObjArray)
-          })
-        }
+  getLibrary({ commit }) {
+    // get owned games
+    const getUserLibrary = this.$fireFunc.httpsCallable('getUserLibrary')
+    getUserLibrary({collection: 'owned_games'}).then(result => {
+      commit('setOwnedGamesObjArray', result.data)
+    })
+  },
+  getWishlist({ commit }) {
+    // get wishlist
+    const getUserLibrary = this.$fireFunc.httpsCallable('getUserLibrary')
+    getUserLibrary({collection: 'wishlist'}).then(result => {
+      commit('setWishlistGamesObjArray', result.data)
+    })
   }
 }

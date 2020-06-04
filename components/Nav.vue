@@ -45,7 +45,6 @@ export default ({
   data() {
     return {
       scrollPosition: null,
-      currentRouteName: this.$nuxt.$route.path
     }
   },
   computed: {

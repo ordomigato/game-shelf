@@ -5,7 +5,13 @@
         <h2 class="font-bold pb-2">My Collection</h2>
         <div class="flex flex-wrap library_games">
           <div v-for="game in owned" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
-            <GameTile :game="game" />
+            <GameTile 
+              :game="{
+                id: game.id,
+                name: game.title,
+                image_id: game.image_url
+              }"
+            />
           </div>
         </div>
       </div>
@@ -13,7 +19,13 @@
         <h2 class="font-bold pb-2">My Wishlist</h2>
         <div class="flex flex-row flex-wrap wishlist_games">
           <div v-for="game in wishlist" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
-            <GameTile :game="game" />
+              <GameTile 
+              :game="{
+                id: game.id,
+                name: game.title,
+                image_id: game.image_url
+              }"
+            />
           </div>
         </div>
       </div>
@@ -30,7 +42,8 @@ export default {
     GameTile,
   },
   mounted() {
-      this.$store.dispatch('users/getGameObjects')
+      this.$store.dispatch('users/getLibrary')
+      this.$store.dispatch('users/getWishlist')
   },
   computed: {
     ...mapGetters({

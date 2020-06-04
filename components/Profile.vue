@@ -43,14 +43,13 @@ export default {
     }
   },
   mounted() {
-    this.editBio = this.bio || ''
+    this.editBio = this.user.bio || ''
   },
   computed: {
     ...mapGetters({
       user: 'users/getUser',
-      bio: 'users/getBio',
-      ownedGames: 'users/getOwnedGames',
-      wishlist: 'users/getWishlist',
+      ownedGames: 'users/getOwnedGamesObjArray',
+      wishlist: 'users/getWishlistGamesObjArray',
       joined: 'users/getJoinedDate'
     })
   },

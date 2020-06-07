@@ -99,7 +99,7 @@ export default {
    ** See https://axios.nuxtjs.org/options
    */
   axios: {
-    baseURL: process.env.BASE_URL || 'https://gameshelf-510ba.firebaseio.com/',
+    baseURL: process.env.BASE_URL || 'https://game-shelf-app.herokuapp.com/',
   },
   proxy: {
     '/games/': 'https://api-v3.igdb.com',

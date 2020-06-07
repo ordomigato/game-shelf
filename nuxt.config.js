@@ -115,5 +115,8 @@ export default {
      */
     extend(config, ctx) {}
   },
-  env: {}
+  env: {},
+  purgeCSS: {
+    whitelistPatterns: [/(^|\.)fa-/, /-fa($|\.)/]
+  },
 }

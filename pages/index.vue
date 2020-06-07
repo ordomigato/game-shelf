@@ -43,10 +43,10 @@ export default Vue.extend({
       searchedGames: 'getSearchedGames'
     })
   },
-  mounted() {
-    this.$store.dispatch('users/getLibrary')
-    this.$store.dispatch('users/getWishlist')
-  },
+  // mounted() {
+  //   this.$store.dispatch('users/getLibrary')
+  //   this.$store.dispatch('users/getWishlist')
+  // },
 })
 </script>
 

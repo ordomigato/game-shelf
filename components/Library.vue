@@ -4,7 +4,7 @@
       <div id="my-collection" class="py-8">
         <h2 class="font-bold pb-2">My Collection</h2>
         <div class="flex flex-wrap library_games">
-          <div v-for="game in owned" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
+          <div :v-if="owned.length > 0" v-for="game in owned" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
             <GameTile 
               :game="{
                 id: game.id,
@@ -18,7 +18,7 @@
       <div id="my-wishlist" class="py-8">
         <h2 class="font-bold pb-2">My Wishlist</h2>
         <div class="flex flex-row flex-wrap wishlist_games">
-          <div v-for="game in wishlist" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
+          <div :v-if="wishlist.length > 0" v-for="game in wishlist" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
               <GameTile 
               :game="{
                 id: game.id,
@@ -40,10 +40,6 @@ import GameTile from '~/components/GameTile.vue'
 export default {
   components: {
     GameTile,
-  },
-  mounted() {
-      this.$store.dispatch('users/getLibrary')
-      this.$store.dispatch('users/getWishlist')
   },
   computed: {
     ...mapGetters({

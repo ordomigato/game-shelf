@@ -8,16 +8,17 @@
           </div>
           <div class="w-2/3 sm:w-1/2 flex items-center justify-end">
             <ul class="flex">
-              <nuxt-link to="/library" v-if="user != null" class="nav-btn my-library-btn">My Library <fa class="ml-2" :icon="['fa', 'book']"  /></nuxt-link>
+              <!-- <nuxt-link to="/library" v-if="user != null" class="nav-btn my-library-btn">My Library <fa class="ml-2" :icon="['fa', 'book']"  /></nuxt-link> -->
               <li v-if="user == null"><button class="nav-btn login-btn" @click="setLoginModalOpenState(true)">Login</button></li>
               <li class="signup" v-if="user == null"><button class="nav-btn signup-btn" @click="setSignupModalOpenState(true)">Signup</button></li>
               <li class="nav-btn user-dropdown" v-if="user != null">
                 {{ user.first_name || user.email }}
-                <fa class="ml-1 caret" :icon="['fa', 'caret-down']" />
-                <fa class="ml-2" :icon="['fa', 'user-circle']" />
+                <fa class="ml-1 caret text-md" :icon="['fa', 'caret-down']" />
+                <fa class="ml-2 text-md" :icon="['fa', 'user-circle']" />
                 <ul class="user-dropdown-sub-1">
-                  <li><nuxt-link to="/account" v-if="user != null">My Account</nuxt-link></li>
-                  <li><button @click="signout">Logout</button></li>
+                  <li><nuxt-link to="/library" class="user-dropdown-sub-1__item">My Library</nuxt-link></li>
+                  <li><nuxt-link to="/account" class="user-dropdown-sub-1__item" v-if="user != null">My Account</nuxt-link></li>
+                  <li><button class="user-dropdown-sub-1__item" @click="signout">Logout</button></li>
                 </ul>
               </li>
             </ul>
@@ -45,6 +46,7 @@ export default ({
   data() {
     return {
       scrollPosition: null,
+
     }
   },
   computed: {
@@ -63,7 +65,6 @@ export default ({
       this.$store.commit('setSignupModalOpenState', arg)
     },
     async signout() {
-      this.$router.push('/')
       await this.$fireAuth.signOut()
       await Cookie.remove('access_token')
       // hard refresh
@@ -112,7 +113,10 @@ export default ({
 }
 
 .user-dropdown {
+    background-color: var(--main-color);
+    height: 100%;
   position: relative;
+  cursor: default;
   &:hover {
     .caret {
       opacity: 1;
@@ -128,13 +132,14 @@ export default ({
   }
   .user-dropdown-sub-1 {
     @apply shadow-md;
+    width: 100%;
     visibility: hidden;
     opacity: 0;
     background-color: white;
     color: black;
     position: absolute;
     right: 0px;
-    top: 110%;
+    top: 100%;
     transition: opacity 0.2s ease-out;
     &:before {
       content: '';
@@ -150,14 +155,28 @@ export default ({
       transform: rotate(-45deg);
       background-color: white;
     }
+    &:after {
+      content: '';
+      position: absolute;
+      visibility: hidden;
+      opacity: 0;
+      top: 0;
+    }
     li {
-      white-space: nowrap;
-      padding: 0.5rem 1.5rem;
-      &:hover {
-        @apply text-blue-400;
+      // white-space: nowrap;
+      .user-dropdown-sub-1__item {
+        @apply py-1 px-4;
+        display: block;
+        &:hover {
+          @apply text-blue-400;
+        }
       }
-      &:last-of-type {
-      }
+        &:last-of-type {
+          padding-bottom: 0.5rem;
+        }
+        &:first-of-type {
+          padding-top: 0.5rem;
+        }
     }
   }
 }

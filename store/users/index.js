@@ -42,7 +42,7 @@ export const actions = {
       })
     })
   },
-  onAuthStateChangedAction({ commit }, { authUser }) {
+  async onAuthStateChangedAction({ commit, dispatch }, { authUser }) {
     if (!authUser) {
       console.log('user is logged out', authUser)
       commit('removeUser')
@@ -53,9 +53,12 @@ export const actions = {
         let userInfo = snapshot.data()
         commit('setUser', userInfo)
       })
+      await dispatch('getLibrary')
+      await dispatch('getWishlist')
     }
   },
   getLibrary({ commit }) {
+    console.log('getting library')
     // get owned games
     const getUserLibrary = this.$fireFunc.httpsCallable('getUserLibrary')
     getUserLibrary({collection: 'owned_games'}).then(result => {
@@ -63,10 +66,11 @@ export const actions = {
     })
   },
   getWishlist({ commit }) {
+    console.log('getting wishlist')
     // get wishlist
     const getUserLibrary = this.$fireFunc.httpsCallable('getUserLibrary')
     getUserLibrary({collection: 'wishlist'}).then(result => {
       commit('setWishlistGamesObjArray', result.data)
     })
-  }
+  },
 }

@@ -113,7 +113,9 @@ export default {
      */
     extend(config, ctx) {}
   },
-  env: {},
+  env: {
+    baseUrl: process.env.BASE_URL || 'http://localhost:3000'
+  },
   purgeCSS: {
     whitelistPatterns: [/(^|\.)fa-/, /-fa($|\.)/]
   },

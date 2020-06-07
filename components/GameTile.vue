@@ -2,7 +2,7 @@
     <article class="single-game" :data-game-id="this.gameId" :class="{'owned': isOwned}">
       <div class="shadow-md">
         <div class="cover-container">
-          <a href="#"><img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`" alt="cover image" class="game-tile_cover-image" /></a>
+          <img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`" alt="cover image" class="game-tile_cover-image" />
           <div class="single-game__tag flex items-center">
             <p v-if='isOwned' class="px-4">Owned</p>
             <p v-if='isInWishlist' class="px-4">In wishlist</p>
@@ -237,6 +237,8 @@ export default {
 #library {
   .single-game {
     &.owned {
+      padding-right: 5px;
+      margin-bottom: 2rem;
       .game-tile_cover-image {
         -webkit-filter: grayscale(0) brightness(1);
         filter: grayscale(0) brightness(1);
@@ -246,7 +248,7 @@ export default {
       visibility: hidden;
     }
     .cover-container {
-      max-height: 200px;
+      max-height: 250px;
     }
   }
 }

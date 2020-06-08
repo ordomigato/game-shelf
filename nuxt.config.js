@@ -114,7 +114,8 @@ export default {
     extend(config, ctx) {}
   },
   env: {
-    baseUrl: process.env.BASE_URL || 'http://localhost:3000'
+    baseUrl: process.env.BASE_URL || 'http://localhost:3000',
+    GAME_APP_ID: process.env.GAME_APP_ID
   },
   purgeCSS: {
     whitelistPatterns: [/(^|\.)fa-/, /-fa($|\.)/]

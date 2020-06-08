@@ -18,7 +18,7 @@
       <div id="my-wishlist" class="py-8">
         <h2 class="font-bold pb-2">My Wishlist</h2>
         <div class="flex flex-row flex-wrap wishlist_games">
-          <div :v-if="wishlist.length > 0" v-for="game in wishlist" :key="game.id" class="w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6">
+          <div :v-if="wishlist.length > 0" v-for="game in wishlist" :key="game.id" class="w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5">
               <GameTile 
               :game="{
                 id: game.id,

@@ -113,8 +113,9 @@ export default ({
 }
 
 .user-dropdown {
-    background-color: var(--main-color);
-    height: 100%;
+  background-color: var(--main-color);
+  height: 100%;
+  min-width: 120px;
   position: relative;
   cursor: default;
   &:hover {

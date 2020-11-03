@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { EffectCoverflow } from 'swiper/js/swiper.esm'
 
 export default({ store, app }, inject) =>  {
   inject('addGame', (gameObj) => {

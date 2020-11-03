@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 export default {
   mode: 'universal',
   /*
@@ -102,7 +104,7 @@ export default {
     baseURL: process.env.baseUrl || 'https://game-shelf-app.herokuapp.com/',
   },
   proxy: {
-    '/games/': 'https://api-v3.igdb.com',
+    '/games/': 'https://api.igdb.com/v4',
   },
   /*
    ** Build configuration
@@ -115,7 +117,8 @@ export default {
   },
   env: {
     baseUrl: process.env.BASE_URL || 'http://localhost:3000',
-    GAME_APP_ID: process.env.GAME_APP_ID
+    GAME_CLIENT_ID: process.env.GAME_CLIENT_ID,
+    AUTHORIZATION: process.env.AUTHORIZATION
   },
   purgeCSS: {
     whitelistPatterns: [/(^|\.)fa-/, /-fa($|\.)/]

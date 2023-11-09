@@ -1,42 +1,79 @@
 <template>
-    <article class="single-game" :data-game-id="this.gameId" :class="{'owned': isOwned}">
-      <div class="shadow-md">
-        <div class="cover-container">
-          <img :src="`//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`" alt="cover image" class="game-tile_cover-image" />
-          <div class="single-game__tag flex items-center">
-            <p v-if='isOwned' class="px-4">Owned</p>
-            <p v-if='isInWishlist' class="px-4">In wishlist</p>
-          </div>
-          <div class="button-container">
-            <button type="button" v-if="!isOwned && isInWishlist" class="z-20 wishlist-remove-icon icon" v-on:click="removeFromWishlist($event)">
-              <fa :icon="['fa', 'star']"  />
-            </button>
-            <button type="button" v-if="!isOwned && !isInWishlist" class="z-20 wishlist-icon icon" v-on:click="addToWishlist($event)">
-              <fa :icon="['far', 'star']"  />
-            </button>
-            <button type="button" v-if="!isOwned" class="z-20 add-icon icon" v-on:click="addToOwned($event)">
-              <fa :icon="['fas', 'plus-circle']"  />
-            </button>
-            <button type="button" v-if="isOwned" class="z-20 remove-icon icon" v-on:click="removeFromOwned($event)">
-              <fa :icon="['fas', 'minus-circle']"  />
-            </button>
-          </div>
+  <article
+    class="single-game"
+    :data-game-id="gameId"
+    :class="{ owned: isOwned }"
+  >
+    <div class="shadow-md">
+      <div class="cover-container">
+        <img
+          :src="
+            `//images.igdb.com/igdb/image/upload/t_cover_big_2x/${gameImageId}.jpg`
+          "
+          alt="cover image"
+          class="game-tile_cover-image"
+        />
+        <div class="single-game__tag flex items-center">
+          <p v-if="isOwned" class="px-4">Owned</p>
+          <p v-if="isInWishlist" class="px-4">In wishlist</p>
         </div>
-        <footer class="game-name__container">
-          <h3 class="game-name">{{ this.gameName }}</h3>
-        </footer>
+        <div class="button-container">
+          <button
+            v-if="!isOwned && isInWishlist"
+            type="button"
+            class="z-20 wishlist-remove-icon icon"
+            @click="removeFromWishlist($event)"
+          >
+            <fa :icon="['fa', 'star']" />
+          </button>
+          <button
+            v-if="!isOwned && !isInWishlist"
+            type="button"
+            class="z-20 wishlist-icon icon"
+            @click="addToWishlist($event)"
+          >
+            <fa :icon="['far', 'star']" />
+          </button>
+          <button
+            v-if="!isOwned"
+            type="button"
+            class="z-20 add-icon icon"
+            @click="addToOwned($event)"
+          >
+            <fa :icon="['fas', 'plus-circle']" />
+          </button>
+          <button
+            v-if="isOwned"
+            type="button"
+            class="z-20 remove-icon icon"
+            @click="removeFromOwned($event)"
+          >
+            <fa :icon="['fas', 'minus-circle']" />
+          </button>
+        </div>
       </div>
-    </article>
+      <footer class="game-name__container">
+        <h3 class="game-name">{{ gameName }}</h3>
+      </footer>
+    </div>
+  </article>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
 
 export default {
+  props: ['game'],
+  data() {
+    return {
+      gameId: this.game.id.toString(),
+      gameName: this.game.name
+    }
+  },
   computed: {
-    gameImageId: function () {
+    gameImageId() {
       if (this.game.image_id) {
-        return  this.game.image_id
+        return this.game.image_id
       } else if (this.game.cover) {
         return this.game.cover.image_id
       } else {
@@ -44,74 +81,65 @@ export default {
       }
     },
     // Check if game is owned
-    isOwned: function () {
+    isOwned() {
       if (!this.user) return
 
-      let ownedGames = this.$store.state.users.ownedGamesObjArray
+      const ownedGames = this.$store.state.users.ownedGamesObjArray
       if (!ownedGames) {
         return false
       } else {
-        let gamesArray = ownedGames.map(game => game.id)
-        let result = gamesArray.some(game => game == this.game.id)
+        const gamesArray = ownedGames.map((game) => game.id)
+        const result = gamesArray.some((game) => game === this.game.id)
         return result
       }
     },
-    isInWishlist: function () {
+    isInWishlist() {
       if (!this.user) return
-      let wishlist = this.$store.state.users.wishlistGamesObjArray
+      const wishlist = this.$store.state.users.wishlistGamesObjArray
       if (!wishlist) {
         return false
       } else {
-        let gamesArray = wishlist.map(game => game.id)
-        let result = gamesArray.some(game => game == this.game.id)
+        const gamesArray = wishlist.map((game) => game.id)
+        const result = gamesArray.some((game) => game === this.game.id)
         return result
       }
     },
     ...mapGetters({
       user: 'users/getUser',
       ownedGames: 'users/ownedGames'
-    }),
-  },
-  props: [
-    'game'
-  ],
-  data() {
-    return {
-      gameId: this.game.id.toString(),
-      gameName: this.game.name,
-    }
+    })
   },
   methods: {
-    async addToOwned() {
+    addToOwned() {
       if (this.isLoggedIn() === false) return
-      let gameObj = {
+      const gameObj = {
         title: this.gameName,
         id: this.gameId,
         image_url: this.gameImageId
       }
       this.$addGame(gameObj)
     },
-    async removeFromOwned() {
+    removeFromOwned() {
       if (this.isLoggedIn() === false) return
-      let gameObj = {
+      const gameObj = {
         title: this.gameName,
         id: this.gameId,
         image_url: this.gameImageId
       }
       this.$removeGame(gameObj)
     },
-    async addToWishlist($event) {
+    addToWishlist() {
       if (this.isLoggedIn() === false) return
-      let gameObj = {
+      const gameObj = {
         title: this.gameName,
         id: this.gameId,
         image_url: this.gameImageId
       }
       this.$addToWishlist(gameObj)
     },
-    async removeFromWishlist($event) {
+    removeFromWishlist() {
       if (this.isLoggedIn() === false) return
-      let gameObj = {
+      const gameObj = {
         title: this.gameName,
         id: this.gameId,
         image_url: this.gameImageId
@@ -119,7 +147,7 @@ export default {
       this.$removeFromWishlist(gameObj)
     },
     isLoggedIn() {
-      if(!this. user) {
+      if (!this.user) {
         this.$store.commit('setLoginModalOpenState', true)
         return false
       }
@@ -158,10 +186,10 @@ export default {
     transition: transform 0.2s ease-in;
   }
   .game-name__container {
-      position: relative;
-      background-color: var(--main-color);
-      padding: 0.5rem 1rem;
-      transition: background-color 0.2s ease-out 0.2s;
+    position: relative;
+    background-color: var(--main-color);
+    padding: 0.5rem 1rem;
+    transition: background-color 0.2s ease-out 0.2s;
     .game-name {
       @apply text-sm;
       overflow: hidden;
@@ -183,7 +211,7 @@ export default {
     .game-tile_cover-image {
       min-height: 250px;
       object-fit: cover;
-      transition: transform .2s ease-out;
+      transition: transform 0.2s ease-out;
       &:hover {
         transform: scale(1.2);
       }
@@ -200,7 +228,8 @@ export default {
         height: 2rem;
         width: 2rem;
         outline: none;
-        &:hover, &:focus {
+        &:hover,
+        &:focus {
           cursor: pointer;
           transition: 0.2s ease-out;
         }
@@ -211,23 +240,27 @@ export default {
         }
       }
       .add-icon {
-        &:hover, &:focus {
+        &:hover,
+        &:focus {
           background-color: var(--secondary-color);
         }
       }
       .remove-icon {
-        &:hover, &:focus {
-          @apply bg-red-400
+        &:hover,
+        &:focus {
+          @apply bg-red-400;
         }
       }
       .wishlist-icon {
-        &:hover, &:focus {
-          @apply bg-yellow-400
+        &:hover,
+        &:focus {
+          @apply bg-yellow-400;
         }
       }
       .wishlist-remove-icon {
-        &:hover, &:focus {
-          @apply bg-red-400
+        &:hover,
+        &:focus {
+          @apply bg-red-400;
         }
       }
     }
@@ -266,7 +299,8 @@ export default {
   }
 }
 
-.library_games, .wishlist_games {
+.library_games,
+.wishlist_games {
   .single-game {
     padding-right: 3px;
     margin-bottom: 2rem;

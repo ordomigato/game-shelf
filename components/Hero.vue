@@ -1,13 +1,20 @@
 <template>
-  <div id="hero" class="relative" v-bind:class="{ 'h-60': searchedGames.length > 0 }">
+  <div id="hero" class="relative" :class="{ 'h-60': searchedGames.length > 0 }">
     <div class="hero-background">
       <div class="hero-background__filter z-20"></div>
-      <div class="hero-background__image" lazy-background="~/assets/images/hero-image.jpg"></div>
+      <div
+        class="hero-background__image"
+        lazy-background="~/assets/images/hero-image.jpg"
+      ></div>
       <div class="hero-background__overlay z-20"></div>
     </div>
     <div class="container h-full">
-      <div class="flex items-center h-full justify-center flex-col hero-inner-container px-4">
-        <h2 class="text-white pb-2 font-bold text-4xl z-30">Catalog Your Video Game Collection</h2>
+      <div
+        class="flex items-center h-full justify-center flex-col hero-inner-container px-4"
+      >
+        <h2 class="text-white pb-2 font-bold text-4xl z-30">
+          Catalog Your Video Game Collection
+        </h2>
         <SearchBar />
       </div>
     </div>
@@ -21,13 +28,13 @@ import SearchBar from '~/components/SearchBar.vue'
 
 export default {
   components: {
-    SearchBar,
+    SearchBar
   },
   computed: {
     ...mapGetters({
       searchedGames: 'getSearchedGames'
     })
-  },
+  }
 }
 </script>
 
@@ -38,7 +45,7 @@ export default {
   width: 100%;
   &.h-60 {
     height: 60vh;
-    transition: height 1s ease-in-out; 
+    transition: height 1s ease-in-out;
   }
   .hero-background__filter {
     position: absolute;

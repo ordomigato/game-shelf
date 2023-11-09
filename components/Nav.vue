@@ -1,6 +1,9 @@
 <template>
   <div>
-    <div class="nav-container bg-primary fixed w-full z-50" v-bind:class="{ change_color: scrollPosition > 50}">
+    <div
+      class="nav-container bg-primary fixed w-full z-50"
+      :class="{ change_color: scrollPosition > 50 }"
+    >
       <div class="container">
         <nav class="flex flex-1 text-white px-4">
           <div class="flex items-center w-1/3 sm:w-1/2">
@@ -9,16 +12,45 @@
           <div class="w-2/3 sm:w-1/2 flex items-center justify-end">
             <ul class="flex">
               <!-- <nuxt-link to="/library" v-if="user != null" class="nav-btn my-library-btn">My Library <fa class="ml-2" :icon="['fa', 'book']"  /></nuxt-link> -->
-              <li v-if="user == null"><button class="nav-btn login-btn" @click="setLoginModalOpenState(true)">Login</button></li>
-              <li class="signup" v-if="user == null"><button class="nav-btn signup-btn" @click="setSignupModalOpenState(true)">Signup</button></li>
-              <li class="nav-btn user-dropdown" v-if="user != null">
+              <li v-if="user == null">
+                <button
+                  class="nav-btn login-btn"
+                  @click="setLoginModalOpenState(true)"
+                >
+                  Login
+                </button>
+              </li>
+              <li v-if="user == null" class="signup">
+                <button
+                  class="nav-btn signup-btn"
+                  @click="setSignupModalOpenState(true)"
+                >
+                  Signup
+                </button>
+              </li>
+              <li v-if="user != null" class="nav-btn user-dropdown">
                 {{ user.first_name || user.email }}
                 <fa class="ml-1 caret text-md" :icon="['fa', 'caret-down']" />
                 <fa class="ml-2 text-md" :icon="['fa', 'user-circle']" />
                 <ul class="user-dropdown-sub-1">
-                  <li><nuxt-link to="/library" class="user-dropdown-sub-1__item">My Library</nuxt-link></li>
-                  <li><nuxt-link to="/account" class="user-dropdown-sub-1__item" v-if="user != null">My Account</nuxt-link></li>
-                  <li><button class="user-dropdown-sub-1__item" @click="signout">Logout</button></li>
+                  <li>
+                    <nuxt-link to="/library" class="user-dropdown-sub-1__item"
+                      >My Library</nuxt-link
+                    >
+                  </li>
+                  <li>
+                    <nuxt-link
+                      v-if="user != null"
+                      to="/account"
+                      class="user-dropdown-sub-1__item"
+                      >My Account</nuxt-link
+                    >
+                  </li>
+                  <li>
+                    <button class="user-dropdown-sub-1__item" @click="signout">
+                      Logout
+                    </button>
+                  </li>
                 </ul>
               </li>
             </ul>
@@ -38,15 +70,14 @@ import Cookie from 'js-cookie'
 import LoginModal from '~/components/LoginModal.vue'
 import SignupModal from '~/components/SignupModal.vue'
 
-export default ({
+export default {
   components: {
     LoginModal,
-    SignupModal,
+    SignupModal
   },
   data() {
     return {
-      scrollPosition: null,
-
+      scrollPosition: null
     }
   },
   computed: {
@@ -55,26 +86,26 @@ export default ({
     })
   },
   mounted() {
-    window.addEventListener('scroll', this.updateScroll);
+    window.addEventListener('scroll', this.updateScroll)
   },
   methods: {
-    setLoginModalOpenState: function (arg) {
+    setLoginModalOpenState(arg) {
       this.$store.commit('setLoginModalOpenState', arg)
     },
-    setSignupModalOpenState: function (arg) {
+    setSignupModalOpenState(arg) {
       this.$store.commit('setSignupModalOpenState', arg)
     },
     async signout() {
       await this.$fireAuth.signOut()
       await Cookie.remove('access_token')
       // hard refresh
-      location.href = '/';
+      location.href = '/'
     },
     updateScroll() {
       this.scrollPosition = window.scrollY
     }
-  },
-})
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -84,32 +115,35 @@ export default ({
     &.change_color {
       @apply shadow-md;
       background-color: var(--main-color);
-      transition: background-color 0.2s ease-out
+      transition: background-color 0.2s ease-out;
     }
   }
 }
 
 .nav-btn {
-    @apply py-2 px-4;
-    &.login-btn {
-      &:hover, &:focus {
-        background-color: var(--secondary-color);
-        transition: background-color 0.2s ease-out;
-        outline: none;
-      }
+  @apply py-2 px-4;
+  &.login-btn {
+    &:hover,
+    &:focus {
+      background-color: var(--secondary-color);
+      transition: background-color 0.2s ease-out;
+      outline: none;
     }
-    &.signup-btn {
-      &:hover, &:focus {
-        background-color: var(--secondary-color);
-        transition: background-color 0.2s ease-out;
-        outline: none;
-      }
+  }
+  &.signup-btn {
+    &:hover,
+    &:focus {
+      background-color: var(--secondary-color);
+      transition: background-color 0.2s ease-out;
+      outline: none;
     }
+  }
 }
 
-.my-library-btn, .signup {
-    background-color: var(--main-color);
-    height: 100%;
+.my-library-btn,
+.signup {
+  background-color: var(--main-color);
+  height: 100%;
 }
 
 .user-dropdown {
@@ -172,13 +206,13 @@ export default ({
           @apply text-blue-400;
         }
       }
-        &:last-of-type {
-          padding-bottom: 0.5rem;
-        }
-        &:first-of-type {
-          padding-top: 0.5rem;
-        }
+      &:last-of-type {
+        padding-bottom: 0.5rem;
+      }
+      &:first-of-type {
+        padding-top: 0.5rem;
+      }
     }
   }
-}
-</style>>
+}</style
+>>

@@ -5,7 +5,10 @@
     <div class="bg-gray-200">
       <div class="container mx-4">
         <main>
-          <GameList v-if="games.length > 0 && searchedGames.length == 0" :games="games" />
+          <GameList
+            v-if="games.length > 0 && searchedGames.length == 0"
+            :games="games"
+          />
           <GameResults v-if="searchedGames.length > 0" :games="searchedGames" />
         </main>
       </div>
@@ -15,11 +18,7 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import axios from 'axios'
 import { mapGetters } from 'vuex'
-
-
-import Logo from '~/components/Logo.vue'
 import Nav from '~/components/Nav.vue'
 import Hero from '~/components/Hero.vue'
 import GameList from '~/components/GameList.vue'
@@ -27,11 +26,10 @@ import GameResults from '~/components/GameResults.vue'
 
 export default Vue.extend({
   components: {
-    Logo,
     Nav,
     Hero,
     GameList,
-    GameResults,
+    GameResults
   },
   data() {
     return {
@@ -42,7 +40,7 @@ export default Vue.extend({
     ...mapGetters({
       searchedGames: 'getSearchedGames'
     })
-  },
+  }
   // mounted() {
   //   this.$store.dispatch('users/getLibrary')
   //   this.$store.dispatch('users/getWishlist')

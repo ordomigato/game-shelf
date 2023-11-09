@@ -1,14 +1,20 @@
 <template>
   <section class="pt-4 pb-8 mx-4">
     <div class="container">
-      <h2 class="font-bold pb-4 text-center">{{user.first_name}} {{user.last_name}}</h2>
+      <h2 class="font-bold pb-4 text-center">
+        {{ user.first_name }} {{ user.last_name }}
+      </h2>
       <div class="flex flex-col">
-        <div class="w-full flex flex-col md:flex-row md:w-2/3 lg:w-1/2 md:inline mx-auto">
+        <div
+          class="w-full flex flex-col md:flex-row md:w-2/3 lg:w-1/2 md:inline mx-auto"
+        >
           <div class="profile-image_container">
-            <img :src="user.profile_pic" class="mx-auto">
+            <img :src="user.profile_pic" class="mx-auto" />
           </div>
           <div class="profile-info_container px-8 pt-4 text-center">
-            <p>Games Owned: {{ ownedGames == undefined ? 0 : ownedGames.length }}</p>
+            <p>
+              Games Owned: {{ ownedGames == undefined ? 0 : ownedGames.length }}
+            </p>
             <p>Wishlist: {{ wishlist == undefined ? 0 : wishlist.length }}</p>
             <p>Joined: {{ joined }}</p>
           </div>
@@ -16,16 +22,42 @@
         <div id="bio" class="max-w-screen-sm w-full 2 pt-4 mx-auto">
           <header class="pl-6">
             <div id="update-bio-icon">
-              <fa v-if="!currentlyEditing" :icon="['fa', 'edit']" @click="editProfileBio" class="edit-icon icon" />
-              <fa v-if="currentlyEditing" :icon="['fas', 'times']" @click="stopEditProfileBio" class="stop-icon icon" />
+              <fa
+                v-if="!currentlyEditing"
+                :icon="['fa', 'edit']"
+                class="edit-icon icon"
+                @click="editProfileBio"
+              />
+              <fa
+                v-if="currentlyEditing"
+                :icon="['fas', 'times']"
+                class="stop-icon icon"
+                @click="stopEditProfileBio"
+              />
             </div>
             <h3 class="font-bold pb-2 pr-1 inline-block">Bio</h3>
           </header>
           <div id="update-bio_error-container"></div>
-          <textarea @change="editingHandler" id="profile-bio" rows="5" class="w-full" v-model="editBio" placeholder="Tell us about yourself <(^_^)>" readonly></textarea>
-          <button v-if="currentlyEditing" id="update-bio-button" @click="submitBio" class="bg-secondary mt-2 text-white py-2 px-4 opacity-50 focus:outline-none cursor-default" type="button" disabled>Change Bio</button>
-          <div class="favourite-games">
-          </div>
+          <textarea
+            id="profile-bio"
+            v-model="editBio"
+            rows="5"
+            class="w-full"
+            placeholder="Tell us about yourself <(^_^)>"
+            readonly
+            @change="editingHandler"
+          ></textarea>
+          <button
+            v-if="currentlyEditing"
+            id="update-bio-button"
+            class="bg-secondary mt-2 text-white py-2 px-4 opacity-50 focus:outline-none cursor-default"
+            type="button"
+            disabled
+            @click="submitBio"
+          >
+            Change Bio
+          </button>
+          <div class="favourite-games"></div>
         </div>
       </div>
     </div>
@@ -39,11 +71,8 @@ export default {
   data() {
     return {
       editBio: '',
-      currentlyEditing: false,
+      currentlyEditing: false
     }
-  },
-  mounted() {
-    this.editBio = this.user.bio || ''
   },
   computed: {
     ...mapGetters({
@@ -53,33 +82,36 @@ export default {
       joined: 'users/getJoinedDate'
     })
   },
+  mounted() {
+    this.editBio = this.user.bio || ''
+  },
   methods: {
-    editingHandler: function() {
+    editingHandler() {
       // change css of button and textarea
-      let textarea = document.getElementById('profile-bio')
-      let button = document.getElementById('update-bio-button')
-      if(this.editBio !== this.bio) {
-        button.classList.remove("opacity-50","cursor-default")
+      const button = document.getElementById('update-bio-button')
+      if (this.editBio !== this.bio) {
+        button.classList.remove('opacity-50', 'cursor-default')
         button.disabled = false
       } else {
-        button.classList.add("opacity-50","cursor-default")
+        button.classList.add('opacity-50', 'cursor-default')
         button.disabled = true
       }
     },
-    editProfileBio: function() {
-      let textarea = document.getElementById('profile-bio')
-      let button = document.getElementById('update-bio-button')
+    editProfileBio() {
+      const textarea = document.getElementById('profile-bio')
       textarea.readOnly = false
       textarea.focus()
       this.currentlyEditing = true
     },
-    stopEditProfileBio: function() {
-      let textarea = document.getElementById('profile-bio')
+    stopEditProfileBio() {
+      const textarea = document.getElementById('profile-bio')
       textarea.readOnly = true
       this.currentlyEditing = false
     },
-    submitBio: function() {
-      const errorContainer = document.getElementById('update-bio_error-container')
+    submitBio() {
+      const errorContainer = document.getElementById(
+        'update-bio_error-container'
+      )
       errorContainer.innerHTML = ''
       // Check if bio is different
       if (this.bio === this.editBio) return
@@ -88,17 +120,20 @@ export default {
         return
       }
       // submit new bio
-      this.$fireStore.collection('users').doc(this.user.uid).update({
-        bio: this.editBio
-      })
-      .then(() => {
-        let textarea = document.getElementById('profile-bio')
-        this.currentlyEditing = false
-        textarea.readOnly = true
-      })
-      .catch(err => {
-        errorContainer.innerHTML = `<p class="text-red-400">${err}</p>`
-      })
+      this.$fireStore
+        .collection('users')
+        .doc(this.user.uid)
+        .update({
+          bio: this.editBio
+        })
+        .then(() => {
+          const textarea = document.getElementById('profile-bio')
+          this.currentlyEditing = false
+          textarea.readOnly = true
+        })
+        .catch((err) => {
+          errorContainer.innerHTML = `<p class="text-red-400">${err}</p>`
+        })
     }
   }
 }
@@ -126,7 +161,7 @@ export default {
     outline: none;
     &:focus {
       border-left: 4px solid var(--secondary-color);
-      transition: all 0.1s ease-out
+      transition: all 0.1s ease-out;
     }
     &:hover {
       @apply shadow-md px-4 py-2;
@@ -137,7 +172,7 @@ export default {
       cursor: default;
       &:focus {
         border-left: 0px;
-        transition: all 0.1s ease-out
+        transition: all 0.1s ease-out;
       }
     }
   }

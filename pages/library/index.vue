@@ -2,8 +2,10 @@
   <div>
     <Nav />
     <main class="nav-padding">
-      <Profile v-if="user.joined" /> <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
-      <Library v-if="user.joined" /> <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
+      <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
+      <Profile v-if="user.joined" />
+      <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
+      <Library v-if="user.joined" />
     </main>
   </div>
 </template>
@@ -23,11 +25,10 @@ export default {
   },
   computed: {
     ...mapGetters({
-      user: 'users/getUser',
+      user: 'users/getUser'
     })
-  },
+  }
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

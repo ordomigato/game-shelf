@@ -3,9 +3,9 @@
     <Nav />
     <main class="nav-padding">
       <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
-      <Profile v-if="user.joined" />
+      <Profile v-if="user && user.joined" />
       <!-- makes sure onAuthStateChanged has got all the info before rendering. -->
-      <Library v-if="user.joined" />
+      <Library v-if="user && user.joined" />
     </main>
   </div>
 </template>

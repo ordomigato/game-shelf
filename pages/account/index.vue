@@ -1,7 +1,7 @@
 <template>
   <div class="account-settings-page page">
     <Nav />
-    <main class="nav-padding container">
+    <main v-if="user" class="nav-padding container">
       <h2 class="pt-4 pb-2 font-bold ml-4">Account Settings</h2>
       <div class="mx-auto px-8 py-8 shadow-md">
         <ul id="account-message-container" class="text-red-400"></ul>

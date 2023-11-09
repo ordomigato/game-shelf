@@ -1,6 +1,11 @@
 require('dotenv').config()
 
 export default {
+  generate: {
+    fallback: true
+  },
+  target: 'static',
+  ssr: 'false',
   mode: 'universal',
   /*
    ** Headers of the page
@@ -25,18 +30,15 @@ export default {
   /*
    ** Global CSS
    */
-  css: [
-    '~assets/css/global.css',
-    'swiper/css/swiper.css'
-  ],
+  css: ['~assets/css/global.css', 'swiper/css/swiper.css'],
   /*
    ** Plugins to load before mounting the App
    */
   plugins: [
     '~/plugins/gameLibraryMixins.js',
-    { src: '@/plugins/vue-awesome-swiper', ssr: false },
+    { src: '@/plugins/vue-awesome-swiper', ssr: false }
   ],
-    /*
+  /*
    ** Router settings
    */
   router: {
@@ -56,55 +58,59 @@ export default {
   modules: [
     'nuxt-lazy-load',
     '@nuxtjs/dotenv',
-    ['@nuxtjs/firebase',
+    [
+      '@nuxtjs/firebase',
       {
         config: {
-          apiKey: "AIzaSyBb-NGwBZ6JlSW_BqxGEtflw1DdBBHvvRw",
-          authDomain: "gameshelf-510ba.firebaseapp.com",
-          databaseURL: "https://gameshelf-510ba.firebaseio.com",
-          projectId: "gameshelf-510ba",
-          storageBucket: "gameshelf-510ba.appspot.com",
-          messagingSenderId: "769359361119",
-          appId: "1:769359361119:web:3c334d177018ba0882d7ea",
-          measurementId: "G-CCCTVVRWFM"
+          apiKey: 'AIzaSyBb-NGwBZ6JlSW_BqxGEtflw1DdBBHvvRw',
+          authDomain: 'gameshelf-510ba.firebaseapp.com',
+          databaseURL: 'https://gameshelf-510ba.firebaseio.com',
+          projectId: 'gameshelf-510ba',
+          storageBucket: 'gameshelf-510ba.appspot.com',
+          messagingSenderId: '769359361119',
+          appId: '1:769359361119:web:3c334d177018ba0882d7ea',
+          measurementId: 'G-CCCTVVRWFM'
         },
         services: {
           auth: {
             initialize: {
               onAuthStateChangedAction: 'users/onAuthStateChangedAction'
-            },
+            }
           },
           firestore: true,
           storage: true,
-          functions: true,
+          functions: true
         }
       }
     ],
     ['@nuxtjs/axios', { proxy: true }],
-    ['nuxt-fontawesome', {
-      component: 'fa', 
-      imports: [
-        //import whole set
-        {
-          set: '@fortawesome/free-solid-svg-icons',
-          icons: ['fas']
-        },
-        {
-          set: '@fortawesome/free-regular-svg-icons',
-          icons: ['far']
-        },
-      ]
-    }]
+    [
+      'nuxt-fontawesome',
+      {
+        component: 'fa',
+        imports: [
+          // import whole set
+          {
+            set: '@fortawesome/free-solid-svg-icons',
+            icons: ['fas']
+          },
+          {
+            set: '@fortawesome/free-regular-svg-icons',
+            icons: ['far']
+          }
+        ]
+      }
+    ]
   ],
   /*
    ** Axios module configuration
    ** See https://axios.nuxtjs.org/options
    */
   axios: {
-    baseURL: process.env.baseUrl || 'https://game-shelf-app.herokuapp.com/',
+    baseURL: process.env.baseUrl || 'https://game-shelf-app.herokuapp.com/'
   },
   proxy: {
-    '/games/': 'https://api.igdb.com/v4',
+    '/games/': 'https://api.igdb.com/v4'
   },
   /*
    ** Build configuration
@@ -122,5 +128,5 @@ export default {
   },
   purgeCSS: {
     whitelistPatterns: [/(^|\.)fa-/, /-fa($|\.)/]
-  },
+  }
 }

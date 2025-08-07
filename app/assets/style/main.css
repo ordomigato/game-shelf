@@ -1,0 +1,15 @@
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-VariableFont_wght.tff') format('tff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  font-family: 'Geist', sans-serif;
+}
+
+.w-100 {
+  width: 100%;
+}

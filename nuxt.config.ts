@@ -9,6 +9,15 @@ export default defineNuxtConfig({
       title: 'GameShelf',
     },
   },
+  runtimeConfig: {
+    public: {
+      cognitoUserPoolId: '',
+      cognitoClientId: '',
+    },
+  },
+  nitro: {
+    preset: 'aws-lambda',
+  },
   eslint: {
     config: {
       typescript: { strict: true },

@@ -9,10 +9,11 @@ description: >
 
 # The gate before calling anything done
 
-Use Node 24 (`nvm use`). Then:
+Use Node 24 (`nvm use`). On a fresh clone, run `npx sst install` once so
+the SST types `typecheck` relies on exist. Then:
 
 ```bash
-npm run typecheck      # nuxi typecheck (vue-tsc)
+npm run typecheck      # nuxi typecheck (vue-tsc), then sst.config.ts
 npm run lint           # @nuxt/eslint with strict typescript-eslint rules
 npm run format:check   # prettier
 npm run build          # full Nuxt build

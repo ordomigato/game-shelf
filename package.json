@@ -16,7 +16,11 @@
     "prepare": "husky",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "sst shell --stage dev -- drizzle-kit migrate",
-    "db:studio": "sst shell --stage dev -- drizzle-kit studio"
+    "db:studio": "sst shell --stage dev -- drizzle-kit studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:check": "drizzle-kit check"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -33,6 +37,7 @@
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
     "@nuxt/eslint": "^1.17.0",
+    "@playwright/test": "^1.64.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
@@ -40,6 +45,7 @@
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "typescript": "^6.0.3",
+    "vitest": "^5.0.3",
     "vue-tsc": "^3.3.12"
   },
   "lint-staged": {

@@ -16,16 +16,25 @@ the SST types `typecheck` relies on exist. Then:
 npm run typecheck      # nuxi typecheck (vue-tsc), then sst.config.ts
 npm run lint           # @nuxt/eslint with strict typescript-eslint rules
 npm run format:check   # prettier
+npm test               # vitest: unit tests in app/, server/, shared/ (*.test.ts)
 npm run build          # full Nuxt build
+npm run test:e2e       # playwright: builds as a plain Node server, runs e2e/
 ```
+
+CI (`.github/workflows/ci.yml`) runs all of these on every PR, plus
+commitlint on every commit and a check that `server/db/schema.ts` has no
+changes missing a migration. Run them locally first anyway. CI is the
+backstop, not the first check.
 
 The commit hook runs eslint and prettier on staged files only, and checks
 the commit message. It doesn't run typecheck or the build, so run those
 yourself.
 
-There's no unit or e2e test suite and no CI yet. Don't claim one ran. If a
-change would clearly benefit from a test, say so and offer to add the
-tooling rather than quietly skipping it.
+Logic with real rules (validating item values against a collection's
+fields, permission checks, IGDB query building) gets a Vitest test next to
+it. A user-facing flow gets a Playwright test in `e2e/`. E2E tests run
+against a build without AWS, so pages that need the database or IGDB need
+those calls stubbed. Raise it when a flow can't be tested that way.
 
 ## What counts as passing
 
@@ -33,6 +42,7 @@ tooling rather than quietly skipping it.
   error is new, even in a file the change didn't touch.
 - `format:check`: clean, or run `npm run format` first.
 - `build`: completes.
+- `test`, `test:e2e`: all green, not only the tests for the area touched.
 
 ## Check it in the running app
 

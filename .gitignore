@@ -32,3 +32,7 @@ logs
 
 # Local notes
 *.local.md
+
+# Playwright
+test-results
+playwright-report

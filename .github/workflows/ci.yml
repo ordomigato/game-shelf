@@ -29,7 +29,40 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
+      - run: npm test
       - run: npm run build
+
+      - name: Check migrations match the schema
+        run: |
+          npm run db:check
+          npx drizzle-kit generate
+          if [ -n "$(git status --porcelain server/db/migrations)" ]; then
+            echo "::error::server/db/schema.ts has changes without a migration. Run npm run db:generate."
+            exit 1
+          fi
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
 
   commitlint:
     if: github.event_name == 'pull_request'

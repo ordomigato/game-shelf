@@ -16,7 +16,8 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    preset: 'aws-lambda',
+    // E2E tests build with NITRO_PRESET=node-server so they can run locally.
+    preset: process.env.NITRO_PRESET ?? 'aws-lambda',
     typescript: {
       tsConfig: {
         include: ['../sst-env.d.ts'],

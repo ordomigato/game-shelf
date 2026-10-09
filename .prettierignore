@@ -8,3 +8,5 @@ node_modules
 package-lock.json
 sst-env.d.ts
 server/db/migrations
+test-results
+playwright-report

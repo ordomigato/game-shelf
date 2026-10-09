@@ -3,7 +3,15 @@ import type { GameSummary } from '#shared/types/game'
 
 const props = defineProps<{ game: GameSummary }>()
 
+const expanded = ref(false)
+
 const platforms = computed(() => summarizePlatforms(props.game.platforms))
+const visiblePlatforms = computed(() =>
+  expanded.value ? props.game.platforms : platforms.value.shown,
+)
+const hiddenPlatforms = computed(() =>
+  props.game.platforms.slice(platforms.value.shown.length),
+)
 </script>
 
 <template>
@@ -19,21 +27,32 @@ const platforms = computed(() => summarizePlatforms(props.game.platforms))
         </p>
       </div>
       <ul
-        v-if="platforms.shown.length"
+        v-if="game.platforms.length"
         class="flex flex-wrap gap-1"
         aria-label="Platforms"
       >
-        <li v-for="platform in platforms.shown" :key="platform">
+        <li v-for="platform in visiblePlatforms" :key="platform">
           <Badge variant="secondary" class="text-[11px]">{{ platform }}</Badge>
         </li>
-        <li v-if="platforms.hiddenCount">
-          <Badge
-            variant="outline"
-            class="text-[11px] text-muted-foreground"
-            :title="game.platforms.slice(platforms.shown.length).join(', ')"
-          >
-            +{{ platforms.hiddenCount }}
-          </Badge>
+        <li v-if="platforms.hiddenCount && !expanded">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="rounded-4xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :aria-label="`Show ${platforms.hiddenCount} more platform${platforms.hiddenCount === 1 ? '' : 's'}`"
+                @click="expanded = true"
+              >
+                <Badge
+                  variant="outline"
+                  class="cursor-pointer text-[11px] text-muted-foreground hover:bg-muted"
+                >
+                  +{{ platforms.hiddenCount }}
+                </Badge>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ hiddenPlatforms.join(', ') }}</TooltipContent>
+          </Tooltip>
         </li>
       </ul>
     </div>

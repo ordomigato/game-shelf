@@ -63,6 +63,29 @@ test('searching shows results and keeps the term in the URL', async ({
   await expect(page).toHaveURL(/\?q=zelda$/)
 })
 
+test('hidden platforms show in a tooltip and expand on click', async ({
+  page,
+}) => {
+  await stubSearch(page, (_q, pageNumber) => ({
+    body: { games: makeGames(1), page: pageNumber, hasMore: false },
+  }))
+  await page.goto('/')
+  await page.getByRole('searchbox', { name: 'Search games' }).fill('zelda')
+
+  const more = page.getByRole('button', { name: 'Show 1 more platform' })
+  await more.hover()
+  await expect(page.getByRole('tooltip')).toHaveText('WiiU')
+
+  await more.click()
+  const platforms = page.getByRole('list', { name: 'Platforms' })
+  await expect(platforms.getByRole('listitem')).toHaveText([
+    'NES',
+    'SNES',
+    'Wii',
+    'WiiU',
+  ])
+})
+
 test('one character asks for more instead of searching', async ({ page }) => {
   let calls = 0
   await stubSearch(page, () => {

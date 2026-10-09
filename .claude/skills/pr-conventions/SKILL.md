@@ -28,8 +28,10 @@ A summary in the same voice as a commit message: what changed and why, not
 a restatement of the diff. A few bullet points at most. If the title says
 it all, a one-line body is fine.
 
-If the change adds an AWS resource, say what it costs at this scale (see
-`project-context`). That's part of the "why", not a checklist.
+Mention cost only when the change adds or changes something that can cost
+money (a new AWS resource, a paid service, a bigger plan). Then say what it
+costs at this scale (see `project-context`) as part of the "why". Never add
+a "Cost: $0" line to PRs that don't touch cost.
 
 Not this:
 

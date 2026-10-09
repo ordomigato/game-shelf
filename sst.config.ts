@@ -17,17 +17,9 @@ export default $config({
 
     const twitchClientId = new sst.Secret('TwitchClientId')
     const twitchClientSecret = new sst.Secret('TwitchClientSecret')
-
-    // One item per game in a user's library. `status` is "owned" or
-    // "wishlist", so a game can never be in both.
-    const library = new sst.aws.Dynamo('Library', {
-      fields: {
-        userId: 'string',
-        gameId: 'number',
-      },
-      primaryIndex: { hashKey: 'userId', rangeKey: 'gameId' },
-      deletionProtection: isProduction,
-    })
+    // Neon Postgres connection string. Each stage points at its own Neon
+    // branch.
+    const databaseUrl = new sst.Secret('DatabaseUrl')
 
     const userPool = new sst.aws.CognitoUserPool('Users', {
       usernames: ['email'],
@@ -38,7 +30,7 @@ export default $config({
       link: [
         twitchClientId,
         twitchClientSecret,
-        library,
+        databaseUrl,
         userPool,
         userPoolClient,
       ],

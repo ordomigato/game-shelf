@@ -22,7 +22,7 @@ Add a resource to the Nuxt component's `link` array, then read it in
 ```ts
 import { Resource } from 'sst'
 
-Resource.Library.name // DynamoDB table name
+Resource.DatabaseUrl.value // Neon connection string (secret)
 Resource.TwitchClientSecret.value // secret value
 Resource.Users.id // Cognito user pool id
 Resource.WebClient.id // user pool client id
@@ -67,7 +67,6 @@ here:
   refuses a reservation that leaves fewer than its minimum unreserved. If a
   deploy fails on that, ask the user to request a quota increase rather
   than removing the cap.
-- DynamoDB on-demand (SST's default). Don't switch to provisioned capacity.
 - No `provisioned` concurrency, no VPC, no NAT, no RDS.
 - Say what a new resource costs at this scale in the PR.
 

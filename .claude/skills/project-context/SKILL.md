@@ -10,8 +10,11 @@ description: >
 
 # Where this project keeps its own context
 
-GameShelf is a personal game catalog: search IGDB, mark games as owned or
-wishlisted, and keep a basic account. `main` is v3, a clean rewrite with no
+GameShelf lets people build their own game collections and share them.
+Each collection has columns the user defines (a collector tracks price and
+quantity, a player tracks console and progress), and IGDB search only
+pre-fills new items. Users own their data. Public collections can be
+browsed by others, with posts and comments planned around them. `main` is v3, a clean rewrite with no
 shared history. The `v1` tag holds the original (Nuxt 2, Heroku, Firebase)
 and the `v2` branch an abandoned Netlify attempt. Read them for behavior
 with `git show v1:<path>`, but don't port their architecture.
@@ -26,14 +29,21 @@ user first.
   `sst.config.ts` and nowhere else. No clicking resources into existence in
   the console.
 - **Nuxt server routes are the backend.** `server/api/` is where anything
-  secret or privileged happens: IGDB calls (see `igdb`) and every DynamoDB
-  read and write. The browser never gets AWS credentials of its own and
-  never talks to DynamoDB directly.
+  secret or privileged happens: IGDB calls (see `igdb`) and every database
+  read and write. The browser never talks to the database directly.
 - **Cognito for accounts.** The browser signs in with Cognito and sends its
   ID token to server routes. A server route verifies that token before
   touching user data and takes the user id from the verified token, never
   from the request body.
-- **DynamoDB for data.** One table for the library, keyed by user and game.
+- **Postgres on Neon, through Drizzle.** Neon is serverless Postgres: free
+  at this scale, sleeps when idle, no VPC needed. Each SST stage has its
+  own Neon branch, reached through the `DatabaseUrl` secret. Relational
+  tables for users, collections, posts and comments. The user-defined
+  columns live in JSONB (`collections.fields` holds the definitions,
+  `items.data` the values). See `postgres-change`.
+- **Not DynamoDB, not Aurora DSQL, not RDS.** DynamoDB was dropped because
+  the social features are relational. DSQL has no JSONB. RDS and
+  self-hosted Postgres cost more than the whole budget.
 - **No profile pictures.** Dropped on purpose. Don't add file uploads.
 - **v3 starts with no data from v1.** Nothing is migrated from Firebase
   unless the user asks.
@@ -44,8 +54,8 @@ user first.
 
 The account has a budget alert. These keep it quiet:
 
-- Stay inside the always-free tiers: Lambda, DynamoDB on-demand at this
-  scale, CloudFront, Cognito.
+- Stay inside the always-free tiers: Lambda, CloudFront, Cognito, and
+  Neon's free plan (1 GB storage, 100 compute-hours a month).
 - Never add a NAT Gateway, RDS, ElastiCache, a load balancer, or anything
   else billed per hour just for existing. Each costs more than the whole
   monthly budget.

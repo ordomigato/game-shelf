@@ -6,6 +6,31 @@
 
 declare module "sst" {
   export interface Resource {
+    "DatabaseUrl": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "Site": {
+      "type": "sst.aws.Nuxt"
+      "url": string
+    }
+    "TwitchClientId": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "TwitchClientSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "Users": {
+      "id": string
+      "type": "sst.aws.CognitoUserPool"
+    }
+    "WebClient": {
+      "id": string
+      "secret": string
+      "type": "sst.aws.CognitoUserPoolClient"
+    }
   }
 }
 

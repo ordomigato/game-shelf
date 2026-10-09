@@ -1,0 +1,140 @@
+<script setup lang="ts">
+import { ArrowLeft, ExternalLink } from '@lucide/vue'
+import type { GameDetails } from '#shared/types/game'
+
+const route = useRoute()
+const router = useRouter()
+
+const { data: game, error } = await useFetch<GameDetails>(
+  () => `/api/games/${String(route.params.id)}`,
+)
+
+if (error.value) {
+  const notFound = [400, 404].includes(error.value.statusCode ?? 0)
+  throw createError({
+    statusCode: notFound ? 404 : 502,
+    statusMessage: notFound ? 'Game not found' : 'Game data unavailable',
+    fatal: true,
+  })
+}
+
+useHead(() => ({
+  title: game.value ? `${game.value.name} · GameShelf` : 'GameShelf',
+}))
+
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else void navigateTo('/')
+}
+</script>
+
+<template>
+  <div v-if="game" class="flex flex-col gap-10">
+    <div>
+      <Button variant="ghost" size="sm" class="-ml-2" @click="goBack">
+        <ArrowLeft />
+        Back
+      </Button>
+    </div>
+
+    <section class="grid gap-8 md:grid-cols-[16rem_1fr]">
+      <GameCover
+        :name="game.name"
+        :cover-id="game.coverId"
+        class="w-48 md:w-full"
+      />
+
+      <div class="flex flex-col gap-6">
+        <div>
+          <Badge variant="outline" class="text-muted-foreground">
+            From IGDB
+          </Badge>
+          <h1 class="mt-3 text-4xl font-bold">{{ game.name }}</h1>
+          <p v-if="game.releaseDate" class="mt-1 text-muted-foreground">
+            Released {{ formatReleaseDate(game.releaseDate) }}
+          </p>
+        </div>
+
+        <dl class="grid gap-4 text-sm sm:grid-cols-2">
+          <div v-if="game.developers.length">
+            <dt class="font-medium text-muted-foreground">Developer</dt>
+            <dd class="mt-1">{{ game.developers.join(', ') }}</dd>
+          </div>
+          <div v-if="game.publishers.length">
+            <dt class="font-medium text-muted-foreground">Publisher</dt>
+            <dd class="mt-1">{{ game.publishers.join(', ') }}</dd>
+          </div>
+          <div v-if="game.genres.length">
+            <dt class="font-medium text-muted-foreground">Genres</dt>
+            <dd class="mt-1">
+              <ul class="flex flex-wrap gap-1" aria-label="Genres">
+                <li v-for="genre in game.genres" :key="genre">
+                  <Badge variant="outline">{{ genre }}</Badge>
+                </li>
+              </ul>
+            </dd>
+          </div>
+          <div v-if="game.platforms.length">
+            <dt class="font-medium text-muted-foreground">Platforms</dt>
+            <dd class="mt-1">
+              <ul class="flex flex-wrap gap-1" aria-label="Platforms">
+                <li
+                  v-for="platform in game.platforms"
+                  :key="platform"
+                  class="max-w-full min-w-0"
+                >
+                  <PlatformPill :name="platform" />
+                </li>
+              </ul>
+            </dd>
+          </div>
+        </dl>
+
+        <div>
+          <h2 class="text-xl font-semibold">About</h2>
+          <p
+            v-if="game.summary"
+            class="mt-2 max-w-prose leading-relaxed whitespace-pre-line"
+          >
+            {{ game.summary }}
+          </p>
+          <p v-else class="mt-2 text-muted-foreground">
+            IGDB has no description for this game yet.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="game.screenshotIds.length">
+      <h2 class="text-xl font-semibold">Screenshots</h2>
+      <ul class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <li v-for="(imageId, index) in game.screenshotIds" :key="imageId">
+          <img
+            :src="igdbImageUrl(imageId, 'screenshot_med')"
+            :srcset="`${igdbImageUrl(imageId, 'screenshot_med')} 1x, ${igdbImageUrl(imageId, 'screenshot_big')} 2x`"
+            :alt="`Screenshot ${index + 1} of ${game.name}`"
+            loading="lazy"
+            decoding="async"
+            class="aspect-video w-full rounded-md bg-muted object-cover ring-1 ring-border"
+          />
+        </li>
+      </ul>
+    </section>
+
+    <aside
+      class="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground"
+    >
+      <p>Game data from IGDB. It may be incomplete or out of date.</p>
+      <a
+        v-if="game.igdbUrl"
+        :href="game.igdbUrl"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
+      >
+        View this game on IGDB
+        <ExternalLink class="size-3.5" aria-hidden="true" />
+      </a>
+    </aside>
+  </div>
+</template>

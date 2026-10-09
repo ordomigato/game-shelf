@@ -1,7 +1,8 @@
-import type { GameSummary } from '../../shared/types/game'
+import type { GameDetails, GameSummary } from '../../shared/types/game'
 
 export const SEARCH_PAGE_SIZE = 24
 export const MAX_SEARCH_PAGE = 20
+export const MAX_SCREENSHOTS = 4
 
 /**
  * IGDB `game_type` ids shown in search: main games, expansions, bundles,
@@ -53,5 +54,56 @@ export function toGameSummary(game: IgdbGame): GameSummary {
       ? new Date(game.first_release_date * 1000).getUTCFullYear()
       : null,
     platforms: [...new Set(platforms)],
+  }
+}
+
+/** The fields of an IGDB `games` row that the detail page asks for. */
+export interface IgdbGameDetails extends IgdbGame {
+  summary?: string
+  url?: string
+  genres?: { name: string }[]
+  involved_companies?: {
+    company: { name: string }
+    developer: boolean
+    publisher: boolean
+  }[]
+  screenshots?: { image_id: string }[]
+}
+
+export function buildGameQuery(id: number): string {
+  if (!Number.isSafeInteger(id) || id < 1) {
+    throw new Error(`Invalid IGDB game id: ${id}`)
+  }
+  return [
+    'fields name, summary, url, first_release_date, cover.image_id,',
+    'platforms.name, genres.name, screenshots.image_id,',
+    'involved_companies.company.name, involved_companies.developer,',
+    'involved_companies.publisher;',
+    `where id = ${id};`,
+    'limit 1;',
+  ].join(' ')
+}
+
+export function toGameDetails(game: IgdbGameDetails): GameDetails {
+  const companies = game.involved_companies ?? []
+  const companyNames = (role: 'developer' | 'publisher') => [
+    ...new Set(companies.filter((c) => c[role]).map((c) => c.company.name)),
+  ]
+  return {
+    id: game.id,
+    name: game.name,
+    coverId: game.cover?.image_id ?? null,
+    releaseDate: game.first_release_date
+      ? new Date(game.first_release_date * 1000).toISOString().slice(0, 10)
+      : null,
+    summary: game.summary?.trim() || null,
+    platforms: [...new Set((game.platforms ?? []).map((p) => p.name))],
+    genres: (game.genres ?? []).map((genre) => genre.name),
+    developers: companyNames('developer'),
+    publishers: companyNames('publisher'),
+    screenshotIds: (game.screenshots ?? [])
+      .slice(0, MAX_SCREENSHOTS)
+      .map((shot) => shot.image_id),
+    igdbUrl: game.url ?? null,
   }
 }

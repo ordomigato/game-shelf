@@ -16,16 +16,27 @@ const hiddenPlatforms = computed(() =>
 
 <template>
   <article class="flex flex-col gap-2">
-    <GameCover :name="game.name" :cover-id="game.coverId" />
-    <div class="flex flex-col gap-1.5">
+    <NuxtLink
+      :to="`/games/${game.id}`"
+      class="group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <GameCover
+        :name="game.name"
+        :cover-id="game.coverId"
+        class="transition group-hover:ring-2 group-hover:ring-primary"
+      />
       <div>
-        <h3 class="line-clamp-2 text-sm leading-snug font-semibold">
+        <h3
+          class="line-clamp-2 text-sm leading-snug font-semibold group-hover:underline"
+        >
           {{ game.name }}
         </h3>
         <p v-if="game.year" class="text-xs text-muted-foreground">
           {{ game.year }}
         </p>
       </div>
+    </NuxtLink>
+    <div class="flex flex-col gap-1.5">
       <ul
         v-if="game.platforms.length"
         class="flex flex-wrap gap-1"

@@ -23,7 +23,8 @@ repo. Do it when the user asked for issue work, and say what you created.
 
 ## Labels
 
-One area label per part of the app: `search`, `library`, `account`,
+One area label per part of the app: `search`, `collections`, `social`,
+`account`,
 `api` (Nuxt server routes), `infra` (SST, AWS resources, tooling). Plus GitHub's defaults: `bug`, `enhancement`, `question`,
 `documentation`. A `question` issue is an open decision for the user, not a
 task.
@@ -34,7 +35,7 @@ than inventing a new one:
 ```bash
 curl -s "${AUTH[@]}" "https://api.github.com/repos/$OWNER/$REPO/labels" | jq '[.[].name]'
 curl -s -X POST "${AUTH[@]}" "https://api.github.com/repos/$OWNER/$REPO/labels" \
-  -d '{"name": "library", "description": "Owned games and wishlist", "color": "1d76db"}'
+  -d '{"name": "collections", "description": "Collections and their items", "color": "1d76db"}'
 ```
 
 Keep a label description to a short phrase.
@@ -43,7 +44,7 @@ Keep a label description to a short phrase.
 
 ```bash
 curl -s -X POST "${AUTH[@]}" "https://api.github.com/repos/$OWNER/$REPO/issues" \
-  -d '{"title": "...", "body": "...", "labels": ["library"]}' | jq '{number, html_url}'
+  -d '{"title": "...", "body": "...", "labels": ["collections"]}' | jq '{number, html_url}'
 ```
 
 No id prefix in the title. The issue number is the id. The body is the task
@@ -52,7 +53,7 @@ in full. Cross-references are real `#<number>` links.
 ## Listing
 
 ```bash
-curl -s "${AUTH[@]}" "https://api.github.com/repos/$OWNER/$REPO/issues?labels=library&state=open" \
+curl -s "${AUTH[@]}" "https://api.github.com/repos/$OWNER/$REPO/issues?labels=collections&state=open" \
   | jq '.[] | select(.pull_request | not) | {number, title}'
 ```
 

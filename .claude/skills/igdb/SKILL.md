@@ -60,6 +60,7 @@ so render a placeholder rather than a broken image.
 
 ## Storing games
 
-A library entry stores a small snapshot of the game (`name`, `coverId`)
-alongside the user's status, so the library page renders without calling
-IGDB at all. Don't fetch from IGDB per tile on page load.
+IGDB only pre-fills. When a user adds a game, the item copies `name`,
+`coverId` and `igdbId` into its own row, and from then on the user owns
+that data and can edit it. GameShelf doesn't mirror IGDB's catalog. Pages
+render from the database, so don't call IGDB per item on page load.

@@ -7,3 +7,4 @@ node_modules
 .sst
 package-lock.json
 sst-env.d.ts
+server/db/migrations

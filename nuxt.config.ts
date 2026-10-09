@@ -17,6 +17,11 @@ export default defineNuxtConfig({
   },
   nitro: {
     preset: 'aws-lambda',
+    typescript: {
+      tsConfig: {
+        include: ['../sst-env.d.ts'],
+      },
+    },
   },
   eslint: {
     config: {

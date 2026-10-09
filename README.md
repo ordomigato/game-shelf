@@ -1,6 +1,7 @@
 # GameShelf
 
-Search IGDB, keep track of the games you own and the ones you want.
+Build your own game collections, with the columns you care about, and share them.
+IGDB search fills in the details.
 
 Nuxt 4 on AWS. Requires Node 24 (`nvm use`).
 
@@ -28,9 +29,21 @@ One-time setup per stage:
 ```bash
 npx sst secret set TwitchClientId <id> --stage dev
 npx sst secret set TwitchClientSecret <secret> --stage dev
+npx sst secret set DatabaseUrl <neon connection string> --stage dev
 ```
 
 Production also needs `npx sst secret set BudgetAlertEmail <email> --stage production`.
 Deploy with `npx sst deploy --stage production`.
+
+## Database
+
+Postgres on [Neon](https://neon.tech), one Neon branch per stage, with
+[Drizzle](https://orm.drizzle.team). The schema is in `server/db/schema.ts`.
+
+```bash
+npm run db:generate -- --name <change>   # write a migration from the schema
+npm run db:migrate                        # apply migrations to dev
+npm run db:studio                         # browse the dev database
+```
 
 Commits follow `type(scope): subject` and are checked by a commit hook.

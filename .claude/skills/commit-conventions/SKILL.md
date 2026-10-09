@@ -15,7 +15,7 @@ type(scope): subject
 ```
 
 `scope` is optional and freeform: any short word naming what the commit
-touches (`search`, `library`, `auth`, `api`, `infra`, `deps`). `type` is one of:
+touches (`search`, `collections`, `auth`, `db`, `api`, `infra`, `deps`). `type` is one of:
 
 ```
 feat fix docs style refactor perf test build ci chore revert
@@ -39,11 +39,11 @@ convention, so don't copy their style.
 ## Examples
 
 ```
-feat(library): add games to a wishlist
+feat(collections): add custom fields to a collection
 
-A star on each search result saves the game to the signed-in user's
-wishlist in DynamoDB. Adding a wishlisted game to owned games takes it
-off the wishlist.
+Each collection can define its own columns, like price, quantity or
+console. Items keep their values for those columns, so two collections
+can track completely different things.
 ```
 
 ```

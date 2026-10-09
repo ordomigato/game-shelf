@@ -35,8 +35,8 @@ Not this:
 
 ```
 ## Summary
-- Added wishlist composable
-- Added star button to GameTile
+- Added fields column to collections
+- Added field editor component
 
 ## Test plan
 - [x] npm run typecheck
@@ -48,9 +48,9 @@ Not this:
 This:
 
 ```
-A star on each search result adds the game to the wishlist. Owned and
-wishlisted games are mutually exclusive, so adding to one removes it from
-the other.
+Collections can define their own columns. Each item stores its values for
+those columns, so a collector can track price and quantity while someone
+else tracks console and progress.
 
 Closes #4
 ```

@@ -22,7 +22,7 @@ Add a resource to the Nuxt component's `link` array, then read it in
 ```ts
 import { Resource } from 'sst'
 
-Resource.Library.name // DynamoDB table name
+Resource.DatabaseUrl.value // Neon connection string (secret)
 Resource.TwitchClientSecret.value // secret value
 Resource.Users.id // Cognito user pool id
 Resource.WebClient.id // user pool client id
@@ -49,8 +49,12 @@ Always pass `--stage` explicitly. Without it, SST falls back to the local
 `.sst/stage` file, or the Mac username on a fresh clone, and quietly
 creates a third copy.
 
-SST signs in with the `gameshelf` profile in `~/.aws/config` (an IAM
-Identity Center login). If a command fails on credentials, the session
+Each project gets its own AWS account under the user's AWS Organization.
+GameShelf lives in the `gameshelf` account (787391403512). The management
+account (`jeremy-personal`) holds billing and the organization only, so
+don't deploy anything there. SST signs in with the `gameshelf` profile in
+`~/.aws/config` (an IAM Identity Center login). Set `AWS_PROFILE` to aim one
+command at another account. If a command fails on credentials, the session
 expired: `aws sso login --profile gameshelf`.
 
 Secrets are per stage: `npx sst secret set <Name> <value> [--stage x]`,
@@ -67,8 +71,13 @@ here:
   refuses a reservation that leaves fewer than its minimum unreserved. If a
   deploy fails on that, ask the user to request a quota increase rather
   than removing the cap.
-- DynamoDB on-demand (SST's default). Don't switch to provisioned capacity.
 - No `provisioned` concurrency, no VPC, no NAT, no RDS.
+- Production's CloudFront distribution is on the **flat-rate Free plan**
+  ($0, 100 GB and 1M requests a month, WAF and DDoS protection included,
+  no overage charges). That plan is what caps bandwidth costs if the site
+  is attacked or scraped. Pay-as-you-go CloudFront has no ceiling. Check
+  the plan is still attached after any change that replaces the
+  distribution, and do the same for every new project's production site.
 - Say what a new resource costs at this scale in the PR.
 
 ## Commands

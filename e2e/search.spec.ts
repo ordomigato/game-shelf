@@ -86,6 +86,39 @@ test('hidden platforms show in a tooltip and expand on click', async ({
   ])
 })
 
+test('a long platform name stays inside its card', async ({ page }) => {
+  const longName = "Terebikko / See 'n Say Video Phone"
+  await stubSearch(page, (_q, pageNumber) => ({
+    body: {
+      games: [
+        {
+          id: 1,
+          name: 'Super Mario World: Mario to Yoshi no Bouken Land',
+          coverId: null,
+          year: 1991,
+          platforms: [longName],
+        },
+      ],
+      page: pageNumber,
+      hasMore: false,
+    },
+  }))
+  await page.goto('/')
+  await page.getByRole('searchbox', { name: 'Search games' }).fill('mario')
+
+  const card = page.getByRole('article').first()
+  const pill = card.getByText(longName)
+  await expect(pill).toBeVisible()
+  const cardBox = await card.boundingBox()
+  const pillBox = await pill.boundingBox()
+  expect(pillBox!.x + pillBox!.width).toBeLessThanOrEqual(
+    cardBox!.x + cardBox!.width + 0.5,
+  )
+
+  await pill.hover()
+  await expect(page.getByRole('tooltip')).toHaveText(longName)
+})
+
 test('one character asks for more instead of searching', async ({ page }) => {
   let calls = 0
   await stubSearch(page, () => {

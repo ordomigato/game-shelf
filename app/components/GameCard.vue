@@ -31,8 +31,12 @@ const hiddenPlatforms = computed(() =>
         class="flex flex-wrap gap-1"
         aria-label="Platforms"
       >
-        <li v-for="platform in visiblePlatforms" :key="platform">
-          <Badge variant="secondary" class="text-[11px]">{{ platform }}</Badge>
+        <li
+          v-for="platform in visiblePlatforms"
+          :key="platform"
+          class="max-w-full min-w-0"
+        >
+          <PlatformPill :name="platform" />
         </li>
         <li v-if="platforms.hiddenCount && !expanded">
           <Tooltip>

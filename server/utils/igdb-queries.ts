@@ -1,7 +1,9 @@
 import type { GameDetails, GameSummary } from '../../shared/types/game'
 
 export const SEARCH_PAGE_SIZE = 24
-export const MAX_SEARCH_PAGE = 20
+/** How many IGDB matches one search fetches and ranks. Pages slice this. */
+export const SEARCH_POOL_SIZE = 96
+export const MAX_SEARCH_PAGE = SEARCH_POOL_SIZE / SEARCH_PAGE_SIZE
 export const MAX_SCREENSHOTS = 4
 
 /**
@@ -18,6 +20,7 @@ export interface IgdbGame {
   cover?: { image_id: string }
   first_release_date?: number
   platforms?: { abbreviation?: string; name: string }[]
+  total_rating_count?: number
 }
 
 /**
@@ -31,15 +34,54 @@ export function escapeApicalypseString(value: string): string {
     .replace(/"/g, '\\"')
 }
 
-export function buildSearchQuery(term: string, page: number): string {
-  const offset = (page - 1) * SEARCH_PAGE_SIZE
+/**
+ * Fetches IGDB's top `SEARCH_POOL_SIZE` text matches for a term, with the
+ * rating count that `rankSearchResults` needs.
+ */
+export function buildSearchQuery(term: string): string {
   return [
     `search "${escapeApicalypseString(term)}";`,
-    'fields name, cover.image_id, first_release_date, platforms.abbreviation, platforms.name;',
+    'fields name, cover.image_id, first_release_date, platforms.abbreviation, platforms.name, total_rating_count;',
     `where version_parent = null & game_type = (${SEARCHABLE_GAME_TYPES.join(',')});`,
-    `limit ${SEARCH_PAGE_SIZE};`,
-    `offset ${offset};`,
+    `limit ${SEARCH_POOL_SIZE};`,
   ].join(' ')
+}
+
+const POPULARITY_WEIGHT = 2
+const RELEVANCE_DECAY = 25
+
+/**
+ * Reorders IGDB search matches so well-known games come first. IGDB orders
+ * by text match only, and its search can't be sorted. Each game scores its
+ * popularity (log of its rating count, so a few hits don't swamp
+ * everything) minus a penalty that grows with its position in IGDB's text
+ * ranking. Ties keep IGDB's order.
+ */
+export function rankSearchResults<T extends { total_rating_count?: number }>(
+  games: T[],
+): T[] {
+  return games
+    .map((game, index) => ({
+      game,
+      index,
+      score:
+        POPULARITY_WEIGHT * Math.log10((game.total_rating_count ?? 0) + 1) -
+        index / RELEVANCE_DECAY,
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(({ game }) => game)
+}
+
+/** One page of an already ranked result list. */
+export function pageOf<T>(
+  results: T[],
+  page: number,
+): { items: T[]; hasMore: boolean } {
+  const start = (page - 1) * SEARCH_PAGE_SIZE
+  return {
+    items: results.slice(start, start + SEARCH_PAGE_SIZE),
+    hasMore: start + SEARCH_PAGE_SIZE < results.length,
+  }
 }
 
 export function toGameSummary(game: IgdbGame): GameSummary {

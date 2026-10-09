@@ -11,3 +11,13 @@ export function summarizePlatforms(
     hiddenCount: Math.max(platforms.length - max, 0),
   }
 }
+
+const releaseDateFormat = new Intl.DateTimeFormat('en', {
+  dateStyle: 'long',
+  timeZone: 'UTC',
+})
+
+/** Formats a `YYYY-MM-DD` date, e.g. "November 21, 1991". */
+export function formatReleaseDate(isoDate: string): string {
+  return releaseDateFormat.format(new Date(`${isoDate}T00:00:00Z`))
+}

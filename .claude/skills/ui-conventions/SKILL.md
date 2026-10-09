@@ -3,22 +3,48 @@ name: ui-conventions
 description: >
   Conventions for building UI in this Nuxt project and for writing comments in
   any file. Use whenever adding or changing a Vue component, page, or layout,
-  creating a UI primitive (button, input, dialog, tile, …), restyling the app,
+  installing or creating a UI primitive (shadcn-vue), restyling the app,
   or writing or editing code comments anywhere in the repo.
 ---
 
 # UI conventions
 
-## Primitives live in `app/components/base/`
+## Primitives come from shadcn-vue
 
-Buttons, inputs, dialogs and similar primitives are `Base*` components in
-`app/components/base/`. Before styling a raw element inline in a page, use
-or extend the existing `Base*` component. A new primitive has the same
-shape: `<script setup lang="ts">`, typed `defineProps`, `v-model` through
-`defineModel`, and variants as a prop rather than a separate component.
+Never hand-roll a UI primitive (button, input, dialog, dropdown, table,
+toast…). If shadcn-vue has it, install it:
 
-Restyling happens in shared CSS and its custom properties, not by forking a
-component per page.
+```bash
+npx shadcn-vue@2.8.2 add <component>
+```
+
+It lands in `app/components/ui/` and is auto-imported. Keep it exactly as
+shadcn-vue ships it: don't rename props, restructure, or wrap it in a
+bespoke abstraction. Those files (and `app/lib/utils.ts`) are excluded from
+ESLint and Prettier for that reason. Only write a component by hand when
+the registry has nothing equivalent, and then follow the shadcn shape:
+`cva` variants, `cn()` class merging, props that extend the native
+element's.
+
+## The look lives in the theme
+
+GameShelf must not look like stock shadcn. Restyle through the theme in
+`app/assets/css/tailwind.css` (colours, `--radius`, fonts, the `--shelf`
+wood tones), never by editing a component. The direction is
+**collector's shelf**: warm paper and walnut in light mode, walnut and
+brass in dark mode, Fraunces for headings, Instrument Sans for text.
+Signature pieces (the shelf edge under the header, later the shelf view
+and generated covers) are our own components in `app/components/`.
+
+After any `shadcn-vue add`, check `git diff app/assets/css/tailwind.css`.
+The CLI can rewrite that file. It has re-added a Google Fonts `@import`,
+a `--font-heading: var(--font-sans)` line that silently overrides the
+heading font, and a duplicate `@layer base`. Fonts are self-hosted by
+`@nuxt/fonts`, so no stylesheet should ever load from Google.
+
+Dark mode follows the system through `@nuxtjs/color-mode` (a `.dark` class
+on `<html>`). Every colour comes from a theme variable so both modes work.
+Check new UI in both.
 
 ## Vue and Nuxt idiom
 

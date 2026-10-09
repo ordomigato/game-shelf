@@ -1,6 +1,10 @@
 <template>
-  <main>
-    <h1>GameShelf</h1>
-    <p>Keep track of the games you own and the ones you want.</p>
-  </main>
+  <section class="mx-auto max-w-2xl py-16 text-center">
+    <h1 class="text-5xl font-semibold text-foreground sm:text-6xl">
+      GameShelf
+    </h1>
+    <p class="mt-4 text-lg text-muted-foreground">
+      Keep your game collection your way, and share it.
+    </p>
+  </section>
 </template>

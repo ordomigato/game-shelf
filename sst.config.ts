@@ -8,7 +8,10 @@ export default $config({
       protect: input.stage === 'production',
       home: 'aws',
       providers: {
-        aws: { region: 'us-east-1', profile: 'gameshelf' },
+        aws: {
+          region: 'us-east-1',
+          profile: process.env.AWS_PROFILE ?? 'gameshelf',
+        },
       },
     }
   },

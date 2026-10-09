@@ -49,36 +49,33 @@ export function useGameSearch() {
     { watch: [term] },
   )
 
-  const extraGames = ref<GameSummary[]>([])
-  const lastPage = ref(1)
-  const hasMore = ref(false)
+  // Pages fetched by "Show more". Everything shown is derived from `data`
+  // plus these, never set in a watcher, so the server render and the
+  // browser's first render agree.
+  const morePages = ref<GameSearchResponse[]>([])
   const loadingMore = ref(false)
   const loadMoreFailed = ref(false)
 
-  watch(
-    data,
-    (response) => {
-      extraGames.value = []
-      lastPage.value = response?.page ?? 1
-      hasMore.value = response?.hasMore ?? false
-      loadMoreFailed.value = false
-    },
-    { immediate: true },
-  )
+  watch(data, () => {
+    morePages.value = []
+    loadMoreFailed.value = false
+  })
+
+  const latestPage = computed(() => morePages.value.at(-1) ?? data.value)
+  const hasMore = computed(() => latestPage.value?.hasMore ?? false)
 
   async function loadMore() {
-    if (!hasMore.value || loadingMore.value) return
+    const current = latestPage.value
+    if (!current?.hasMore || loadingMore.value) return
     loadingMore.value = true
     loadMoreFailed.value = false
     const searchedTerm = term.value
     try {
       const response = await $fetch<GameSearchResponse>('/api/games/search', {
-        query: { q: searchedTerm, page: lastPage.value + 1 },
+        query: { q: searchedTerm, page: current.page + 1 },
       })
       if (searchedTerm !== term.value) return
-      extraGames.value.push(...response.games)
-      lastPage.value = response.page
-      hasMore.value = response.hasMore
+      morePages.value.push(response)
     } catch (error) {
       console.error(error)
       loadMoreFailed.value = true
@@ -87,9 +84,9 @@ export function useGameSearch() {
     }
   }
 
-  const games = computed(() => [
+  const games = computed<GameSummary[]>(() => [
     ...(data.value?.games ?? []),
-    ...extraGames.value,
+    ...morePages.value.flatMap((page) => page.games),
   ])
 
   return {

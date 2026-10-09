@@ -55,6 +55,29 @@ editions. The kept types are listed in `igdb-queries.ts`. IGDB renamed
 `category` to `game_type`, so check field names against the live API
 before relying on older examples.
 
+## Apicalypse in brief
+
+IGDB's own query language (not a general standard). A query is plain text
+sent as the POST body to `https://api.igdb.com/v4/<endpoint>`. Clauses end
+with `;` and can come in any order.
+
+| Clause             | Example                                                | Notes                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fields`           | `fields name, cover.image_id, platforms.abbreviation;` | Dot notation expands a related record in the same request. Never `fields *` in app code.                                                                     |
+| `exclude`          | `exclude summary;`                                     | Drops fields from a `*` selection.                                                                                                                           |
+| `search`           | `search "zelda";`                                      | Full-text search. Can't be combined with `sort`. Results come in relevance order.                                                                            |
+| `where`            | `where game_type = (0,8) & version_parent = null;`     | `&` and, `\|` or, `!=`, `<`, `>`. `= (a,b)` matches any of, `= [a,b]` matches all of, `= null` is missing. `name ~ "zel"*` is case-insensitive prefix match. |
+| `sort`             | `sort first_release_date desc;`                        |                                                                                                                                                              |
+| `limit` / `offset` | `limit 24; offset 48;`                                 | Max 500 per request. Page with `offset`.                                                                                                                     |
+
+Useful endpoints: `games`, `covers`, `screenshots`, `platforms`,
+`genres`, `involved_companies` (with `company.name`), `franchises`,
+`game_types`. The `multiquery` endpoint batches several queries into one
+HTTP request (check IGDB's docs for its limits before relying on it).
+
+Build every query in `server/utils/igdb-queries.ts`. Any user text goes
+through `escapeApicalypseString` and stays inside a `"..."` literal.
+
 ## Limits
 
 - 4 requests per second per client id, at most 8 open at once. Search fires

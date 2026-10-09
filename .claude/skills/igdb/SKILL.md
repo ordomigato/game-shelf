@@ -19,8 +19,19 @@ IGDB (owned by Twitch) needs two things the browser can't provide:
    `fetch` to it fails no matter what it carries.
 
 So every IGDB call goes browser → Nuxt server route in `server/api/` →
-IGDB. Shared IGDB code (token cache, request helper) lives in
-`server/utils/`, which Nitro auto-imports into server routes.
+IGDB. The pieces:
+
+- `server/utils/igdb.ts`: `igdbRequest(endpoint, query)`. Holds the token
+  cache, retries once on 401, and turns IGDB failures into 502/503 without
+  passing IGDB's response to the browser. Add new endpoints to its
+  `IgdbEndpoint` type.
+- `server/utils/igdb-queries.ts`: pure functions that build Apicalypse
+  queries and map IGDB rows to our types. No network or `Resource`, so they
+  are unit-tested in `igdb-queries.test.ts`. New queries go here, with
+  tests.
+- `server/api/games/search.get.ts`: `GET /api/games/search?q=&page=`.
+
+Nitro auto-imports `server/utils/` into routes.
 
 ## What a route may accept
 
@@ -37,6 +48,35 @@ never:
 
 Escape `"` and `\` in a search term before it goes into `search "...";`, cap
 its length, and clamp `limit` on the server.
+
+Search leaves out DLC, mods, episodes and other add-ons through a
+`game_type` filter, plus `version_parent = null` to drop duplicate
+editions. The kept types are listed in `igdb-queries.ts`. IGDB renamed
+`category` to `game_type`, so check field names against the live API
+before relying on older examples.
+
+## Apicalypse in brief
+
+IGDB's own query language (not a general standard). A query is plain text
+sent as the POST body to `https://api.igdb.com/v4/<endpoint>`. Clauses end
+with `;` and can come in any order.
+
+| Clause             | Example                                                | Notes                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fields`           | `fields name, cover.image_id, platforms.abbreviation;` | Dot notation expands a related record in the same request. Never `fields *` in app code.                                                                     |
+| `exclude`          | `exclude summary;`                                     | Drops fields from a `*` selection.                                                                                                                           |
+| `search`           | `search "zelda";`                                      | Full-text search. Can't be combined with `sort`. Results come in relevance order.                                                                            |
+| `where`            | `where game_type = (0,8) & version_parent = null;`     | `&` and, `\|` or, `!=`, `<`, `>`. `= (a,b)` matches any of, `= [a,b]` matches all of, `= null` is missing. `name ~ "zel"*` is case-insensitive prefix match. |
+| `sort`             | `sort first_release_date desc;`                        |                                                                                                                                                              |
+| `limit` / `offset` | `limit 24; offset 48;`                                 | Max 500 per request. Page with `offset`.                                                                                                                     |
+
+Useful endpoints: `games`, `covers`, `screenshots`, `platforms`,
+`genres`, `involved_companies` (with `company.name`), `franchises`,
+`game_types`. The `multiquery` endpoint batches several queries into one
+HTTP request (check IGDB's docs for its limits before relying on it).
+
+Build every query in `server/utils/igdb-queries.ts`. Any user text goes
+through `escapeApicalypseString` and stays inside a `"..."` literal.
 
 ## Limits
 

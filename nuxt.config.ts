@@ -1,8 +1,26 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import tailwindcss from '@tailwindcss/vite'
+
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint'],
+  modules: ['@nuxt/eslint', 'shadcn-nuxt', '@nuxt/fonts', '@nuxtjs/color-mode'],
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  css: ['~/assets/css/tailwind.css'],
+  vite: {
+    plugins: [tailwindcss()],
+  },
+  fonts: {
+    defaults: {
+      weights: [400, 500, 600, 700],
+    },
+  },
+  colorMode: {
+    classSuffix: '',
+  },
+  shadcn: {
+    prefix: '',
+    componentDir: '@/components/ui',
+  },
   app: {
     head: {
       htmlAttrs: { lang: 'en' },

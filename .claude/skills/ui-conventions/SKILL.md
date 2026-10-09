@@ -3,22 +3,59 @@ name: ui-conventions
 description: >
   Conventions for building UI in this Nuxt project and for writing comments in
   any file. Use whenever adding or changing a Vue component, page, or layout,
-  creating a UI primitive (button, input, dialog, tile, …), restyling the app,
+  installing or creating a UI primitive (shadcn-vue), restyling the app,
   or writing or editing code comments anywhere in the repo.
 ---
 
 # UI conventions
 
-## Primitives live in `app/components/base/`
+## Primitives come from shadcn-vue
 
-Buttons, inputs, dialogs and similar primitives are `Base*` components in
-`app/components/base/`. Before styling a raw element inline in a page, use
-or extend the existing `Base*` component. A new primitive has the same
-shape: `<script setup lang="ts">`, typed `defineProps`, `v-model` through
-`defineModel`, and variants as a prop rather than a separate component.
+Never hand-roll a UI primitive (button, input, dialog, dropdown, table,
+toast…). If shadcn-vue has it, install it:
 
-Restyling happens in shared CSS and its custom properties, not by forking a
-component per page.
+```bash
+npx shadcn-vue@2.8.2 add <component>
+```
+
+It lands in `app/components/ui/` and is auto-imported. Keep it exactly as
+shadcn-vue ships it: don't rename props, restructure, or wrap it in a
+bespoke abstraction. Those files (and `app/lib/utils.ts`) are excluded from
+ESLint and Prettier for that reason. Only write a component by hand when
+the registry has nothing equivalent, and then follow the shadcn shape:
+`cva` variants, `cn()` class merging, props that extend the native
+element's.
+
+## The look lives in the theme
+
+GameShelf must not look like stock shadcn. Restyle through the theme in
+`app/assets/css/tailwind.css` (colours, `--radius`, fonts, the `--masthead`
+and `--shelf` tokens), never by editing a component. The palette comes from
+GameShelf v1: steel blue `#3D6F94` (primary), navy `#001F44` (masthead,
+dark mode), sky blue `#76BDF2` (accents, dark-mode primary), grey
+`#A0AEC0` (muted text in dark mode). Exo 2 for headings and Outfit for
+text, for a game-friendly but readable feel. The longer-term direction is
+a collector's shelf: signature pieces (the steel-blue shelf edge under the
+navy header, later the shelf view and generated covers) are our own
+components in `app/components/`.
+
+After any `shadcn-vue add`, check `git diff app/assets/css/tailwind.css`.
+The CLI can rewrite that file. It has re-added a Google Fonts `@import`,
+a `--font-heading: var(--font-sans)` line that silently overrides the
+heading font, and a duplicate `@layer base`. Fonts are self-hosted by
+`@nuxt/fonts`, so no stylesheet should ever load from Google.
+
+Themes are switched in the header (`ThemeSwitcher`) through
+`@nuxtjs/color-mode`, which puts the chosen theme's id as a class on
+`<html>` and remembers it in the browser. The list lives in
+`app/utils/themes.ts`: System, Light (`:root` variables) and Dark (`.dark`
+variables). Every colour comes from a theme variable, so new UI works in
+every theme. Check new UI in at least light and dark.
+
+To add a theme: add an entry to `themes.ts`, and a block of the same
+variables under its class in `tailwind.css`. A dark-based theme also needs
+the `dark` variant to apply (the `@custom-variant dark` rule), so plan for
+that when the first one lands.
 
 ## Vue and Nuxt idiom
 

@@ -10,3 +10,7 @@ sst-env.d.ts
 server/db/migrations
 test-results
 playwright-report
+
+# Copied verbatim from the shadcn-vue registry
+app/components/ui
+app/lib/utils.ts

@@ -1,6 +1,8 @@
 <template>
-  <NuxtRouteAnnouncer />
-  <NuxtLayout>
-    <NuxtPage />
-  </NuxtLayout>
+  <TooltipProvider :delay-duration="150">
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+  </TooltipProvider>
 </template>

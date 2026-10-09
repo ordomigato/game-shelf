@@ -1,0 +1,64 @@
+<script setup lang="ts">
+import type { GameSummary } from '#shared/types/game'
+
+const props = defineProps<{ game: GameSummary }>()
+
+const expanded = ref(false)
+
+const platforms = computed(() => summarizePlatforms(props.game.platforms))
+const visiblePlatforms = computed(() =>
+  expanded.value ? props.game.platforms : platforms.value.shown,
+)
+const hiddenPlatforms = computed(() =>
+  props.game.platforms.slice(platforms.value.shown.length),
+)
+</script>
+
+<template>
+  <article class="flex flex-col gap-2">
+    <GameCover :name="game.name" :cover-id="game.coverId" />
+    <div class="flex flex-col gap-1.5">
+      <div>
+        <h3 class="line-clamp-2 text-sm leading-snug font-semibold">
+          {{ game.name }}
+        </h3>
+        <p v-if="game.year" class="text-xs text-muted-foreground">
+          {{ game.year }}
+        </p>
+      </div>
+      <ul
+        v-if="game.platforms.length"
+        class="flex flex-wrap gap-1"
+        aria-label="Platforms"
+      >
+        <li
+          v-for="platform in visiblePlatforms"
+          :key="platform"
+          class="max-w-full min-w-0"
+        >
+          <PlatformPill :name="platform" />
+        </li>
+        <li v-if="platforms.hiddenCount && !expanded">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="rounded-4xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :aria-label="`Show ${platforms.hiddenCount} more platform${platforms.hiddenCount === 1 ? '' : 's'}`"
+                @click="expanded = true"
+              >
+                <Badge
+                  variant="outline"
+                  class="cursor-pointer text-[11px] text-muted-foreground hover:bg-muted"
+                >
+                  +{{ platforms.hiddenCount }}
+                </Badge>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ hiddenPlatforms.join(', ') }}</TooltipContent>
+          </Tooltip>
+        </li>
+      </ul>
+    </div>
+  </article>
+</template>

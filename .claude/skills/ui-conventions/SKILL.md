@@ -45,6 +45,10 @@ a `--font-heading: var(--font-sans)` line that silently overrides the
 heading font, and a duplicate `@layer base`. Fonts are self-hosted by
 `@nuxt/fonts`, so no stylesheet should ever load from Google.
 
+A running `npm run dev` or `sst dev` doesn't pick up a newly added shadcn
+component folder: the tag renders as unknown HTML with no styles. Restart
+the dev server after `shadcn-vue add`.
+
 Themes are switched in the header (`ThemeSwitcher`) through
 `@nuxtjs/color-mode`, which puts the chosen theme's id as a class on
 `<html>` and remembers it in the browser. The list lives in

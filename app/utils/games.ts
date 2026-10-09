@@ -1,9 +1,13 @@
 /**
- * Joins platform names with " · ", showing at most `max` and summarising the
- * rest as "+N". Returns an empty string for no platforms.
+ * Splits a platform list for display: the first `max` names, and how many
+ * more there are (shown as a "+N" pill).
  */
-export function formatPlatforms(platforms: string[], max = 3): string {
-  if (platforms.length <= max) return platforms.join(' · ')
-  const shown = platforms.slice(0, max).join(' · ')
-  return `${shown} +${platforms.length - max}`
+export function summarizePlatforms(
+  platforms: string[],
+  max = 3,
+): { shown: string[]; hiddenCount: number } {
+  return {
+    shown: platforms.slice(0, max),
+    hiddenCount: Math.max(platforms.length - max, 0),
+  }
 }

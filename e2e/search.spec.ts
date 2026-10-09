@@ -47,7 +47,18 @@ test('searching shows results and keeps the term in the URL', async ({
   await expect(
     page.getByRole('heading', { name: 'Zelda Game 1' }),
   ).toBeVisible()
-  await expect(page.getByText('1986 · NES · SNES · Wii +1')).toBeVisible()
+  const firstCard = page.getByRole('article').first()
+  const platforms = firstCard.getByRole('list', { name: 'Platforms' })
+  await expect(platforms.getByRole('listitem')).toHaveText([
+    'NES',
+    'SNES',
+    'Wii',
+    '+1',
+  ])
+  await expect(firstCard.getByText('1986')).toBeVisible()
+  await expect(
+    platforms.getByRole('listitem').first().locator('[data-slot="badge"]'),
+  ).toBeVisible()
   await expect(page).toHaveURL(/\?q=zelda$/)
 })
 

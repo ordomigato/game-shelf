@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { formatPlatforms } from './games'
+import { summarizePlatforms } from './games'
 
-describe('formatPlatforms', () => {
-  it('joins a short list', () => {
-    expect(formatPlatforms(['NES', 'SNES'])).toBe('NES · SNES')
+describe('summarizePlatforms', () => {
+  it('shows a short list in full', () => {
+    expect(summarizePlatforms(['NES', 'SNES'])).toEqual({
+      shown: ['NES', 'SNES'],
+      hiddenCount: 0,
+    })
   })
 
-  it('summarises platforms past the limit', () => {
-    expect(formatPlatforms(['NES', 'SNES', 'Wii', 'WiiU', '3DS'])).toBe(
-      'NES · SNES · Wii +2',
-    )
+  it('counts platforms past the limit', () => {
+    expect(summarizePlatforms(['NES', 'SNES', 'Wii', 'WiiU', '3DS'])).toEqual({
+      shown: ['NES', 'SNES', 'Wii'],
+      hiddenCount: 2,
+    })
   })
 
-  it('returns an empty string for no platforms', () => {
-    expect(formatPlatforms([])).toBe('')
+  it('handles no platforms', () => {
+    expect(summarizePlatforms([])).toEqual({ shown: [], hiddenCount: 0 })
   })
 })

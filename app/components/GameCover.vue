@@ -29,10 +29,10 @@ const srcset = computed(() =>
     />
     <div
       v-else
-      class="flex size-full items-end bg-gradient-to-br from-primary to-masthead p-3"
+      class="flex size-full items-end bg-gradient-to-br from-shelf to-masthead p-3"
     >
       <span
-        class="line-clamp-4 font-heading text-lg leading-tight font-bold text-primary-foreground"
+        class="line-clamp-4 font-heading text-lg leading-tight font-bold text-white"
       >
         {{ name }}
       </span>

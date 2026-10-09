@@ -8,6 +8,7 @@
       <NuxtLink to="/" class="font-heading text-2xl font-bold tracking-tight">
         GameShelf
       </NuxtLink>
+      <ThemeSwitcher />
     </div>
   </header>
 </template>

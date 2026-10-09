@@ -45,9 +45,17 @@ a `--font-heading: var(--font-sans)` line that silently overrides the
 heading font, and a duplicate `@layer base`. Fonts are self-hosted by
 `@nuxt/fonts`, so no stylesheet should ever load from Google.
 
-Dark mode follows the system through `@nuxtjs/color-mode` (a `.dark` class
-on `<html>`). Every colour comes from a theme variable so both modes work.
-Check new UI in both.
+Themes are switched in the header (`ThemeSwitcher`) through
+`@nuxtjs/color-mode`, which puts the chosen theme's id as a class on
+`<html>` and remembers it in the browser. The list lives in
+`app/utils/themes.ts`: System, Light (`:root` variables) and Dark (`.dark`
+variables). Every colour comes from a theme variable, so new UI works in
+every theme. Check new UI in at least light and dark.
+
+To add a theme: add an entry to `themes.ts`, and a block of the same
+variables under its class in `tailwind.css`. A dark-based theme also needs
+the `dark` variant to apply (the `@custom-variant dark` rule), so plan for
+that when the first one lands.
 
 ## Vue and Nuxt idiom
 

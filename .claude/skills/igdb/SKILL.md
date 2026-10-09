@@ -19,8 +19,19 @@ IGDB (owned by Twitch) needs two things the browser can't provide:
    `fetch` to it fails no matter what it carries.
 
 So every IGDB call goes browser → Nuxt server route in `server/api/` →
-IGDB. Shared IGDB code (token cache, request helper) lives in
-`server/utils/`, which Nitro auto-imports into server routes.
+IGDB. The pieces:
+
+- `server/utils/igdb.ts`: `igdbRequest(endpoint, query)`. Holds the token
+  cache, retries once on 401, and turns IGDB failures into 502/503 without
+  passing IGDB's response to the browser. Add new endpoints to its
+  `IgdbEndpoint` type.
+- `server/utils/igdb-queries.ts`: pure functions that build Apicalypse
+  queries and map IGDB rows to our types. No network or `Resource`, so they
+  are unit-tested in `igdb-queries.test.ts`. New queries go here, with
+  tests.
+- `server/api/games/search.get.ts`: `GET /api/games/search?q=&page=`.
+
+Nitro auto-imports `server/utils/` into routes.
 
 ## What a route may accept
 
@@ -37,6 +48,12 @@ never:
 
 Escape `"` and `\` in a search term before it goes into `search "...";`, cap
 its length, and clamp `limit` on the server.
+
+Search leaves out DLC, mods, episodes and other add-ons through a
+`game_type` filter, plus `version_parent = null` to drop duplicate
+editions. The kept types are listed in `igdb-queries.ts`. IGDB renamed
+`category` to `game_type`, so check field names against the live API
+before relying on older examples.
 
 ## Limits
 

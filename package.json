@@ -23,11 +23,14 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1149.0",
     "@lucide/vue": "^1.54.0",
     "@neondatabase/serverless": "^1.2.0",
     "@nuxt/fonts": "^0.14.0",
     "@nuxtjs/color-mode": "^4.0.1",
     "@vueuse/core": "^15.0.0",
+    "aws-amplify": "^6.22.1",
+    "aws-jwt-verify": "^5.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
@@ -37,6 +40,7 @@
     "sst": "^4.17.2",
     "tailwind-merge": "^3.7.0",
     "vue": "^3.5.43",
+    "vue-input-otp": "^0.4.0",
     "vue-router": "^5.3.1",
     "zod": "^4.6.5"
   },

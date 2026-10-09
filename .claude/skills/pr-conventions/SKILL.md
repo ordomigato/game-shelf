@@ -63,7 +63,7 @@ covers the difference.
 
 ## Base branch
 
-Work targets `v3`, not `master`, until the user says v3 has replaced v1.
+PRs target `main`.
 
 ## Where this doesn't apply
 

@@ -11,10 +11,10 @@ description: >
 # Where this project keeps its own context
 
 GameShelf is a personal game catalog: search IGDB, mark games as owned or
-wishlisted, and keep a basic account. The `v3` branch is a clean rewrite.
-`master` holds v1 (Nuxt 2, Heroku, Firebase) and `v2` holds an abandoned
-Netlify attempt. Read them for behavior with `git show master:<path>`, but
-don't port their architecture.
+wishlisted, and keep a basic account. `main` is v3, a clean rewrite with no
+shared history. The `v1` tag holds the original (Nuxt 2, Heroku, Firebase)
+and the `v2` branch an abandoned Netlify attempt. Read them for behavior
+with `git show v1:<path>`, but don't port their architecture.
 
 ## Settled decisions
 

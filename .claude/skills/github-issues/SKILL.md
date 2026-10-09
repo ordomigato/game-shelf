@@ -71,10 +71,9 @@ against.
 ## Linking a PR to its issue
 
 GitHub reads the link from plain text. `Closes #12`, `Fixes #12` or
-`Resolves #12` in a PR body closes the issue when the PR merges, **but only
-when the PR targets the default branch** (`master`). v3 PRs target `v3`, so
-a closing keyword there links the issue without closing it. Close those
-issues by hand once the work is merged, or once v3 lands on `master`.
+`Resolves #12` in a PR body closes the issue when the PR merges into
+`main`, the default branch. A PR into any other branch links the issue
+without closing it.
 
 Use `Towards #12` or a bare `#12` for partial progress. `pr-conventions`
 covers the rest of the PR body.

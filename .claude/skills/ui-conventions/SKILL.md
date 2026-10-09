@@ -29,12 +29,15 @@ element's.
 ## The look lives in the theme
 
 GameShelf must not look like stock shadcn. Restyle through the theme in
-`app/assets/css/tailwind.css` (colours, `--radius`, fonts, the `--shelf`
-wood tones), never by editing a component. The direction is
-**collector's shelf**: warm paper and walnut in light mode, walnut and
-brass in dark mode, Fraunces for headings, Instrument Sans for text.
-Signature pieces (the shelf edge under the header, later the shelf view
-and generated covers) are our own components in `app/components/`.
+`app/assets/css/tailwind.css` (colours, `--radius`, fonts, the `--masthead`
+and `--shelf` tokens), never by editing a component. The palette comes from
+GameShelf v1: steel blue `#3D6F94` (primary), navy `#001F44` (masthead,
+dark mode), sky blue `#76BDF2` (accents, dark-mode primary), grey
+`#A0AEC0` (muted text in dark mode). Exo 2 for headings and Outfit for
+text, for a game-friendly but readable feel. The longer-term direction is
+a collector's shelf: signature pieces (the steel-blue shelf edge under the
+navy header, later the shelf view and generated covers) are our own
+components in `app/components/`.
 
 After any `shadcn-vue add`, check `git diff app/assets/css/tailwind.css`.
 The CLI can rewrite that file. It has re-added a Google Fonts `@import`,

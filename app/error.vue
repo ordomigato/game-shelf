@@ -13,7 +13,7 @@ function goHome() {
 <template>
   <NuxtLayout>
     <section class="mx-auto max-w-xl py-16 text-center">
-      <h1 class="text-4xl font-semibold">
+      <h1 class="text-4xl font-bold">
         {{ notFound ? 'Page not found' : 'Something went wrong' }}
       </h1>
       <p class="mt-4 text-muted-foreground">

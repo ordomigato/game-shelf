@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import type { GameSearchResponse } from '../../../shared/types/game'
+import type {
+  GameSearchResponse,
+  GameSummary,
+} from '../../../shared/types/game'
 import type { IgdbGame } from '../../utils/igdb-queries'
 
 const querySchema = z.object({
@@ -8,31 +11,32 @@ const querySchema = z.object({
 })
 
 /**
- * Searches are cached for an hour, keyed by the lowercased term and page,
- * so "Zelda" and " zelda" share one entry.
+ * The ranked results for a term, cached for an hour and keyed by the
+ * lowercased term, so "Zelda" and " zelda" share one entry and paging
+ * through results costs no extra IGDB calls.
  */
-export default defineCachedEventHandler(
-  async (event): Promise<GameSearchResponse> => {
-    const { q, page } = await getValidatedQuery(event, querySchema.parse)
-    const games = await igdbRequest<IgdbGame[]>(
-      'games',
-      buildSearchQuery(q, page),
-    )
-    return {
-      games: games.map(toGameSummary),
-      page,
-      hasMore: games.length === SEARCH_PAGE_SIZE,
-    }
+const rankedSearch = defineCachedFunction(
+  async (term: string): Promise<GameSummary[]> => {
+    const games = await igdbRequest<IgdbGame[]>('games', buildSearchQuery(term))
+    return rankSearchResults(games).map(toGameSummary)
   },
   {
     name: 'game-search',
     maxAge: 60 * 60,
     swr: true,
-    getKey: (event) => {
-      const { q, page } = getQuery(event)
-      return `${String(q ?? '')
-        .trim()
-        .toLowerCase()}:${String(page ?? '1')}`
-    },
+    getKey: (term: string) => term.toLowerCase(),
+  },
+)
+
+export default defineEventHandler(
+  async (event): Promise<GameSearchResponse> => {
+    const { q, page } = await getValidatedQuery(event, querySchema.parse)
+    const { items, hasMore } = pageOf(await rankedSearch(q), page)
+    setResponseHeader(
+      event,
+      'cache-control',
+      's-maxage=3600, stale-while-revalidate',
+    )
+    return { games: items, page, hasMore }
   },
 )

@@ -42,8 +42,16 @@ there, never a secret.
 - `production`: the real site. `protect` and `removal: retain` stop
   `sst remove` from deleting data, and the table has deletion protection.
   The budget lives only here because AWS budgets are account-wide.
-- Anything else (each developer's personal stage from `sst dev`, PR
-  stages): disposable. `sst remove --stage <name>` cleans one up.
+- `dev`: the development copy, used by `npx sst dev --stage dev`.
+  Disposable. `npx sst remove --stage dev` wipes it.
+
+Always pass `--stage` explicitly. Without it, SST falls back to the local
+`.sst/stage` file, or the Mac username on a fresh clone, and quietly
+creates a third copy.
+
+SST signs in with the `gameshelf` profile in `~/.aws/config` (an IAM
+Identity Center login). If a command fails on credentials, the session
+expired: `aws sso login --profile gameshelf`.
 
 Secrets are per stage: `npx sst secret set <Name> <value> [--stage x]`,
 or `--fallback` to set a default for every stage.

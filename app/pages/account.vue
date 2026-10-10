@@ -7,16 +7,16 @@ const router = useRouter()
 const currentPath = computed(() => router.currentRoute.value.path)
 
 const tabs = [
-  { to: '/account', label: 'Profile' },
-  { to: '/account/security', label: 'Security' },
-  { to: '/account/settings', label: 'Settings' },
+  { to: '/account', labelKey: 'account.tabs.profile' },
+  { to: '/account/security', labelKey: 'account.tabs.security' },
+  { to: '/account/settings', labelKey: 'account.tabs.settings' },
 ]
 </script>
 
 <template>
   <div class="mx-auto flex w-full max-w-2xl flex-col gap-6">
-    <h1 class="text-3xl font-bold">Account</h1>
-    <nav aria-label="Account sections" class="border-b">
+    <h1 class="text-3xl font-bold">{{ $t('account.title') }}</h1>
+    <nav :aria-label="$t('account.sections')" class="border-b">
       <ul class="-mb-px flex gap-6">
         <li v-for="tab in tabs" :key="tab.to">
           <NuxtLink
@@ -29,7 +29,7 @@ const tabs = [
             "
             :aria-current="currentPath === tab.to ? 'page' : undefined"
           >
-            {{ tab.label }}
+            {{ $t(tab.labelKey) }}
           </NuxtLink>
         </li>
       </ul>

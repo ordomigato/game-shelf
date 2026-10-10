@@ -13,7 +13,7 @@ const emit = defineEmits<{ complete: [code: string] }>()
     :pattern="REGEXP_ONLY_DIGITS"
     inputmode="numeric"
     autocomplete="one-time-code"
-    aria-label="6-digit code"
+    :aria-label="$t('fields.codeLabel')"
     @complete="emit('complete', $event)"
   >
     <InputOTPGroup>

@@ -26,4 +26,8 @@ describe('formatReleaseDate', () => {
     expect(formatReleaseDate('1991-11-21')).toBe('November 21, 1991')
     expect(formatReleaseDate('2000-01-01')).toBe('January 1, 2000')
   })
+
+  it('formats for other languages too', () => {
+    expect(formatReleaseDate('1991-11-21', 'fr')).toBe('21 novembre 1991')
+  })
 })

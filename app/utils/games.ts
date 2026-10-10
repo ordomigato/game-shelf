@@ -12,12 +12,20 @@ export function summarizePlatforms(
   }
 }
 
-const releaseDateFormat = new Intl.DateTimeFormat('en', {
-  dateStyle: 'long',
-  timeZone: 'UTC',
-})
+const releaseDateFormats = new Map<string, Intl.DateTimeFormat>()
 
-/** Formats a `YYYY-MM-DD` date, e.g. "November 21, 1991". */
-export function formatReleaseDate(isoDate: string): string {
-  return releaseDateFormat.format(new Date(`${isoDate}T00:00:00Z`))
+/**
+ * Formats a `YYYY-MM-DD` date for a language, e.g. "November 21, 1991" in
+ * English.
+ */
+export function formatReleaseDate(isoDate: string, locale = 'en'): string {
+  let format = releaseDateFormats.get(locale)
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, {
+      dateStyle: 'long',
+      timeZone: 'UTC',
+    })
+    releaseDateFormats.set(locale, format)
+  }
+  return format.format(new Date(`${isoDate}T00:00:00Z`))
 }

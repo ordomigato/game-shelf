@@ -48,6 +48,8 @@ the rest. Log the original to the console.
 
 - Every user-facing string: labels, buttons, placeholders, hints, dialog
   titles, confirmation prompts, empty states, error messages.
+- Every message in `i18n/locales/en.json`, which is where all user-facing
+  English lives (see `i18n`).
 - New commit messages and pull request descriptions.
 
 ## Where this doesn't apply

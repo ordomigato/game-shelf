@@ -1,0 +1,217 @@
+{
+  "app": {
+    "title": "{page} · GameShelf"
+  },
+  "header": {
+    "settings": "Settings",
+    "theme": "Theme",
+    "signIn": "Sign in",
+    "account": "Account",
+    "signOut": "Sign out"
+  },
+  "theme": {
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "footer": {
+    "igdbCredit": "Game data from {igdb}."
+  },
+  "error": {
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "This page is not on the shelf.",
+    "genericTitle": "Something went wrong",
+    "genericBody": "Please try again in a moment.",
+    "backHome": "Back to home"
+  },
+  "search": {
+    "title": "Find any game",
+    "subtitle": "Search thousands of games, then add them to your shelf.",
+    "label": "Search games",
+    "placeholder": "Search games, like Zelda or Hades",
+    "tooShort": "Type at least {count} characters.",
+    "resultCount": "No games found for {term} | {count} game found | {count} games found",
+    "errorTitle": "Search isn't working right now.",
+    "errorBody": "Try again in a moment.",
+    "retry": "Try again",
+    "noResultsTitle": "No games found for \"{term}\".",
+    "noResultsBody": "Check the spelling, or try fewer words.",
+    "showMore": "Show more",
+    "loadingMore": "Loading…",
+    "loadMoreFailed": "Couldn't load more games. Try again."
+  },
+  "game": {
+    "coverAlt": "Cover of {name}",
+    "platforms": "Platforms",
+    "showMorePlatforms": "Show {count} more platform | Show {count} more platforms",
+    "back": "Back",
+    "fromIgdb": "From IGDB",
+    "released": "Released {date}",
+    "developer": "Developer",
+    "publisher": "Publisher",
+    "genres": "Genres",
+    "about": "About",
+    "noSummary": "IGDB has no description for this game yet.",
+    "screenshots": "Screenshots",
+    "screenshotAlt": "Screenshot {number} of {name}",
+    "igdbNote": "Game data from IGDB. It may be incomplete or out of date.",
+    "viewOnIgdb": "View this game on IGDB"
+  },
+  "fields": {
+    "email": "Email",
+    "password": "Password",
+    "newPassword": "New password",
+    "currentPassword": "Current password",
+    "confirmPassword": "Confirm password",
+    "code": "Code",
+    "codeLabel": "6-digit code",
+    "username": "Username",
+    "displayName": "Display name",
+    "displayNameOptional": "Display name (optional)",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "password": {
+    "rulesLabel": "Password rules",
+    "rules": {
+      "length": "At least {min} characters",
+      "uppercase": "A capital letter",
+      "lowercase": "A lowercase letter",
+      "number": "A number",
+      "match": "Passwords match"
+    },
+    "ruleDone": "(done)",
+    "ruleNotYet": "(not yet)",
+    "problems": {
+      "rules": "Your password needs at least {min} characters, with a capital letter, a lowercase letter and a number.",
+      "mismatch": "The passwords don't match."
+    }
+  },
+  "username": {
+    "problems": {
+      "tooShort": "Usernames need at least {min} characters.",
+      "tooLong": "Usernames can have at most {max} characters.",
+      "characters": "Use only letters, numbers and underscores."
+    },
+    "taken": "That username is taken. Try another one."
+  },
+  "signUp": {
+    "pageTitle": "Create an account",
+    "title": "Create an account",
+    "description": "Save games to your shelf and build collections your way.",
+    "submit": "Create account",
+    "submitting": "Creating account…",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in"
+  },
+  "verify": {
+    "pageTitle": "Check your email",
+    "title": "Check your email",
+    "sentTo": "We sent a 6-digit code to {email}. Enter it below to finish creating your account.",
+    "submit": "Verify email",
+    "submitting": "Checking…",
+    "notReceived": "Didn't get it? Check your spam folder, or {resend}.",
+    "resend": "send a new code",
+    "resent": "We sent a new code. Check your email.",
+    "wrongEmail": "Wrong email?",
+    "startAgain": "Start again",
+    "noEmail": "Open the link from the sign-up page to enter your code, or sign in and we will send a new one.",
+    "goToSignIn": "Go to sign in"
+  },
+  "signIn": {
+    "pageTitle": "Sign in",
+    "title": "Sign in",
+    "description": "Welcome back to your shelf.",
+    "forgotPassword": "Forgot password?",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "newHere": "New to GameShelf?",
+    "createAccount": "Create an account",
+    "verified": "Your email is verified. Sign in to continue.",
+    "passwordChanged": "Your password is changed. Sign in with the new one."
+  },
+  "resetPassword": {
+    "pageTitle": "Reset your password",
+    "title": "Reset your password",
+    "askEmail": "Enter your email and we will send you a code.",
+    "codeSent": "If an account exists for {email}, we sent it a 6-digit code. Enter it with a new password.",
+    "sendCode": "Send code",
+    "sending": "Sending…",
+    "save": "Save new password",
+    "saving": "Saving…",
+    "codeMissing": "Enter the 6-digit code from the email.",
+    "backToSignIn": "Back to sign in"
+  },
+  "welcome": {
+    "pageTitle": "Welcome",
+    "title": "Pick a username",
+    "description": "Your username is how others find your shelf. You can change it later.",
+    "usernameHint": "3 to 20 letters, numbers or underscores. Your shelf will be at /u/{username}.",
+    "usernamePlaceholder": "yourname",
+    "submit": "Continue",
+    "submitting": "Saving…"
+  },
+  "account": {
+    "title": "Account",
+    "sections": "Account sections",
+    "tabs": {
+      "profile": "Profile",
+      "security": "Security",
+      "settings": "Settings"
+    },
+    "profile": {
+      "pageTitle": "Profile",
+      "title": "Profile",
+      "description": "How you appear to others on GameShelf.",
+      "usernameHint": "Changing it changes your shelf's address. Old links stop working.",
+      "save": "Save profile",
+      "saving": "Saving…",
+      "saved": "Profile saved."
+    },
+    "security": {
+      "pageTitle": "Security",
+      "title": "Password",
+      "description": "Change the password you sign in with.",
+      "save": "Change password",
+      "saving": "Saving…",
+      "saved": "Password changed.",
+      "wrongCurrent": "Your current password isn't right."
+    },
+    "settings": {
+      "pageTitle": "Settings",
+      "deleteTitle": "Delete account",
+      "deleteDescription": "This deletes your account, your collections and everything in them. It can't be undone.",
+      "deleteButton": "Delete account",
+      "confirmTitle": "Delete your account?",
+      "confirmBody": "Your account, collections and everything in them will be deleted. This can't be undone.",
+      "keep": "Keep my account",
+      "deleteFailed": "We couldn't delete your account. Try again."
+    }
+  },
+  "common": {
+    "genericError": "Something went wrong. Try again."
+  },
+  "authErrors": {
+    "UsernameExistsException": "An account with that email already exists. Try signing in.",
+    "NotAuthorizedException": "That email and password don't match.",
+    "UserNotFoundException": "That email and password don't match.",
+    "CodeMismatchException": "That code isn't right. Check the email and try again.",
+    "ExpiredCodeException": "That code has expired. Send a new one.",
+    "InvalidPasswordException": "Passwords need at least 8 characters, with a capital letter, a lowercase letter and a number.",
+    "InvalidParameterException": "Check the details and try again.",
+    "LimitExceededException": "Too many attempts. Wait a few minutes and try again.",
+    "TooManyRequestsException": "Too many attempts. Wait a few minutes and try again.",
+    "TooManyFailedAttemptsException": "Too many attempts. Wait a few minutes and try again.",
+    "CodeDeliveryFailureException": "We couldn't send the email. Check the address and try again.",
+    "EmptySignInUsername": "Enter your email.",
+    "EmptySignInPassword": "Enter your password.",
+    "EmptySignUpUsername": "Enter your email.",
+    "EmptySignUpPassword": "Enter a password.",
+    "EmptyConfirmSignUpCode": "Enter the code from the email.",
+    "EmptyConfirmResetPasswordConfirmationCode": "Enter the code from the email.",
+    "EmptyConfirmResetPasswordNewPassword": "Enter a new password.",
+    "UserAlreadyAuthenticatedException": "You're already signed in.",
+    "NetworkError": "Can't reach the server. Check your connection and try again.",
+    "generic": "Something went wrong. Try again."
+  }
+}

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { FetchError } from 'ofetch'
 
-useHead({ title: 'Profile · GameShelf' })
+const { t } = useI18n()
+useHead(() => ({
+  title: t('app.title', { page: t('account.profile.pageTitle') }),
+}))
 
 const auth = useAuth()
 const username = ref(auth.me.value?.username ?? '')
@@ -13,7 +16,8 @@ const saving = ref(false)
 async function save() {
   saved.value = false
   const normalized = normalizeUsername(username.value)
-  error.value = usernameProblem(normalized) ?? ''
+  const problem = usernameProblem(normalized)
+  error.value = problem ? t(problem.key, problem.params ?? {}) : ''
   if (error.value) return
   saving.value = true
   try {
@@ -26,8 +30,8 @@ async function save() {
   } catch (e) {
     error.value =
       e instanceof FetchError && e.statusCode === 409
-        ? 'That username is taken. Try another one.'
-        : 'Something went wrong. Try again.'
+        ? t('username.taken')
+        : t('common.genericError')
   } finally {
     saving.value = false
   }
@@ -37,15 +41,19 @@ async function save() {
 <template>
   <Card>
     <CardHeader>
-      <CardTitle><h2 class="text-lg font-semibold">Profile</h2></CardTitle>
-      <CardDescription>How you appear to others on GameShelf.</CardDescription>
+      <CardTitle>
+        <h2 class="text-lg font-semibold">{{ $t('account.profile.title') }}</h2>
+      </CardTitle>
+      <CardDescription>{{ $t('account.profile.description') }}</CardDescription>
     </CardHeader>
     <CardContent>
       <form class="flex flex-col gap-4" @submit.prevent="save">
         <FormMessage v-if="error">{{ error }}</FormMessage>
-        <FormMessage v-if="saved" tone="success">Profile saved.</FormMessage>
+        <FormMessage v-if="saved" tone="success">
+          {{ $t('account.profile.saved') }}
+        </FormMessage>
         <div class="flex flex-col gap-2">
-          <Label for="username">Username</Label>
+          <Label for="username">{{ $t('fields.username') }}</Label>
           <Input
             id="username"
             v-model="username"
@@ -55,16 +63,18 @@ async function save() {
             required
           />
           <p id="username-hint" class="text-xs text-muted-foreground">
-            Changing it changes your shelf's address. Old links stop working.
+            {{ $t('account.profile.usernameHint') }}
           </p>
         </div>
         <div class="flex flex-col gap-2">
-          <Label for="display-name">Display name</Label>
+          <Label for="display-name">{{ $t('fields.displayName') }}</Label>
           <Input id="display-name" v-model="displayName" maxlength="50" />
         </div>
         <div>
           <Button type="submit" :disabled="saving">
-            {{ saving ? 'Saving…' : 'Save profile' }}
+            {{
+              saving ? $t('account.profile.saving') : $t('account.profile.save')
+            }}
           </Button>
         </div>
       </form>

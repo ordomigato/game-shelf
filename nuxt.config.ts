@@ -2,7 +2,13 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', 'shadcn-nuxt', '@nuxt/fonts', '@nuxtjs/color-mode'],
+  modules: [
+    '@nuxt/eslint',
+    'shadcn-nuxt',
+    '@nuxt/fonts',
+    '@nuxtjs/color-mode',
+    '@nuxtjs/i18n',
+  ],
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/tailwind.css'],
@@ -13,6 +19,16 @@ export default defineNuxtConfig({
     defaults: {
       weights: [400, 500, 600, 700],
     },
+  },
+  // English only for now. Adding a language means adding a file under
+  // i18n/locales and an entry here. URLs stay unprefixed.
+  i18n: {
+    defaultLocale: 'en',
+    strategy: 'no_prefix',
+    locales: [
+      { code: 'en', language: 'en-US', name: 'English', file: 'en.json' },
+    ],
+    detectBrowserLanguage: false,
   },
   colorMode: {
     classSuffix: '',

@@ -2,7 +2,9 @@
 import { FetchError } from 'ofetch'
 
 definePageMeta({ middleware: 'auth' })
-useHead({ title: 'Welcome · GameShelf' })
+
+const { t } = useI18n()
+useHead(() => ({ title: t('app.title', { page: t('welcome.pageTitle') }) }))
 
 const route = useRoute()
 const auth = useAuth()
@@ -14,7 +16,8 @@ const submitting = ref(false)
 const normalized = computed(() => normalizeUsername(username.value))
 
 async function submit() {
-  error.value = usernameProblem(normalized.value) ?? ''
+  const problem = usernameProblem(normalized.value)
+  error.value = problem ? t(problem.key, problem.params ?? {}) : ''
   if (error.value) return
   submitting.value = true
   try {
@@ -26,8 +29,8 @@ async function submit() {
   } catch (e) {
     error.value =
       e instanceof FetchError && e.statusCode === 409
-        ? 'That username is taken. Try another one.'
-        : 'Something went wrong. Try again.'
+        ? t('username.taken')
+        : t('common.genericError')
   } finally {
     submitting.value = false
   }
@@ -36,13 +39,13 @@ async function submit() {
 
 <template>
   <AuthCard
-    title="Pick a username"
-    description="Your username is how others find your shelf. You can change it later."
+    :title="$t('welcome.title')"
+    :description="$t('welcome.description')"
   >
     <form class="flex flex-col gap-4" @submit.prevent="submit">
       <FormMessage v-if="error">{{ error }}</FormMessage>
       <div class="flex flex-col gap-2">
-        <Label for="username">Username</Label>
+        <Label for="username">{{ $t('fields.username') }}</Label>
         <Input
           id="username"
           v-model="username"
@@ -53,13 +56,15 @@ async function submit() {
           required
         />
         <p id="username-hint" class="text-xs text-muted-foreground">
-          3 to 20 letters, numbers or underscores. Your shelf will be at /u/{{
-            normalized || 'yourname'
-          }}.
+          {{
+            $t('welcome.usernameHint', {
+              username: normalized || $t('welcome.usernamePlaceholder'),
+            })
+          }}
         </p>
       </div>
       <div class="flex flex-col gap-2">
-        <Label for="display-name">Display name (optional)</Label>
+        <Label for="display-name">{{ $t('fields.displayNameOptional') }}</Label>
         <Input
           id="display-name"
           v-model="displayName"
@@ -68,7 +73,7 @@ async function submit() {
         />
       </div>
       <Button type="submit" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Continue' }}
+        {{ submitting ? $t('welcome.submitting') : $t('welcome.submit') }}
       </Button>
     </form>
   </AuthCard>

@@ -1,33 +1,39 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { authErrorMessage, GENERIC_AUTH_ERROR } from './auth-errors'
+import en from '../../i18n/locales/en.json'
+import { authErrorKey } from './auth-errors'
 
 afterEach(() => vi.restoreAllMocks())
 
-describe('authErrorMessage', () => {
-  it('maps known Cognito errors to plain sentences', () => {
+function lookup(key: string): unknown {
+  return key
+    .split('.')
+    .reduce<unknown>(
+      (node, part) => (node as Record<string, unknown>)?.[part],
+      en,
+    )
+}
+
+describe('authErrorKey', () => {
+  it('maps known Cognito errors to their own key', () => {
     const error = Object.assign(new Error('Incorrect username or password.'), {
       name: 'NotAuthorizedException',
     })
-    expect(authErrorMessage(error)).toBe("That email and password don't match.")
+    expect(authErrorKey(error)).toBe('authErrors.NotAuthorizedException')
   })
 
-  it('never shows the raw error for unknown cases', () => {
+  it('falls back to the generic key for unknown errors', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    const error = Object.assign(new Error('InternalErrorException: oops'), {
-      name: 'InternalErrorException',
-    })
-    expect(authErrorMessage(error)).toBe(GENERIC_AUTH_ERROR)
-    expect(authErrorMessage('weird')).toBe(GENERIC_AUTH_ERROR)
+    expect(authErrorKey({ name: 'InternalErrorException' })).toBe(
+      'authErrors.generic',
+    )
+    expect(authErrorKey('weird')).toBe('authErrors.generic')
   })
 
-  it('uses plain punctuation (no dashes or semicolons)', () => {
-    for (const name of [
-      'UsernameExistsException',
-      'InvalidPasswordException',
-      'LimitExceededException',
-      'CodeMismatchException',
-    ]) {
-      expect(authErrorMessage({ name })).not.toMatch(/[—–;]/)
+  it('has English text for every key it can return', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const names = Object.keys(en.authErrors).filter((n) => n !== 'generic')
+    for (const name of [...names, 'Unknown']) {
+      expect(typeof lookup(authErrorKey({ name }))).toBe('string')
     }
   })
 })

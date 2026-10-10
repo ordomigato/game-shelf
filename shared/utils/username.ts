@@ -1,3 +1,5 @@
+import type { Message } from '../types/message'
+
 export const USERNAME_MIN_LENGTH = 3
 export const USERNAME_MAX_LENGTH = 20
 /** Lowercase letters, numbers and underscores. Also enforced in Postgres. */
@@ -8,19 +10,22 @@ export function normalizeUsername(value: string): string {
   return value.trim().toLowerCase()
 }
 
-/**
- * Returns why a (normalized) username can't be used, as a sentence to show
- * the user, or null when it's fine.
- */
-export function usernameProblem(username: string): string | null {
+/** Why a (normalized) username can't be used, or null when it's fine. */
+export function usernameProblem(username: string): Message | null {
   if (username.length < USERNAME_MIN_LENGTH) {
-    return `Usernames need at least ${USERNAME_MIN_LENGTH} characters.`
+    return {
+      key: 'username.problems.tooShort',
+      params: { min: USERNAME_MIN_LENGTH },
+    }
   }
   if (username.length > USERNAME_MAX_LENGTH) {
-    return `Usernames can have at most ${USERNAME_MAX_LENGTH} characters.`
+    return {
+      key: 'username.problems.tooLong',
+      params: { max: USERNAME_MAX_LENGTH },
+    }
   }
   if (!USERNAME_PATTERN.test(username)) {
-    return 'Use only letters, numbers and underscores.'
+    return { key: 'username.problems.characters' }
   }
   return null
 }

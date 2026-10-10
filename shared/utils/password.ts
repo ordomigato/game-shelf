@@ -1,37 +1,42 @@
+import type { Message } from '../types/message'
+
 /**
  * The password rules, matching the Cognito user pool's policy in
  * `sst.config.ts`. Cognito enforces them too. These give instant feedback.
  */
 export const PASSWORD_MIN_LENGTH = 8
 
-export interface PasswordRule {
-  label: string
+export interface PasswordRule extends Message {
   met: boolean
 }
 
 export function passwordRules(password: string): PasswordRule[] {
   return [
     {
-      label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+      key: 'password.rules.length',
+      params: { min: PASSWORD_MIN_LENGTH },
       met: password.length >= PASSWORD_MIN_LENGTH,
     },
-    { label: 'A capital letter', met: /[A-Z]/.test(password) },
-    { label: 'A lowercase letter', met: /[a-z]/.test(password) },
-    { label: 'A number', met: /\d/.test(password) },
+    { key: 'password.rules.uppercase', met: /[A-Z]/.test(password) },
+    { key: 'password.rules.lowercase', met: /[a-z]/.test(password) },
+    { key: 'password.rules.number', met: /\d/.test(password) },
   ]
 }
 
 /**
- * Why a new password can't be used yet, as a sentence to show, or null when
- * it meets every rule and matches its confirmation.
+ * Why a new password can't be used yet, or null when it meets every rule
+ * and matches its confirmation.
  */
 export function newPasswordProblem(
   password: string,
   confirmation: string,
-): string | null {
+): Message | null {
   if (passwordRules(password).some((rule) => !rule.met)) {
-    return 'Your password needs at least 8 characters, with a capital letter, a lowercase letter and a number.'
+    return {
+      key: 'password.problems.rules',
+      params: { min: PASSWORD_MIN_LENGTH },
+    }
   }
-  if (password !== confirmation) return "The passwords don't match."
+  if (password !== confirmation) return { key: 'password.problems.mismatch' }
   return null
 }

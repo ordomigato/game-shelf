@@ -2,6 +2,7 @@
 import { CircleUser, LogOut, UserRound } from '@lucide/vue'
 
 const auth = useAuth()
+const { t } = useI18n()
 const route = useRoute()
 
 /**
@@ -15,7 +16,8 @@ const signedIn = computed(
     (auth.status.value === 'loading' && Boolean(auth.hint.value)),
 )
 const label = computed(
-  () => auth.me.value?.username ?? auth.hint.value?.username ?? 'Account',
+  () =>
+    auth.me.value?.username ?? auth.hint.value?.username ?? t('header.account'),
 )
 
 async function signOut() {
@@ -37,10 +39,14 @@ async function signOut() {
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       <DropdownMenuItem as-child>
-        <NuxtLink to="/account"><UserRound /> Account</NuxtLink>
+        <NuxtLink to="/account"
+          ><UserRound /> {{ $t('header.account') }}</NuxtLink
+        >
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem @select="signOut"><LogOut /> Sign out</DropdownMenuItem>
+      <DropdownMenuItem @select="signOut"
+        ><LogOut /> {{ $t('header.signOut') }}</DropdownMenuItem
+      >
     </DropdownMenuContent>
   </DropdownMenu>
   <Button
@@ -55,7 +61,7 @@ async function signOut() {
         query: route.path === '/' ? {} : { redirect: route.fullPath },
       }"
     >
-      Sign in
+      {{ $t('header.signIn') }}
     </NuxtLink>
   </Button>
 </template>

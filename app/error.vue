@@ -14,16 +14,12 @@ function goHome() {
   <NuxtLayout>
     <section class="mx-auto max-w-xl py-16 text-center">
       <h1 class="text-4xl font-bold">
-        {{ notFound ? 'Page not found' : 'Something went wrong' }}
+        {{ notFound ? $t('error.notFoundTitle') : $t('error.genericTitle') }}
       </h1>
       <p class="mt-4 text-muted-foreground">
-        {{
-          notFound
-            ? 'This page is not on the shelf.'
-            : 'Please try again in a moment.'
-        }}
+        {{ notFound ? $t('error.notFoundBody') : $t('error.genericBody') }}
       </p>
-      <Button class="mt-8" @click="goHome">Back to home</Button>
+      <Button class="mt-8" @click="goHome">{{ $t('error.backHome') }}</Button>
     </section>
   </NuxtLayout>
 </template>

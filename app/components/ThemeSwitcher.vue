@@ -10,14 +10,14 @@ const colorMode = useColorMode()
       <Button
         variant="ghost"
         size="icon"
-        aria-label="Settings"
+        :aria-label="$t('header.settings')"
         class="text-masthead-foreground hover:bg-masthead-foreground/15 hover:text-masthead-foreground aria-expanded:bg-masthead-foreground/15 aria-expanded:text-masthead-foreground"
       >
         <Settings class="size-5" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
-      <DropdownMenuLabel>Theme</DropdownMenuLabel>
+      <DropdownMenuLabel>{{ $t('header.theme') }}</DropdownMenuLabel>
       <DropdownMenuRadioGroup v-model="colorMode.preference">
         <DropdownMenuRadioItem
           v-for="theme in themes"
@@ -25,7 +25,7 @@ const colorMode = useColorMode()
           :value="theme.id"
         >
           <component :is="theme.icon" />
-          {{ theme.label }}
+          {{ $t(theme.labelKey) }}
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
     </DropdownMenuContent>

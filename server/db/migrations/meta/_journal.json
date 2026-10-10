@@ -15,6 +15,20 @@
       "when": 1791587085308,
       "tag": "0001_usernames",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791591843098,
+      "tag": "0002_drop_old_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791591859268,
+      "tag": "0003_collections_model",
+      "breakpoints": true
     }
   ]
 }

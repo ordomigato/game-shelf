@@ -1,11 +1,14 @@
 import { sql } from 'drizzle-orm'
 import {
   check,
+  boolean,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
+  uniqueIndex,
   text,
   timestamp,
   uuid,
@@ -23,6 +26,7 @@ const timestamps = {
 }
 
 export const visibility = pgEnum('visibility', ['private', 'public'])
+export const collectionKind = pgEnum('collection_kind', ['custom', 'wishlist'])
 
 export const users = pgTable(
   'users',
@@ -42,6 +46,25 @@ export const users = pgTable(
   ],
 )
 
+/**
+ * A set of field definitions. A shared blueprint has a name and can be used
+ * by several collections. A private one (no name) belongs to one collection.
+ */
+export const blueprints = pgTable(
+  'blueprints',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name'),
+    shared: boolean('shared').notNull().default(false),
+    fields: jsonb('fields').$type<FieldDefinition[]>().notNull().default([]),
+    ...timestamps,
+  },
+  (table) => [index('blueprints_owner_id_idx').on(table.ownerId)],
+)
+
 export const collections = pgTable(
   'collections',
   {
@@ -49,28 +72,71 @@ export const collections = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    blueprintId: uuid('blueprint_id')
+      .notNull()
+      .references(() => blueprints.id, { onDelete: 'restrict' }),
     title: text('title').notNull(),
+    /** URL name, from the title. Unique per owner. */
+    slug: text('slug').notNull(),
     description: text('description'),
     visibility: visibility('visibility').notNull().default('private'),
-    fields: jsonb('fields').$type<FieldDefinition[]>().notNull().default([]),
+    kind: collectionKind('kind').notNull().default('custom'),
     ...timestamps,
   },
-  (table) => [index('collections_owner_id_idx').on(table.ownerId)],
+  (table) => [
+    index('collections_owner_id_idx').on(table.ownerId),
+    uniqueIndex('collections_owner_slug_idx').on(table.ownerId, table.slug),
+    uniqueIndex('collections_one_wishlist_idx')
+      .on(table.ownerId)
+      .where(sql`${table.kind} = 'wishlist'`),
+  ],
 )
 
-export const items = pgTable(
-  'items',
+/**
+ * A game a user is tracking, once per game per user, however many
+ * collections it's in. `data` holds its values for every blueprint field,
+ * keyed by field id.
+ */
+export const libraryItems = pgTable(
+  'library_items',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    collectionId: uuid('collection_id')
+    ownerId: uuid('owner_id')
       .notNull()
-      .references(() => collections.id, { onDelete: 'cascade' }),
-    /** Set when the item was pre-filled from IGDB. */
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Set when the item came from IGDB. */
     igdbId: integer('igdb_id'),
     name: text('name').notNull(),
     coverId: text('cover_id'),
     data: jsonb('data').$type<ItemData>().notNull().default({}),
     ...timestamps,
   },
-  (table) => [index('items_collection_id_idx').on(table.collectionId)],
+  (table) => [
+    index('library_items_owner_id_idx').on(table.ownerId),
+    index('library_items_igdb_id_idx').on(table.igdbId),
+    uniqueIndex('library_items_owner_igdb_idx')
+      .on(table.ownerId, table.igdbId)
+      .where(sql`${table.igdbId} is not null`),
+  ],
+)
+
+/** Junction table: which library items are in which collections. */
+export const collectionItems = pgTable(
+  'collection_items',
+  {
+    collectionId: uuid('collection_id')
+      .notNull()
+      .references(() => collections.id, { onDelete: 'cascade' }),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => libraryItems.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+    addedAt: timestamp('added_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.collectionId, table.itemId] }),
+    index('collection_items_item_id_idx').on(table.itemId),
+  ],
 )

@@ -25,14 +25,33 @@ description: >
 
 Fixed facts that every row has, that the app filters or joins on, or that
 other tables point at, are real columns: owner, title, visibility,
-timestamps, foreign keys. Only the **user-defined** part of an item lives in
-JSONB: `collections.fields` holds the column definitions, `items.data` the
-values keyed by `FieldDefinition.id`. Don't push ordinary columns into JSONB
-to skip a migration.
+timestamps, foreign keys. Only the **user-defined** part lives in JSONB:
+`blueprints.fields` holds the field definitions, `library_items.data` the
+values keyed by `FieldDefinition.id` (across every blueprint the item's
+collections use). Don't push ordinary columns into JSONB to skip a
+migration.
 
-Postgres doesn't validate JSONB contents. Server code validates `items.data`
-against the collection's `fields` before writing it: unknown keys rejected,
-values matching their field's type, `select` values in `options`.
+Postgres doesn't validate JSONB contents. Values are written through
+`applyFieldValues` (`shared/utils/field-values.ts`), which accepts only the
+fields of the collection's blueprint, checks each value against its type
+(`select` must be one of `options`, rating 1 to 5, and so on), and leaves
+values for other blueprints untouched.
+
+## The collections model
+
+- `library_items`: one row per game per user (a partial unique index on
+  owner + `igdb_id`), however many collections it's in.
+- `collection_items`: the junction table (composite primary key), with
+  `position` and `added_at`.
+- `collections`: owner, `blueprint_id`, title, `slug` (unique per owner),
+  visibility, and `kind` (`custom`, or the one `wishlist` per user, enforced
+  by a partial unique index). The Wishlist is created by `ensureWishlist`.
+- `blueprints`: shared (named) or private to one collection. A blueprint in
+  use can't be deleted (`restrict`).
+
+Every query on these tables is scoped to the owner from `requireAuth`.
+Helpers live in `server/utils/collections.ts`. Use them rather than
+querying in routes, and keep the owner filter in every new one.
 
 ## Order of work
 

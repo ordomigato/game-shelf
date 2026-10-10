@@ -5,8 +5,15 @@ import type {
   CollectionDetail,
   CollectionEntry,
   CollectionSummary,
+  FieldDefinition,
   LibraryItem,
 } from '../../shared/types/collection'
+import {
+  cleanFields,
+  fieldsProblem,
+  migrateItemData,
+  type OptionRenames,
+} from '../../shared/utils/field-changes'
 import { applyFieldValues } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import {
@@ -542,4 +549,102 @@ export async function trackedItems(
   return rows.flatMap((row) =>
     row.igdbId === null ? [] : [{ igdbId: row.igdbId, itemId: row.itemId }],
   )
+}
+
+/** Whether saving `after` can change stored values for field `before`. */
+function touchesValues(
+  before: FieldDefinition,
+  after: FieldDefinition | undefined,
+  renames: Record<string, string> | undefined,
+): boolean {
+  if (!after || after.type !== before.type) return true
+  if (before.type !== 'select') return false
+  if (renames && Object.keys(renames).length) return true
+  const kept = new Set(after.options ?? [])
+  return (before.options ?? []).some((option) => !kept.has(option))
+}
+
+/**
+ * Replaces the fields of a collection the user owns, and carries the
+ * user's stored values over: values for removed fields are dropped, values
+ * for changed fields converted or dropped when they no longer fit, renamed
+ * select options renamed. All in one batch, so it happens fully or not at
+ * all. Returns the saved blueprint.
+ */
+export async function updateCollectionFields(
+  ownerId: string,
+  collectionId: string,
+  input: FieldDefinition[],
+  optionRenames: OptionRenames = {},
+): Promise<Blueprint> {
+  const collection = await getOwnedCollection(ownerId, collectionId)
+  const db = useDb()
+  const [blueprint] = await db
+    .select()
+    .from(blueprints)
+    .where(eq(blueprints.id, collection.blueprintId))
+  if (!blueprint) throw notFound()
+
+  const fields = cleanFields(input)
+  const problem = fieldsProblem(fields)
+  if (problem) {
+    throw createError({ statusCode: 400, statusMessage: problem.key })
+  }
+
+  // Only renames from an option that existed to one that still does.
+  const before = blueprint.fields
+  const afterById = new Map(fields.map((field) => [field.id, field]))
+  const renames: OptionRenames = {}
+  for (const field of before) {
+    const after = afterById.get(field.id)
+    const asked = optionRenames[field.id]
+    if (field.type !== 'select' || after?.type !== 'select' || !asked) continue
+    const valid = Object.entries(asked).filter(
+      ([from, to]) =>
+        (field.options ?? []).includes(from) &&
+        (after.options ?? []).includes(to),
+    )
+    if (valid.length) renames[field.id] = Object.fromEntries(valid)
+  }
+
+  const touched = before
+    .filter((field) =>
+      touchesValues(field, afterById.get(field.id), renames[field.id]),
+    )
+    .map((field) => field.id)
+  const items = touched.length
+    ? await db
+        .select({ id: libraryItems.id, data: libraryItems.data })
+        .from(libraryItems)
+        .where(
+          and(
+            eq(libraryItems.ownerId, ownerId),
+            sql`${libraryItems.data} ?| ARRAY[${sql.join(
+              touched.map((id) => sql`${id}`),
+              sql`, `,
+            )}]::text[]`,
+          ),
+        )
+    : []
+  const itemUpdates = items.flatMap((item) => {
+    const data = migrateItemData(item.data, before, fields, renames)
+    return data
+      ? [
+          db
+            .update(libraryItems)
+            .set({ data })
+            .where(eq(libraryItems.id, item.id)),
+        ]
+      : []
+  })
+
+  const [[saved]] = await db.batch([
+    db
+      .update(blueprints)
+      .set({ fields })
+      .where(eq(blueprints.id, blueprint.id))
+      .returning(),
+    ...itemUpdates,
+  ])
+  return toBlueprint(saved!)
 }

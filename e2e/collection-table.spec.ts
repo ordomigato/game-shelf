@@ -217,6 +217,30 @@ test.describe('owners', () => {
     expect(removed).toBe(`DELETE ${items[2]!.id}`)
   })
 
+  test('rename a game', async ({ page }) => {
+    let renamed: unknown
+    await page.route(`**/api/library-items/${items[1]!.id}`, (route) => {
+      renamed = route.request().postDataJSON()
+      return route.fulfill({ json: { ...items[1], name: 'Mother 2' } })
+    })
+    await openCollection(page, true)
+    await page.getByRole('button', { name: 'Actions for EarthBound' }).click()
+    await page.getByRole('menuitem', { name: 'Rename' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Rename game' })
+    await dialog.getByRole('textbox', { name: 'Name' }).fill('Mother 2')
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('link', { name: 'Mother 2' })).toBeVisible()
+    expect(renamed).toEqual({ name: 'Mother 2' })
+  })
+
+  test('the header row does not light up on hover', async ({ page }) => {
+    await openCollection(page, true)
+    const header = page.getByRole('table').locator('thead tr')
+    await header.hover()
+    await expect(header).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  })
+
   test('the covers view is remembered', async ({ page }) => {
     await openCollection(page, true)
     await page.getByRole('button', { name: 'Covers' }).click()

@@ -21,6 +21,7 @@ import {
   ListFilter,
   MoveDown,
   MoveUp,
+  Pencil,
   Search,
   Trash2,
   X,
@@ -35,7 +36,7 @@ import type {
 /**
  * A collection's games as a table: one column per field in its blueprint.
  * Anyone can sort by a column, search, and filter by select and checkbox
- * fields. Owners edit values in place, remove games, and put games in
+ * fields. Owners edit values in place, rename and remove games, and put games in
  * their own order by dragging or from the row menu.
  */
 const props = defineProps<{
@@ -46,6 +47,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
   remove: [itemId: string]
+  rename: [itemId: string]
   /** Place `itemId` right after `afterItemId`, or first when null. */
   move: [itemId: string, afterItemId: string | null]
 }>()
@@ -363,7 +365,8 @@ const addedFormat = computed(
     <div class="overflow-x-auto rounded-lg border bg-card">
       <Table>
         <TableHeader>
-          <TableRow>
+          <!-- Header cells don't react to hover like the rows below. -->
+          <TableRow class="hover:bg-transparent">
             <TableHead v-if="reorderable" class="w-8 pr-0">
               <span class="sr-only">{{ $t('table.order') }}</span>
             </TableHead>
@@ -504,6 +507,9 @@ const addedFormat = computed(
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </template>
+                  <DropdownMenuItem @select="emit('rename', item.id)">
+                    <Pencil /> {{ $t('table.rename') }}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     class="text-destructive focus:text-destructive"
                     @select="emit('remove', item.id)"

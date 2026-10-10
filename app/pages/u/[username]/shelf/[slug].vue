@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
+  Columns3,
   Ellipsis,
   Heart,
   LayoutGrid,
@@ -16,6 +17,7 @@ import type {
   CollectionSummary,
   FieldValue,
   ItemData,
+  LibraryItem,
 } from '#shared/types/collection'
 
 const NuxtLink = resolveComponent('NuxtLink')
@@ -48,6 +50,7 @@ useHead(() => ({
 }))
 
 const editing = ref(false)
+const editingFields = ref(false)
 const confirmingDelete = ref(false)
 const deleting = ref(false)
 const deleteError = ref('')
@@ -128,6 +131,23 @@ async function saveValue(
     setItemData(itemId, before)
     itemError.value = t('table.saveFailed')
   }
+}
+
+const renaming = ref(false)
+const renamingItem = ref<CollectionEntry | null>(null)
+
+function startRenaming(itemId: string) {
+  renamingItem.value =
+    data.value?.items.find((entry) => entry.id === itemId) ?? null
+  renaming.value = Boolean(renamingItem.value)
+}
+
+function onRenamed(saved: LibraryItem) {
+  setItems(
+    (data.value?.items ?? []).map((entry) =>
+      entry.id === saved.id ? { ...entry, name: saved.name } : entry,
+    ),
+  )
 }
 
 async function removeItem(itemId: string) {
@@ -264,6 +284,14 @@ async function deleteCollection() {
                   })
                 : $t('collection.noColumns')
             }}
+            <button
+              v-if="data.isOwner"
+              type="button"
+              class="ml-1 font-medium text-primary underline-offset-4 hover:underline"
+              @click="editingFields = true"
+            >
+              {{ $t('collection.editFields') }}
+            </button>
           </p>
         </div>
 
@@ -287,6 +315,9 @@ async function deleteCollection() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem @select="editing = true">
                 <Pencil /> {{ $t('collection.edit') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem @select="editingFields = true">
+                <Columns3 /> {{ $t('collection.editFields') }}
               </DropdownMenuItem>
               <DropdownMenuItem
                 v-if="data.kind !== 'wishlist'"
@@ -355,6 +386,7 @@ async function deleteCollection() {
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"
+          @rename="startRenaming"
         />
 
         <VueDraggable
@@ -395,6 +427,20 @@ async function deleteCollection() {
         </div>
       </template>
 
+      <RenameItemDialog
+        v-if="data.isOwner"
+        v-model:open="renaming"
+        :item="renamingItem"
+        @saved="onRenamed"
+      />
+      <FieldsEditorDialog
+        v-if="data.isOwner"
+        v-model:open="editingFields"
+        :collection-id="data.id"
+        :fields="data.blueprint.fields"
+        :items="data.items"
+        @saved="refresh()"
+      />
       <CollectionFormDialog
         v-if="data.isOwner"
         v-model:open="editing"

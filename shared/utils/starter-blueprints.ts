@@ -21,7 +21,7 @@ const templates: Record<StarterBlueprint | 'wishlist', FieldTemplate[]> = {
       type: 'select',
       options: ['Sealed', 'Complete in box', 'Game and box', 'Loose'],
     },
-    { name: 'Price paid', type: 'currency' },
+    { name: 'Price paid', type: 'currency', currency: 'USD' },
     { name: 'Purchased on', type: 'date' },
     {
       name: 'Region',

@@ -18,6 +18,8 @@ export interface FieldDefinition {
   type: FieldType
   /** Allowed values, for `select` fields only. */
   options?: string[]
+  /** ISO 4217 code like "USD", for `currency` fields only. */
+  currency?: string
 }
 
 /**

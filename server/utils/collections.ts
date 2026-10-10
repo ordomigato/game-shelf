@@ -435,3 +435,32 @@ export async function updateItemValues(
     .returning()
   return toLibraryItem(updated!)
 }
+
+/**
+ * The user's items for the given IGDB games that are in a collection: any
+ * of their collections, or only `collectionId` when given. Lets search
+ * results mark games the user already has, and remove them in one click.
+ */
+export async function trackedItems(
+  ownerId: string,
+  igdbIds: number[],
+  collectionId?: string,
+): Promise<{ igdbId: number; itemId: string }[]> {
+  if (igdbIds.length === 0) return []
+  const rows = await useDb()
+    .selectDistinct({ igdbId: libraryItems.igdbId, itemId: libraryItems.id })
+    .from(libraryItems)
+    .innerJoin(collectionItems, eq(collectionItems.itemId, libraryItems.id))
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        inArray(libraryItems.igdbId, igdbIds),
+        collectionId
+          ? eq(collectionItems.collectionId, collectionId)
+          : undefined,
+      ),
+    )
+  return rows.flatMap((row) =>
+    row.igdbId === null ? [] : [{ igdbId: row.igdbId, itemId: row.itemId }],
+  )
+}

@@ -15,7 +15,7 @@ const hiddenPlatforms = computed(() =>
 </script>
 
 <template>
-  <article class="flex flex-col gap-2">
+  <article class="cover-actions relative flex flex-col gap-2">
     <NuxtLink
       :to="`/games/${game.id}`"
       class="group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -36,6 +36,10 @@ const hiddenPlatforms = computed(() =>
         </p>
       </div>
     </NuxtLink>
+    <!-- A button over the cover's corner, like Add to collection. -->
+    <div v-if="$slots.action" class="absolute top-2 right-2">
+      <slot name="action" />
+    </div>
     <div class="flex flex-col gap-1.5">
       <ul
         v-if="game.platforms.length"

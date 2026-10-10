@@ -7,7 +7,8 @@
     "account": "Account",
     "signOut": "Sign out",
     "myShelf": "My shelf",
-    "blueprints": "Blueprints"
+    "blueprints": "Blueprints",
+    "explore": "Explore"
   },
   "theme": {
     "label": "Theme",
@@ -520,5 +521,13 @@
     "shelfTitle": "{owner}'s shelf",
     "collectionCount": "No public collections on GameShelf yet | 1 public collection on GameShelf | {count} public collections on GameShelf",
     "site": "Search games, track your collection and share your shelf."
+  },
+  "explore": {
+    "title": "Explore",
+    "description": "Public collections from everyone on GameShelf, most recently active first.",
+    "by": "by {owner}",
+    "empty": "No public collections yet. Make one of yours public to be the first.",
+    "loadFailed": "Couldn't load collections. Try again.",
+    "loadMoreFailed": "Couldn't load more collections. Try again."
   }
 }

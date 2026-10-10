@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleUser, LogOut, UserRound } from '@lucide/vue'
+import { CircleUser, Library, LogOut } from '@lucide/vue'
 
 const auth = useAuth()
 const { t } = useI18n()
@@ -15,9 +15,12 @@ const signedIn = computed(
     auth.status.value === 'signedIn' ||
     (auth.status.value === 'loading' && Boolean(auth.hint.value)),
 )
-const label = computed(
-  () =>
-    auth.me.value?.username ?? auth.hint.value?.username ?? t('header.account'),
+const username = computed(
+  () => auth.me.value?.username ?? auth.hint.value?.username ?? null,
+)
+const label = computed(() => username.value ?? t('header.account'))
+const shelfPath = computed(() =>
+  username.value ? `/u/${username.value}/shelf` : null,
 )
 
 async function signOut() {
@@ -27,6 +30,16 @@ async function signOut() {
 </script>
 
 <template>
+  <Button
+    v-if="signedIn && shelfPath"
+    as-child
+    class="hidden bg-highlight text-highlight-foreground hover:bg-highlight/85 sm:inline-flex"
+  >
+    <NuxtLink :to="shelfPath">
+      <Library class="size-5" aria-hidden="true" />
+      {{ $t('header.myShelf') }}
+    </NuxtLink>
+  </Button>
   <DropdownMenu v-if="signedIn">
     <DropdownMenuTrigger as-child>
       <Button
@@ -38,15 +51,21 @@ async function signOut() {
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
+      <!-- On phones the header has no room for the My shelf button. -->
+      <DropdownMenuItem v-if="shelfPath" as-child class="sm:hidden">
+        <NuxtLink :to="shelfPath">
+          {{ $t('header.myShelf') }}
+        </NuxtLink>
+      </DropdownMenuItem>
       <DropdownMenuItem as-child>
-        <NuxtLink to="/account"
-          ><UserRound /> {{ $t('header.account') }}</NuxtLink
-        >
+        <NuxtLink to="/account">
+          {{ $t('header.account') }}
+        </NuxtLink>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem @select="signOut"
-        ><LogOut /> {{ $t('header.signOut') }}</DropdownMenuItem
-      >
+      <DropdownMenuItem @select="signOut">
+        <LogOut /> {{ $t('header.signOut') }}
+      </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
   <Button

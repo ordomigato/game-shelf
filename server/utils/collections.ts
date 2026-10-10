@@ -19,7 +19,7 @@ import {
   collections,
   libraryItems,
 } from '../db/schema'
-import { isUniqueViolation } from './users'
+import { isUniqueViolation } from './db-errors'
 
 type CollectionRow = typeof collections.$inferSelect
 type BlueprintRow = typeof blueprints.$inferSelect
@@ -55,7 +55,10 @@ export function toLibraryItem(row: ItemRow): LibraryItem {
   }
 }
 
-/** Creates the user's Wishlist (and its blueprint) if they don't have one. */
+/**
+ * Creates the user's Wishlist (with an empty blueprint) if they don't have
+ * one. Called when the user's row is first created.
+ */
 export async function ensureWishlist(ownerId: string): Promise<void> {
   const db = useDb()
   const [existing] = await db

@@ -15,6 +15,15 @@ const {
   retry,
 } = useGameSearch()
 
+// Someone can type before the page has finished loading. Vue would reset the
+// box to empty when it takes over, so keep whatever was already typed.
+onBeforeMount(() => {
+  const field = document.getElementById(
+    'game-search',
+  ) as HTMLInputElement | null
+  if (field?.value && field.value !== input.value) input.value = field.value
+})
+
 const showSkeletons = computed(
   () => isSearchable.value && status.value === 'pending' && !games.value.length,
 )
@@ -50,6 +59,7 @@ const resultsLabel = computed(() => {
           aria-hidden="true"
         />
         <Input
+          id="game-search"
           v-model="input"
           type="search"
           :aria-label="$t('search.label')"

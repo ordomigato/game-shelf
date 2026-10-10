@@ -20,7 +20,6 @@ export default defineEventHandler(
     if (!owner)
       throw createError({ statusCode: 404, statusMessage: 'Not found' })
     const isOwner = claims?.sub === owner.cognitoSub
-    if (isOwner) await ensureWishlist(owner.id)
     return listCollections(owner.id, { publicOnly: !isOwner })
   },
 )

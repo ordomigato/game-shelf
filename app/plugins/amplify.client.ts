@@ -11,5 +11,10 @@ export default defineNuxtPlugin(() => {
       },
     },
   })
-  void useAuth().ensureLoaded()
+  // Checking the session changes auth state, so on server-rendered pages it
+  // waits until hydration is done. Otherwise a fast check could change the
+  // header before Vue has matched it to the server's HTML.
+  onNuxtReady(() => {
+    void useAuth().ensureLoaded()
+  })
 })

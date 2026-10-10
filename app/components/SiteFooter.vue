@@ -3,7 +3,10 @@
     <div
       class="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6"
     >
-      <p>GameShelf</p>
+      <div class="flex items-center gap-4">
+        <p>GameShelf</p>
+        <ThemeSwitcher />
+      </div>
       <i18n-t keypath="footer.igdbCredit" tag="p">
         <template #igdb>
           <a

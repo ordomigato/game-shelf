@@ -9,7 +9,6 @@
         GameShelf
       </NuxtLink>
       <div class="flex items-center gap-1">
-        <ThemeSwitcher />
         <UserMenu />
       </div>
     </div>

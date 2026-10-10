@@ -1,33 +1,43 @@
 <script setup lang="ts">
-import { Settings } from '@lucide/vue'
+withDefaults(
+  defineProps<{
+    /** Show each theme's name next to its icon. */
+    showLabels?: boolean
+  }>(),
+  { showLabels: false },
+)
 
 const colorMode = useColorMode()
+
+// A single toggle group clears its value when the active item is clicked
+// again. Ignore that so one theme is always chosen.
+function choose(value: unknown) {
+  if (typeof value === 'string' && value) colorMode.preference = value
+}
 </script>
 
 <template>
-  <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button
-        variant="ghost"
-        size="icon"
-        :aria-label="$t('header.settings')"
-        class="text-masthead-foreground hover:bg-masthead-foreground/15 hover:text-masthead-foreground aria-expanded:bg-masthead-foreground/15 aria-expanded:text-masthead-foreground"
+  <!-- The saved theme is only known in the browser. -->
+  <ClientOnly>
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      :model-value="colorMode.preference"
+      :aria-label="$t('theme.label')"
+      @update:model-value="choose"
+    >
+      <ToggleGroupItem
+        v-for="theme in themes"
+        :key="theme.id"
+        :value="theme.id"
+        :aria-label="$t(theme.labelKey)"
+        :title="showLabels ? undefined : $t(theme.labelKey)"
+        class="data-[state=on]:bg-primary/15 data-[state=on]:text-primary"
       >
-        <Settings class="size-5" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuLabel>{{ $t('header.theme') }}</DropdownMenuLabel>
-      <DropdownMenuRadioGroup v-model="colorMode.preference">
-        <DropdownMenuRadioItem
-          v-for="theme in themes"
-          :key="theme.id"
-          :value="theme.id"
-        >
-          <component :is="theme.icon" />
-          {{ $t(theme.labelKey) }}
-        </DropdownMenuRadioItem>
-      </DropdownMenuRadioGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>
+        <component :is="theme.icon" aria-hidden="true" />
+        <span v-if="showLabels">{{ $t(theme.labelKey) }}</span>
+      </ToggleGroupItem>
+    </ToggleGroup>
+  </ClientOnly>
 </template>

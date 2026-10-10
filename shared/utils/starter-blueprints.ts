@@ -10,9 +10,9 @@ export const STARTER_BLUEPRINTS: StarterBlueprint[] = [
 type FieldTemplate = Omit<FieldDefinition, 'id'>
 
 /**
- * Field sets offered when creating a collection, plus the Wishlist's.
- * Names are stored as the user's own data once created, so they start in
- * English.
+ * Field sets offered when creating a collection. The Wishlist starts with
+ * none. Names are stored as the user's own data once created, so they start
+ * in English.
  */
 const templates: Record<StarterBlueprint | 'wishlist', FieldTemplate[]> = {
   collector: [
@@ -41,11 +41,7 @@ const templates: Record<StarterBlueprint | 'wishlist', FieldTemplate[]> = {
     { name: 'Rating', type: 'rating' },
     { name: 'Hours played', type: 'number' },
   ],
-  wishlist: [
-    { name: 'Max price', type: 'currency' },
-    { name: 'Priority', type: 'select', options: ['High', 'Medium', 'Low'] },
-    { name: 'Notes', type: 'text' },
-  ],
+  wishlist: [],
   blank: [],
 }
 

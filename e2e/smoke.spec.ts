@@ -12,15 +12,20 @@ test('theme switcher changes and remembers the theme', async ({ page }) => {
   await page.goto('/')
   const html = page.locator('html')
 
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('menuitemradio', { name: 'Dark' }).click()
+  const theme = page.getByRole('contentinfo').getByRole('group', {
+    name: 'Theme',
+  })
+  await theme.getByRole('button', { name: 'Dark' }).click()
   await expect(html).toHaveClass(/\bdark\b/)
 
   await page.reload()
   await expect(html).toHaveClass(/\bdark\b/)
 
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('menuitemradio', { name: 'Light' }).click()
+  await expect(theme.getByRole('button', { name: 'Dark' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await theme.getByRole('button', { name: 'Light' }).click()
   await expect(html).toHaveClass(/\blight\b/)
   await expect(html).not.toHaveClass(/\bdark\b/)
 })

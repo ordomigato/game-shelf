@@ -5,7 +5,6 @@ export default defineEventHandler(
   async (event): Promise<CollectionSummary[]> => {
     const { sub } = await requireAuth(event)
     const user = await findOrCreateUser(sub)
-    await ensureWishlist(user.id)
     return listCollections(user.id, { publicOnly: false })
   },
 )

@@ -33,7 +33,10 @@ GameShelf must not look like stock shadcn. Restyle through the theme in
 and `--shelf` tokens), never by editing a component. The palette comes from
 GameShelf v1: steel blue `#3D6F94` (primary), navy `#001F44` (masthead,
 dark mode), sky blue `#76BDF2` (accents, dark-mode primary), grey
-`#A0AEC0` (muted text in dark mode). Exo 2 for headings and Outfit for
+`#A0AEC0` (muted text in dark mode). Amber (`--highlight`, the
+complement of the steel blue) is the one warm colour: use it sparingly,
+for the single thing in view that should stand out (today the header's My
+shelf button). Exo 2 for headings and Outfit for
 text, for a game-friendly but readable feel. The longer-term direction is
 a collector's shelf: signature pieces (the steel-blue shelf edge under the
 navy header, later the shelf view and generated covers) are our own

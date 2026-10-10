@@ -6,3 +6,11 @@ export interface Me {
   displayName: string | null
   createdAt: string
 }
+
+/** What anyone can see about a user, on their shelf. */
+export interface PublicProfile {
+  username: string
+  displayName: string | null
+  /** When they joined, as an ISO timestamp. */
+  memberSince: string
+}

@@ -5,11 +5,13 @@ import type {
   BlueprintImpact,
   CollectionDetail,
   CollectionSummary,
+  CollectionVisibility,
   FieldDefinition,
   BlueprintSummary,
   FieldValue,
   LibraryItem,
 } from '#shared/types/collection'
+import type { PublicProfile } from '#shared/types/user'
 import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
 
 /**
@@ -34,6 +36,10 @@ export function useCollections() {
     /** Whether `username` is the signed-in user. */
     isMine: (username: string) =>
       auth.me.value?.username === username.toLowerCase(),
+
+    /** What anyone can see about a user. */
+    profile: (username: string) =>
+      ofetch<PublicProfile>(`/api/u/${encodeURIComponent(username)}`),
 
     list: (username: string) =>
       viewerFetch<CollectionSummary[]>(userPath(username)),
@@ -110,7 +116,11 @@ export function useCollections() {
 
     update: (
       id: string,
-      changes: { title?: string; description?: string | null },
+      changes: {
+        title?: string
+        description?: string | null
+        visibility?: CollectionVisibility
+      },
     ) =>
       auth.apiFetch<CollectionSummary>(`/api/collections/${id}`, {
         method: 'PATCH',

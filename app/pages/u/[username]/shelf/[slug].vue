@@ -6,7 +6,6 @@ import {
   Ellipsis,
   Heart,
   LayoutGrid,
-  Lock,
   PenLine,
   Pencil,
   Plus,
@@ -267,6 +266,29 @@ function setBlueprint(blueprint: Blueprint) {
   data.value = { ...data.value, blueprint }
 }
 
+const changingVisibility = ref(false)
+
+/** Makes the collection private or public. Resolves whether it worked. */
+async function setVisibility(visibility: CollectionVisibility) {
+  if (!data.value) return false
+  changingVisibility.value = true
+  try {
+    const saved = await collections.update(data.value.id, { visibility })
+    data.value = { ...data.value, visibility: saved.visibility }
+    toast.success(
+      visibility === 'public'
+        ? t('visibility.nowPublic')
+        : t('visibility.nowPrivate'),
+    )
+    return true
+  } catch {
+    toast.error(t('visibility.failed'))
+    return false
+  } finally {
+    changingVisibility.value = false
+  }
+}
+
 const detaching = ref(false)
 
 /**
@@ -345,17 +367,13 @@ async function deleteCollection() {
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
             <span>{{ $t('shelf.gameCount', data.itemCount) }}</span>
-            <Badge
-              v-if="data.isOwner && data.visibility === 'private'"
-              variant="outline"
-              class="gap-1"
-            >
-              <Lock class="size-3" aria-hidden="true" />
-              {{ $t('shelf.private') }}
-            </Badge>
-            <Badge v-else-if="data.isOwner" variant="secondary">
-              {{ $t('shelf.public') }}
-            </Badge>
+            <VisibilityMenu
+              v-if="data.isOwner"
+              :visibility="data.visibility"
+              :is-wishlist="data.kind === 'wishlist'"
+              :disabled="changingVisibility"
+              @change="setVisibility"
+            />
           </div>
           <p v-if="data.description" class="max-w-prose whitespace-pre-line">
             {{ data.description }}
@@ -395,61 +413,70 @@ async function deleteCollection() {
           </i18n-t>
         </div>
 
-        <div v-if="data.isOwner" class="flex items-center gap-2">
-          <Button v-if="data.items.length" as-child>
-            <NuxtLink :to="{ path: '/', query: { to: data.slug } }">
-              <Plus />
-              {{ $t('collection.addGames') }}
-            </NuxtLink>
-          </Button>
-          <Button
-            v-if="data.items.length"
-            variant="outline"
-            @click="addingByHand = true"
-          >
-            <PenLine />
-            <span class="hidden sm:inline">{{
-              $t('collection.addByHand')
-            }}</span>
-            <span class="sr-only sm:hidden">{{
-              $t('collection.addByHand')
-            }}</span>
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <Button
-                variant="outline"
-                size="icon"
-                :aria-label="$t('collection.actions')"
-              >
-                <Ellipsis />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" class="w-max">
-              <DropdownMenuItem @select="editing = true">
-                <Pencil /> {{ $t('collection.edit') }}
-              </DropdownMenuItem>
-              <DropdownMenuItem @select="editingFields = true">
-                <Columns3 /> {{ $t('collection.editFields') }}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                v-if="data.blueprint.shared"
-                @select="detachFields"
-              >
-                <Unlink /> {{ $t('blueprints.detach') }}
-              </DropdownMenuItem>
-              <DropdownMenuItem v-else @select="savingBlueprint = true">
-                <BookmarkPlus /> {{ $t('blueprints.saveAsBlueprint') }}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                v-if="data.kind !== 'wishlist'"
-                class="text-destructive focus:text-destructive"
-                @select="confirmingDelete = true"
-              >
-                <Trash2 /> {{ $t('collection.delete') }}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div class="flex items-center gap-2">
+          <ShareButton
+            v-if="data.isOwner || data.visibility === 'public'"
+            :path="`${shelfPath}/${data.slug}`"
+            :title="titleOf(data)"
+            :is-public="data.visibility === 'public'"
+            :make-public="() => setVisibility('public')"
+          />
+          <template v-if="data.isOwner">
+            <Button v-if="data.items.length" as-child>
+              <NuxtLink :to="{ path: '/', query: { to: data.slug } }">
+                <Plus />
+                {{ $t('collection.addGames') }}
+              </NuxtLink>
+            </Button>
+            <Button
+              v-if="data.items.length"
+              variant="outline"
+              @click="addingByHand = true"
+            >
+              <PenLine />
+              <span class="hidden sm:inline">{{
+                $t('collection.addByHand')
+              }}</span>
+              <span class="sr-only sm:hidden">{{
+                $t('collection.addByHand')
+              }}</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  :aria-label="$t('collection.actions')"
+                >
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-max">
+                <DropdownMenuItem @select="editing = true">
+                  <Pencil /> {{ $t('collection.edit') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem @select="editingFields = true">
+                  <Columns3 /> {{ $t('collection.editFields') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="data.blueprint.shared"
+                  @select="detachFields"
+                >
+                  <Unlink /> {{ $t('blueprints.detach') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-else @select="savingBlueprint = true">
+                  <BookmarkPlus /> {{ $t('blueprints.saveAsBlueprint') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="data.kind !== 'wishlist'"
+                  class="text-destructive focus:text-destructive"
+                  @select="confirmingDelete = true"
+                >
+                  <Trash2 /> {{ $t('collection.delete') }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </template>
         </div>
       </div>
 

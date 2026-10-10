@@ -21,6 +21,17 @@ export async function findOrCreateUser(cognitoSub: string): Promise<UserRow> {
   return existing
 }
 
+/** The user with this username, or undefined. */
+export async function findUserByUsername(
+  username: string,
+): Promise<UserRow | undefined> {
+  const [user] = await useDb()
+    .select()
+    .from(users)
+    .where(eq(users.username, username.toLowerCase()))
+  return user
+}
+
 export function toMe(user: UserRow): Me {
   return {
     id: user.id,

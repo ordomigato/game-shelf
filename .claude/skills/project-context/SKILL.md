@@ -38,9 +38,12 @@ user first.
 - **Postgres on Neon, through Drizzle.** Neon is serverless Postgres: free
   at this scale, sleeps when idle, no VPC needed. Each SST stage has its
   own Neon branch, reached through the `DatabaseUrl` secret. Relational
-  tables for users, collections, posts and comments. The user-defined
-  columns live in JSONB (`collections.fields` holds the definitions,
-  `items.data` the values). See `postgres-change`.
+  tables for users, collections, posts and comments. A collection's fields
+  come from a blueprint (JSONB `blueprints.fields`), and each game's values
+  live in JSONB `library_items.data`. A game can be in many collections
+  through the `collection_items` junction table. See `postgres-change`.
+- **Collection addresses are `/u/<username>/shelf/<slug>`**, the same for
+  the owner and visitors. A private collection is a 404 for anyone else.
 - **Not DynamoDB, not Aurora DSQL, not RDS.** DynamoDB was dropped because
   the social features are relational. DSQL has no JSONB. RDS and
   self-hosted Postgres cost more than the whole budget.

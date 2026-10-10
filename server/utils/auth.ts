@@ -44,3 +44,12 @@ export async function requireAuth(event: H3Event): Promise<AuthClaims> {
     throw createError({ statusCode: 401, statusMessage: 'Sign in required' })
   }
 }
+
+/**
+ * Like `requireAuth`, but a request without a token is allowed (returns
+ * null). A token that is present but invalid is still rejected with 401.
+ */
+export async function optionalAuth(event: H3Event): Promise<AuthClaims | null> {
+  if (!getHeader(event, 'authorization')) return null
+  return requireAuth(event)
+}

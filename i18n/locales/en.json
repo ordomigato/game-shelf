@@ -512,5 +512,13 @@
     "makePublicTitle": "Make it public to share?",
     "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your shelf. You can make it private again at any time.",
     "makePublicConfirm": "Make public and share"
+  },
+  "preview": {
+    "collectionTitle": "{collection} · {owner}'s shelf",
+    "text": "{text}",
+    "gameCount": "An empty collection on GameShelf | 1 game on GameShelf | {count} games on GameShelf",
+    "shelfTitle": "{owner}'s shelf",
+    "collectionCount": "No public collections on GameShelf yet | 1 public collection on GameShelf | {count} public collections on GameShelf",
+    "site": "Search games, track your collection and share your shelf."
   }
 }

@@ -58,6 +58,11 @@ async function signOut() {
         </NuxtLink>
       </DropdownMenuItem>
       <DropdownMenuItem as-child>
+        <NuxtLink to="/blueprints">
+          {{ $t('header.blueprints') }}
+        </NuxtLink>
+      </DropdownMenuItem>
+      <DropdownMenuItem as-child>
         <NuxtLink to="/account">
           {{ $t('header.account') }}
         </NuxtLink>

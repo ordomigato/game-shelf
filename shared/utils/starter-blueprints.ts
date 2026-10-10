@@ -10,7 +10,7 @@ export const STARTER_BLUEPRINTS: StarterBlueprint[] = [
 type FieldTemplate = Omit<FieldDefinition, 'id'>
 
 /**
- * Field sets offered when creating a collection. The Wishlist starts with
+ * Blueprints offered when creating a collection. The Wishlist starts with
  * none. Names are stored as the user's own data once created, so they start
  * in English.
  */

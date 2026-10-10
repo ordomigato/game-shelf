@@ -53,6 +53,40 @@ export interface Blueprint {
   name: string | null
   shared: boolean
   fields: FieldDefinition[]
+  /**
+   * How many of the owner's collections use this blueprint. Sent to the
+   * owner only.
+   */
+  usedBy?: number
+}
+
+/** A shared blueprint as offered when creating a collection. */
+export interface BlueprintSummary {
+  id: string
+  name: string
+  fieldCount: number
+  /** How many of the owner's collections use it. */
+  usedBy: number
+}
+
+/** A collection using a blueprint, as listed on the blueprint's page. */
+export interface BlueprintCollection {
+  id: string
+  title: string
+  slug: string
+  kind: CollectionKind
+  itemCount: number
+}
+
+export interface BlueprintDetail extends Blueprint {
+  collections: BlueprintCollection[]
+}
+
+/** What saving a blueprint's new fields would change. */
+export interface BlueprintImpact {
+  collections: BlueprintCollection[]
+  /** Per field (by its current name), how many games would lose a value. */
+  lost: { name: string; count: number }[]
 }
 
 export interface CollectionSummary {

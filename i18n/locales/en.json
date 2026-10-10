@@ -6,7 +6,8 @@
     "signIn": "Sign in",
     "account": "Account",
     "signOut": "Sign out",
-    "myShelf": "My shelf"
+    "myShelf": "My shelf",
+    "blueprints": "Blueprints"
   },
   "theme": {
     "label": "Theme",
@@ -243,11 +244,16 @@
           "description": "No columns yet. You can add your own later."
         }
       },
+      "fieldCount": "No fields | {count} field | {count} fields",
       "create": "Create collection",
       "creating": "Creating…",
       "save": "Save",
       "saving": "Saving…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "yourBlueprints": "Your blueprints",
+      "keepLinked": "Keep linked to the blueprint",
+      "keepLinkedOn": "Field changes apply to every collection using this blueprint.",
+      "keepLinkedOff": "This collection gets its own copy of the fields to change as you like."
     }
   },
   "shelf": {
@@ -380,11 +386,7 @@
     "back": "Go back",
     "save": "Save fields",
     "saving": "Saving…",
-    "saveAnyway": "Save and clear",
     "saveFailed": "Couldn't save the fields. Try again.",
-    "confirmTitle": "Some values will be cleared",
-    "confirmBody": "These games keep everything else. This can't be undone.",
-    "cleared": "{name}: cleared on {count} game | {name}: cleared on {count} games",
     "types": {
       "text": "Text",
       "number": "Number",
@@ -409,7 +411,13 @@
     "allowMultiple": "Allow more than one choice",
     "outOf": "Out of",
     "outOfFor": "What {name} is out of",
-    "scaleStars": "5 (stars)"
+    "scaleStars": "5 (stars)",
+    "fromBlueprint": "These fields come from the blueprint \"{name}\".",
+    "blueprintUsedBy": "It's used by {count} collection. Edit it on its page, or detach this collection to change its own copy here. | It's used by {count} collections. Edit it on its page, so every collection changes together, or detach this collection to change its own copy here.",
+    "editBlueprint": "Edit blueprint",
+    "detachAndEdit": "Detach and edit here",
+    "close": "Close",
+    "reviewTitle": "Before you save"
   },
   "rename": {
     "title": "Rename game",
@@ -432,5 +440,59 @@
     "added": "Added {name} to {collection}",
     "notFound": "Can't find it?",
     "addItByHand": "Add it by hand"
+  },
+  "blueprints": {
+    "saveAsBlueprint": "Save as blueprint",
+    "detach": "Detach from blueprint",
+    "detachFailed": "Couldn't detach from the blueprint. Try again.",
+    "fromBlueprint": "Uses the blueprint {name}.",
+    "saveTitle": "Save as a blueprint",
+    "saveDescription": "Name these fields to reuse them in new collections. This collection keeps using them.",
+    "name": "Blueprint name",
+    "namePlaceholder": "Blueprint name, like Collector basics",
+    "cancel": "Cancel",
+    "save": "Save blueprint",
+    "saving": "Saving…",
+    "saveFailed": "Couldn't save the blueprint. Try again.",
+    "nameTaken": "You already have a blueprint with that name.",
+    "errors": {
+      "nameRequired": "Give the blueprint a name.",
+      "nameTooLong": "Use up to {max} characters for the name."
+    }
+  },
+  "blueprintsPage": {
+    "title": "Blueprints",
+    "description": "Sets of fields you can reuse across collections. Editing a blueprint changes every collection that uses it.",
+    "empty": "No blueprints yet.",
+    "emptyHint": "Open a collection's ⋯ menu and choose Save as blueprint.",
+    "usedBy": "Not used by any collection | Used by {count} collection | Used by {count} collections",
+    "loadFailed": "Couldn't load your blueprints. Try again.",
+    "notFound": "This blueprint doesn't exist, or it isn't yours.",
+    "back": "Back to blueprints",
+    "nameTitle": "Name",
+    "rename": "Rename",
+    "renamed": "Blueprint renamed",
+    "renameFailed": "Couldn't rename the blueprint. Try again.",
+    "usedByTitle": "Used by",
+    "usedByDescription": "Changing the fields below changes these collections.",
+    "unused": "No collection uses this blueprint.",
+    "delete": "Delete blueprint",
+    "deleteTitle": "Delete {name}?",
+    "deleteBody": "No collection uses it, so nothing else changes.",
+    "deleteFailed": "Couldn't delete the blueprint. Try again.",
+    "fieldsDescription": "Drag to reorder. Saving shows what changes before anything is saved.",
+    "checking": "Checking…",
+    "previewFailed": "Couldn't check what this changes. Try again.",
+    "reviewTitle": "Before you save",
+    "reviewCollections": "This changes {count} collection with {games} games. | This changes {count} collections with {games} games in all.",
+    "saved": "Blueprint saved"
+  },
+  "dataLoss": {
+    "title": "Saved values will be permanently deleted",
+    "field": "{name}: deleted from {count} game | {name}: deleted from {count} games",
+    "cantUndo": "This can't be undone.",
+    "emptyRemoval": "Removing {name}. No games have a value for it.",
+    "acknowledge": "I understand these values will be deleted",
+    "deleteAndSave": "Delete values and save"
   }
 }

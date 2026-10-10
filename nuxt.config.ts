@@ -50,6 +50,8 @@ export default defineNuxtConfig({
     '/account': { ssr: false },
     '/account/**': { ssr: false },
     '/welcome': { ssr: false },
+    '/blueprints': { ssr: false },
+    '/blueprints/**': { ssr: false },
     '/login': { ssr: false },
     '/signup': { ssr: false },
     '/verify': { ssr: false },

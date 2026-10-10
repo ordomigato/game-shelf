@@ -1,9 +1,12 @@
 import { ofetch } from 'ofetch'
 import type {
   Blueprint,
+  BlueprintDetail,
+  BlueprintImpact,
   CollectionDetail,
   CollectionSummary,
   FieldDefinition,
+  BlueprintSummary,
   FieldValue,
   LibraryItem,
 } from '#shared/types/collection'
@@ -40,14 +43,69 @@ export function useCollections() {
         `${userPath(username)}/${encodeURIComponent(slug)}`,
       ),
 
-    create: (input: {
-      title: string
-      description: string | null
-      starter: StarterBlueprint
-    }) =>
+    /** Starts from a copy of a starter's fields, or uses a blueprint. */
+    create: (
+      input: { title: string; description: string | null } & (
+        { starter: StarterBlueprint } | { blueprintId: string; copy?: boolean }
+      ),
+    ) =>
       auth.apiFetch<CollectionSummary>('/api/collections', {
         method: 'POST',
         body: input,
+      }),
+
+    /** The signed-in user's blueprints. */
+    blueprints: () => auth.apiFetch<BlueprintSummary[]>('/api/blueprints'),
+
+    /** Saves a collection's fields as a named set. 409 if the name is taken. */
+    saveBlueprint: (collectionId: string, name: string) =>
+      auth.apiFetch<Blueprint>(
+        `/api/collections/${collectionId}/blueprint/share`,
+        { method: 'POST', body: { name } },
+      ),
+
+    /** Gives a collection its own copy of the set it uses. */
+    detachBlueprint: (collectionId: string) =>
+      auth.apiFetch<Blueprint>(
+        `/api/collections/${collectionId}/blueprint/detach`,
+        { method: 'POST' },
+      ),
+
+    /** One blueprint with the collections that use it. */
+    getBlueprint: (id: string) =>
+      auth.apiFetch<BlueprintDetail>(`/api/blueprints/${id}`),
+
+    /** Renames a blueprint. 409 if the name is taken. */
+    renameBlueprint: (id: string, name: string) =>
+      auth.apiFetch<Blueprint>(`/api/blueprints/${id}`, {
+        method: 'PATCH',
+        body: { name },
+      }),
+
+    /** Deletes a blueprint no collection uses. 409 while one does. */
+    deleteBlueprint: (id: string) =>
+      auth.apiFetch(`/api/blueprints/${id}`, { method: 'DELETE' }),
+
+    /** What saving these fields on a blueprint would change. */
+    previewBlueprintFields: (
+      id: string,
+      fields: FieldDefinition[],
+      optionRenames: Record<string, Record<string, string>>,
+    ) =>
+      auth.apiFetch<BlueprintImpact>(`/api/blueprints/${id}/preview`, {
+        method: 'POST',
+        body: { fields, optionRenames },
+      }),
+
+    /** Replaces a blueprint's fields, for every collection using it. */
+    updateBlueprintFields: (
+      id: string,
+      fields: FieldDefinition[],
+      optionRenames: Record<string, Record<string, string>>,
+    ) =>
+      auth.apiFetch<Blueprint>(`/api/blueprints/${id}/fields`, {
+        method: 'PUT',
+        body: { fields, optionRenames },
       }),
 
     update: (

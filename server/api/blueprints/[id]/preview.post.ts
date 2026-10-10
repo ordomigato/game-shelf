@@ -1,10 +1,16 @@
 import { z } from 'zod'
-import type { Blueprint } from '../../../../shared/types/collection'
+import type {
+  Blueprint,
+  BlueprintImpact,
+} from '../../../../shared/types/collection'
 
 const paramsSchema = z.object({ id: z.uuid() })
 
-/** Replaces a collection's fields, carrying stored values over. */
-export default defineEventHandler(async (event): Promise<Blueprint> => {
+/**
+ * What saving these fields on a blueprint would change, without saving:
+ * the collections using it, and how many games would lose values.
+ */
+export default defineEventHandler(async (event): Promise<BlueprintImpact> => {
   const { sub } = await requireAuth(event)
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const { fields, optionRenames } = await readValidatedBody(
@@ -12,7 +18,7 @@ export default defineEventHandler(async (event): Promise<Blueprint> => {
     fieldsBodySchema.parse,
   )
   const user = await findOrCreateUser(sub)
-  return updateCollectionFields(
+  return previewBlueprintFields(
     user.id,
     id,
     fields as Blueprint['fields'],

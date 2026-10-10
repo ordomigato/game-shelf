@@ -74,6 +74,17 @@ querying in routes, and keep the owner filter in every new one.
 7. **The composable and UI** in `app/`. See `ui-conventions` and
    `plain-language`.
 
+## Correlated subqueries
+
+Inside a `sql` template, Drizzle writes a column like `${blueprints.id}`
+without its table name. In a subquery that can silently point at the
+inner table instead of the outer one (`where blueprint_id = id` compares
+a collection with itself), returning wrong counts with no error. Write
+subqueries with an alias and spelled-out names instead:
+`(select count(*)::int from collections as used where used.blueprint_id = blueprints.id)`.
+Check a new subquery against the dev branch before trusting it, since e2e
+tests stub the API and won't catch it.
+
 ## Neon specifics
 
 - The HTTP driver has no interactive transactions. Group writes that must

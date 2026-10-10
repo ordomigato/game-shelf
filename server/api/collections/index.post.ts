@@ -16,14 +16,28 @@ const bodySchema = z.object({
     .transform((value) => value || null)
     .nullable()
     .default(null),
-  starter: z.enum(STARTER_BLUEPRINTS).default('blank'),
+  /** Copies a starter's fields. Leave out when using `blueprintId`. */
+  starter: z.enum(STARTER_BLUEPRINTS).optional(),
+  /** One of the user's blueprints, used as is. */
+  blueprintId: z.uuid().optional(),
+  /** With `blueprintId`: start from a copy of its fields instead. */
+  copy: z.boolean().optional(),
 })
+const startSchema = bodySchema.refine(
+  (body) => !(body.starter && body.blueprintId),
+  { message: 'Send a starter or a blueprintId, not both' },
+)
 
 export default defineEventHandler(async (event): Promise<CollectionSummary> => {
   const { sub } = await requireAuth(event)
-  const body = await readValidatedBody(event, bodySchema.parse)
+  const { title, description, starter, blueprintId, copy } =
+    await readValidatedBody(event, startSchema.parse)
   const user = await findOrCreateUser(sub)
-  const created = await createCollection(user.id, body)
+  const created = await createCollection(user.id, {
+    title,
+    description,
+    ...(blueprintId ? { blueprintId, copy } : { starter: starter ?? 'blank' }),
+  })
   setResponseStatus(event, 201)
   return created
 })

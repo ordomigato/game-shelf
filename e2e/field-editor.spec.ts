@@ -130,11 +130,18 @@ test('asks before clearing values', async ({ page }) => {
   await page.getByRole('option', { name: 'Number' }).click()
   await dialog.getByRole('button', { name: 'Save fields' }).click()
 
-  await expect(dialog.getByText('Some values will be cleared')).toBeVisible()
-  await expect(dialog.getByRole('listitem')).toHaveText([
-    'Status: cleared on 2 games',
-    'Notes: cleared on 1 game',
+  const warning = dialog.getByRole('alert')
+  await expect(warning).toContainText(
+    'Saved values will be permanently deleted',
+  )
+  await expect(warning.getByRole('listitem')).toHaveText([
+    'Status: deleted from 2 games',
+    'Notes: deleted from 1 game',
   ])
+  await expect(warning).toContainText("This can't be undone.")
+  // The delete button waits for the tick.
+  const confirm = dialog.getByRole('button', { name: 'Delete values and save' })
+  await expect(confirm).toBeDisabled()
   expect(saved).toHaveLength(0)
 
   // Going back keeps the changes, so they can be fixed.
@@ -143,7 +150,40 @@ test('asks before clearing values', async ({ page }) => {
     dialog.getByRole('button', { name: 'Remove Notes' }),
   ).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Save fields' }).click()
-  await dialog.getByRole('button', { name: 'Save and clear' }).click()
+  await dialog
+    .getByRole('checkbox', {
+      name: 'I understand these values will be deleted',
+    })
+    .click()
+  await confirm.click()
+  await expect(dialog).toBeHidden()
+  expect(saved).toHaveLength(1)
+})
+
+test('removing an empty field still asks, without the warning', async ({
+  page,
+}) => {
+  await signInAs(page, { username: 'retro_fan' })
+  const withExtra = [...fields, { id: 'shelf', name: 'Shelf', type: 'text' }]
+  await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
+    route.fulfill({ json: detail(withExtra) }),
+  )
+  const saved: unknown[] = []
+  await page.route(`**/api/collections/${collectionId}/fields`, (route) => {
+    saved.push(route.request().postDataJSON())
+    return route.fulfill({ json: { ...detail(fields).blueprint } })
+  })
+  await page.goto('/u/retro_fan/shelf/snes-games')
+  await page.getByRole('button', { name: 'Edit fields' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Fields' })
+
+  await dialog.getByRole('button', { name: 'Remove Shelf' }).click()
+  await dialog.getByRole('button', { name: 'Save fields' }).click()
+  await expect(
+    dialog.getByText('Removing Shelf. No games have a value for it.'),
+  ).toBeVisible()
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Save fields' }).click()
   await expect(dialog).toBeHidden()
   expect(saved).toHaveLength(1)
 })

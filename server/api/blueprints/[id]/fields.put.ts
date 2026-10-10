@@ -3,7 +3,10 @@ import type { Blueprint } from '../../../../shared/types/collection'
 
 const paramsSchema = z.object({ id: z.uuid() })
 
-/** Replaces a collection's fields, carrying stored values over. */
+/**
+ * Replaces a blueprint's fields, carrying stored values over. Every
+ * collection using it changes.
+ */
 export default defineEventHandler(async (event): Promise<Blueprint> => {
   const { sub } = await requireAuth(event)
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
@@ -12,7 +15,7 @@ export default defineEventHandler(async (event): Promise<Blueprint> => {
     fieldsBodySchema.parse,
   )
   const user = await findOrCreateUser(sub)
-  return updateCollectionFields(
+  return updateBlueprintFields(
     user.id,
     id,
     fields as Blueprint['fields'],

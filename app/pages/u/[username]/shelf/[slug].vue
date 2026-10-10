@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
+  BookmarkPlus,
   Columns3,
   Ellipsis,
   Heart,
@@ -11,10 +12,12 @@ import {
   Plus,
   Table2,
   Trash2,
+  Unlink,
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { toast } from 'vue-sonner'
 import type {
+  Blueprint,
   CollectionEntry,
   CollectionSummary,
   FieldValue,
@@ -257,6 +260,32 @@ function onCoverDragged(event: { oldIndex?: number; newIndex?: number }) {
   coverItems.value = (data.value?.items ?? []).slice(0, coverLimit.value)
 }
 
+const savingBlueprint = ref(false)
+
+function setBlueprint(blueprint: Blueprint) {
+  if (!data.value) return
+  data.value = { ...data.value, blueprint }
+}
+
+const detaching = ref(false)
+
+/**
+ * Gives this collection its own copy of the blueprint's fields. The copy
+ * has new field ids with the games' values copied over, so reload them.
+ */
+async function detachFields() {
+  if (!data.value) return
+  detaching.value = true
+  try {
+    setBlueprint(await collections.detachBlueprint(data.value.id))
+    await refresh()
+  } catch {
+    toast.error(t('blueprints.detachFailed'))
+  } finally {
+    detaching.value = false
+  }
+}
+
 async function deleteCollection() {
   if (!data.value) return
   deleting.value = true
@@ -350,6 +379,20 @@ async function deleteCollection() {
               {{ $t('collection.editFields') }}
             </button>
           </p>
+          <i18n-t
+            v-if="data.isOwner && data.blueprint.shared"
+            keypath="blueprints.fromBlueprint"
+            tag="p"
+            class="text-sm text-muted-foreground"
+          >
+            <template #name>
+              <NuxtLink
+                :to="`/blueprints/${data.blueprint.id}`"
+                class="font-medium text-primary underline-offset-4 hover:underline"
+                >{{ data.blueprint.name }}</NuxtLink
+              >
+            </template>
+          </i18n-t>
         </div>
 
         <div v-if="data.isOwner" class="flex items-center gap-2">
@@ -382,12 +425,21 @@ async function deleteCollection() {
                 <Ellipsis />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="w-max">
               <DropdownMenuItem @select="editing = true">
                 <Pencil /> {{ $t('collection.edit') }}
               </DropdownMenuItem>
               <DropdownMenuItem @select="editingFields = true">
                 <Columns3 /> {{ $t('collection.editFields') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                v-if="data.blueprint.shared"
+                @select="detachFields"
+              >
+                <Unlink /> {{ $t('blueprints.detach') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem v-else @select="savingBlueprint = true">
+                <BookmarkPlus /> {{ $t('blueprints.saveAsBlueprint') }}
               </DropdownMenuItem>
               <DropdownMenuItem
                 v-if="data.kind !== 'wishlist'"
@@ -533,7 +585,16 @@ async function deleteCollection() {
         :collection-id="data.id"
         :fields="data.blueprint.fields"
         :items="data.items"
+        :blueprint="data.blueprint"
+        :detaching="detaching"
         @saved="refresh()"
+        @detach="detachFields"
+      />
+      <SaveBlueprintDialog
+        v-if="data.isOwner"
+        v-model:open="savingBlueprint"
+        :collection-id="data.id"
+        @saved="setBlueprint"
       />
       <CollectionFormDialog
         v-if="data.isOwner"

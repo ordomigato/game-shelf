@@ -3,13 +3,13 @@
     "title": "{page} · GameShelf"
   },
   "header": {
-    "settings": "Settings",
-    "theme": "Theme",
     "signIn": "Sign in",
     "account": "Account",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "myShelf": "My shelf"
   },
   "theme": {
+    "label": "Theme",
     "system": "System",
     "light": "Light",
     "dark": "Dark"
@@ -179,6 +179,8 @@
     },
     "settings": {
       "pageTitle": "Settings",
+      "appearanceTitle": "Appearance",
+      "appearanceDescription": "Choose how GameShelf looks on this device.",
       "deleteTitle": "Delete account",
       "deleteDescription": "This deletes your account, your collections and everything in them. It can't be undone.",
       "deleteButton": "Delete account",
@@ -218,6 +220,64 @@
     "problems": {
       "noLetters": "Use at least one letter or number in the name.",
       "reserved": "That name is kept for your Wishlist. Pick another one."
+    },
+    "nameTaken": "You already have a collection with that name.",
+    "form": {
+      "createTitle": "New collection",
+      "editTitle": "Edit collection",
+      "name": "Name",
+      "description": "Description (optional)",
+      "address": "Address: {path}",
+      "start": "Start with",
+      "starters": {
+        "collector": {
+          "name": "Collector",
+          "description": "For physical games: condition, price paid, purchase date and region."
+        },
+        "player": {
+          "name": "Player",
+          "description": "For playing: platform, status, progress, rating and hours played."
+        },
+        "blank": {
+          "name": "Blank",
+          "description": "No columns yet. You can add your own later."
+        }
+      },
+      "create": "Create collection",
+      "creating": "Creating…",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
     }
+  },
+  "shelf": {
+    "myTitle": "My shelf",
+    "userTitle": "{username}'s shelf",
+    "newCollection": "New collection",
+    "gameCount": "No games | {count} game | {count} games",
+    "private": "Private",
+    "public": "Public",
+    "emptyMine": "You don't have any collections yet. Create one to start tracking games.",
+    "emptyVisitor": "{username} hasn't shared any collections yet.",
+    "loadFailed": "Couldn't load this shelf. Try again.",
+    "retry": "Try again",
+    "wishlist": "Wishlist"
+  },
+  "collection": {
+    "back": "Back to {shelf}",
+    "columns": "Columns: {fields}",
+    "noColumns": "No columns yet.",
+    "empty": "No games here yet.",
+    "emptyHint": "Search for a game and add it to this collection.",
+    "searchGames": "Search games",
+    "actions": "Collection actions",
+    "edit": "Edit details",
+    "delete": "Delete collection",
+    "deleteTitle": "Delete {title}?",
+    "deleteBody": "The collection is deleted. Its games stay in your library and any other collections.",
+    "deleteConfirm": "Delete collection",
+    "cancel": "Cancel",
+    "deleteFailed": "Couldn't delete the collection. Try again.",
+    "loadFailed": "Couldn't load this collection. Try again."
   }
 }

@@ -33,7 +33,7 @@ function referencedKeys(): { key: string; file: string }[] {
   const patterns = [
     /(?<![\w$])\$?t\(\s*'([a-zA-Z0-9_.]+)'/g,
     /keypath="([a-zA-Z0-9_.]+)"/g,
-    /(?:labelKey|key):\s*'([a-zA-Z0-9_.]+)'/g,
+    /(?:\w*Key|key):\s*'([a-zA-Z0-9_.]+)'/g,
   ]
   return files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')

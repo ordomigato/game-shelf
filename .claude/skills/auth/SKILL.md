@@ -81,7 +81,11 @@ Cognito user with `AdminDeleteUser`. The site's link to the user pool grants
 
 - Unit: username rules, error mapping, `safeRedirect`, `bearerToken`.
 - E2E in CI stubs Cognito's API (`e2e/auth.spec.ts`) with placeholder pool
-  ids from `playwright.config.ts`. It covers redirects, links and error
+  ids from `playwright.config.ts`.
+- Signed-in pages in E2E: `signInAs(page, { username })` from
+  `e2e/support/session.ts` puts unsigned tokens where Amplify reads them
+  and stubs `/api/me`. Only the browser is fooled (real routes reject the
+  tokens), so stub every API call the page makes. See `e2e/shelf.spec.ts`. It covers redirects, links and error
   messages, not a successful sign-in.
 - Real flows: test against the `dev` pool with a throwaway user created by
   `aws cognito-idp admin-create-user --message-action SUPPRESS` and

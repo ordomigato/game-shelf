@@ -54,6 +54,8 @@ export default defineNuxtConfig({
     '/signup': { ssr: false },
     '/verify': { ssr: false },
     '/forgot-password': { ssr: false },
+    // Rendered in the browser until public shelves get server rendering.
+    '/u/**': { ssr: false },
   },
   runtimeConfig: {
     public: {

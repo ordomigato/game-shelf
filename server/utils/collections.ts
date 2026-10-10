@@ -558,6 +558,8 @@ function touchesValues(
   renames: Record<string, string> | undefined,
 ): boolean {
   if (!after || after.type !== before.type) return true
+  if (before.type === 'rating')
+    return (before.scale ?? 5) !== (after.scale ?? 5)
   if (before.type !== 'select' && before.type !== 'multiselect') return false
   if (renames && Object.keys(renames).length) return true
   const kept = new Set(after.options ?? [])

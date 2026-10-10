@@ -158,6 +158,20 @@ test.describe('owners', () => {
       page.getByRole('button', { name: 'Notes for EarthBound: Ness!' }),
     ).toBeVisible()
 
+    // Numbers save too.
+    await page
+      .getByRole('button', { name: 'Hours played for Chrono Trigger: 30' })
+      .click()
+    await page
+      .getByRole('spinbutton', { name: 'Hours played for Chrono Trigger' })
+      .fill('31.5')
+    await page.keyboard.press('Enter')
+    await expect(
+      page.getByRole('button', {
+        name: 'Hours played for Chrono Trigger: 31.5',
+      }),
+    ).toBeVisible()
+
     // Escape cancels without saving.
     await page
       .getByRole('button', { name: 'Hours played for EarthBound: 9' })
@@ -184,6 +198,7 @@ test.describe('owners', () => {
 
     expect(saved).toEqual([
       { notes: 'Ness!' },
+      { hours: 31.5 },
       { done: true },
       { rating: 4 },
       { status: 'Finished' },

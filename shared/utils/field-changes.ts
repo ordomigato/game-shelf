@@ -3,6 +3,7 @@ import type {
   FieldType,
   FieldValue,
   ItemData,
+  RatingScale,
 } from '../types/collection'
 import { normalizeFieldValue } from './field-values'
 
@@ -22,6 +23,7 @@ export const FIELD_NAME_MAX_LENGTH = 60
 export const MAX_SELECT_OPTIONS = 50
 export const OPTION_MAX_LENGTH = 60
 export const DEFAULT_CURRENCY = 'USD'
+export const RATING_SCALES: RatingScale[] = [5, 10, 100]
 
 /** Select option renames, per field id: old option to new option. */
 export type OptionRenames = Record<string, Record<string, string>>
@@ -79,6 +81,13 @@ export function fieldsProblem(
       }
     }
     if (
+      field.type === 'rating' &&
+      field.scale !== undefined &&
+      !RATING_SCALES.includes(field.scale)
+    ) {
+      return { key: 'fieldEditor.errors.invalid' }
+    }
+    if (
       field.type === 'currency' &&
       field.currency !== undefined &&
       !/^[A-Z]{3}$/.test(field.currency)
@@ -101,6 +110,7 @@ export function cleanFields(fields: FieldDefinition[]): FieldDefinition[] {
     ...(field.type === 'currency' && {
       currency: field.currency ?? DEFAULT_CURRENCY,
     }),
+    ...(field.type === 'rating' && { scale: field.scale ?? 5 }),
   }))
 }
 
@@ -143,6 +153,21 @@ export function carryValue(
   }
 
   if (candidate === undefined) return undefined
+  // A score keeps its place on a new scale: 4 of 5 becomes 8 of 10.
+  if (
+    before.type === 'rating' &&
+    after.type === 'rating' &&
+    typeof candidate === 'number'
+  ) {
+    const from = before.scale ?? 5
+    const to = after.scale ?? 5
+    if (from !== to) {
+      candidate = Math.max(
+        to === 5 ? 1 : 0,
+        Math.round((candidate * to) / from),
+      )
+    }
+  }
   if (after.type === 'text' && typeof candidate !== 'string') {
     candidate =
       before.type === 'checkbox'

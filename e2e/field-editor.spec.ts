@@ -160,3 +160,79 @@ test('explains what to fix before saving', async ({ page }) => {
   )
   expect(saved).toHaveLength(0)
 })
+
+test('scores out of 10 edit like numbers and keep their place', async ({
+  page,
+}) => {
+  await signInAs(page, { username: 'retro_fan' })
+  let current: unknown[] = [{ id: 'score', name: 'Score', type: 'rating' }]
+  const scored = items.map((item, i) => ({
+    ...item,
+    data: { score: [4, 2][i] },
+  }))
+  await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
+    route.fulfill({ json: { ...detail(current), items: scored } }),
+  )
+  const saved: { fields: unknown[] }[] = []
+  await page.route(`**/api/collections/${collectionId}/fields`, (route) => {
+    const body = route.request().postDataJSON() as (typeof saved)[number]
+    saved.push(body)
+    current = body.fields
+    return route.fulfill({ json: { ...detail(current).blueprint } })
+  })
+  await page.goto('/u/retro_fan/shelf/snes-games')
+  await expect(
+    page.getByRole('group', { name: 'Score for Chrono Trigger' }),
+  ).toBeVisible()
+
+  await page.getByRole('button', { name: 'Edit fields' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Fields' })
+  await dialog.getByRole('combobox', { name: 'What Score is out of' }).click()
+  await page.getByRole('option', { name: '10', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save fields' }).click()
+  await expect(dialog).toBeHidden()
+  expect(saved[0]!.fields).toEqual([
+    { id: 'score', name: 'Score', type: 'rating', scale: 10 },
+  ])
+  // The stub keeps the old values, so this just checks the new display.
+  const cell = page.getByRole('button', {
+    name: 'Score for Chrono Trigger: 4/10',
+  })
+  await expect(cell).toBeVisible()
+
+  // And a score out of 10 saves like a number.
+  const values: unknown[] = []
+  await page.route(`**/api/collections/${collectionId}/items/*`, (route) => {
+    values.push(route.request().postDataJSON())
+    return route.fulfill({
+      json: { ...scored[0], data: { score: 9 } },
+    })
+  })
+  // Out of range: the hint shows, Enter keeps the box open, and leaving
+  // puts the old value back without saving.
+  await cell.click()
+  const box = page.getByRole('spinbutton', { name: 'Score for Chrono Trigger' })
+  await expect(page.getByText('/ 10')).toBeVisible()
+  await box.fill('15')
+  // Shown floating under the box, and read out as the box's description.
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText(
+    'A whole number from 0 to 10',
+  )
+  await expect(box).toHaveAccessibleDescription('A whole number from 0 to 10')
+  await expect(box).toHaveAttribute('aria-invalid', 'true')
+  await page.keyboard.press('Enter')
+  await expect(box).toBeVisible()
+  await page.getByRole('heading', { level: 1 }).click()
+  await expect(cell).toBeVisible()
+  expect(values).toEqual([])
+
+  await cell.click()
+  await page
+    .getByRole('spinbutton', { name: 'Score for Chrono Trigger' })
+    .fill('9')
+  await page.keyboard.press('Enter')
+  await expect(
+    page.getByRole('button', { name: 'Score for Chrono Trigger: 9/10' }),
+  ).toBeVisible()
+  expect(values).toEqual([{ values: { score: 9 } }])
+})

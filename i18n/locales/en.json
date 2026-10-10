@@ -335,7 +335,14 @@
     "moveDown": "Move down",
     "moveBottom": "Move to bottom",
     "moveFailed": "Couldn't move that game. Try again.",
-    "rename": "Rename"
+    "rename": "Rename",
+    "hints": {
+      "score": "A whole number from 0 to {max}",
+      "percentage": "A number from 0 to 100",
+      "amount": "An amount of 0 or more",
+      "number": "A number",
+      "text": "That's too long"
+    }
   },
   "fieldEditor": {
     "title": "Fields",
@@ -370,8 +377,8 @@
       "date": "Date",
       "checkbox": "Checkbox",
       "select": "Choice list",
-      "rating": "Rating (stars)",
-      "progress": "Progress (%)"
+      "rating": "Score",
+      "progress": "Percentage"
     },
     "errors": {
       "tooMany": "A collection can have up to {max} fields.",
@@ -384,7 +391,10 @@
       "duplicateOption": "\"{name}\" has the same choice twice.",
       "invalid": "Something about these fields isn't valid. Check them and try again."
     },
-    "allowMultiple": "Allow more than one choice"
+    "allowMultiple": "Allow more than one choice",
+    "outOf": "Out of",
+    "outOfFor": "What {name} is out of",
+    "scaleStars": "5 (stars)"
   },
   "rename": {
     "title": "Rename game",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CircleCheck, CirclePlus, Heart, Plus } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /**
@@ -99,7 +100,7 @@ async function toggle(collection: CollectionSummary, checked: boolean) {
     }
   } catch {
     setSelected(before)
-    error.value = t('addToCollection.saveFailed')
+    toast.error(t('addToCollection.saveFailed'))
   } finally {
     const done = new Set(saving.value)
     done.delete(id)

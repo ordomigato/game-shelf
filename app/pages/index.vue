@@ -106,13 +106,6 @@ const resultsLabel = computed(() => {
         :username="auth.me.value.username"
         @change="changeTarget"
       />
-      <p
-        v-if="tracked.error.value"
-        role="alert"
-        class="text-sm text-destructive"
-      >
-        {{ tracked.error.value }}
-      </p>
     </div>
     <section
       class="mx-auto max-w-2xl text-center transition-[padding]"

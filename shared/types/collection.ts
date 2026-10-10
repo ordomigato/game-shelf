@@ -21,11 +21,19 @@ export interface FieldDefinition {
   options?: string[]
   /** ISO 4217 code like "USD", for `currency` fields only. */
   currency?: string
+  /**
+   * What a `rating` (shown as "Score") is out of: 5 shows stars, 10 and 100
+   * show "8/10". Missing means 5.
+   */
+  scale?: RatingScale
 }
+
+export type RatingScale = 5 | 10 | 100
 
 /**
  * A value as stored: text, select and date (`YYYY-MM-DD`) are strings,
- * number, currency, rating (1 to 5) and progress (0 to 100) are numbers,
+ * number, currency, rating (whole, up to its scale) and progress (0 to
+ * 100) are numbers,
  * checkbox is a boolean, multiselect is a list of options in the field's
  * option order.
  */

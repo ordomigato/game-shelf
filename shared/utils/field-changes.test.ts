@@ -129,6 +129,29 @@ describe('carryValue', () => {
   })
 })
 
+describe('carryValue between score scales', () => {
+  const stars: FieldDefinition = { id: 'r', name: 'Rating', type: 'rating' }
+  it('keeps a score in proportion', () => {
+    expect(carryValue(4, stars, { ...stars, scale: 10 })).toBe(8)
+    expect(carryValue(4, stars, { ...stars, scale: 100 })).toBe(80)
+    expect(carryValue(85, { ...stars, scale: 100 }, stars)).toBe(4)
+  })
+
+  it('never turns a score into zero stars', () => {
+    expect(carryValue(0, { ...stars, scale: 10 }, stars)).toBe(1)
+  })
+
+  it('rejects an unknown scale', () => {
+    expect(fieldsProblem([{ ...stars, scale: 7 as never }])?.key).toBe(
+      'fieldEditor.errors.invalid',
+    )
+  })
+
+  it('stores the scale, 5 when missing', () => {
+    expect(cleanFields([stars])).toEqual([{ ...stars, scale: 5 }])
+  })
+})
+
 describe('carryValue with multiple choice', () => {
   const genres: FieldDefinition = {
     id: 's',

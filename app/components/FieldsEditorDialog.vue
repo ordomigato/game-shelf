@@ -6,11 +6,13 @@ import type {
   CollectionEntry,
   FieldDefinition,
   FieldType,
+  RatingScale,
 } from '#shared/types/collection'
 import {
   DEFAULT_CURRENCY,
   FIELD_TYPES,
   MAX_FIELDS,
+  RATING_SCALES,
   cleanFields,
   fieldsProblem,
   valuesLost,
@@ -48,6 +50,7 @@ interface FieldDraft {
   type: FieldType
   options: OptionDraft[]
   currency: string
+  scale: RatingScale
 }
 
 const drafts = ref<FieldDraft[]>([])
@@ -72,6 +75,7 @@ watch(open, (isOpen) => {
       original: option,
     })),
     currency: field.currency ?? DEFAULT_CURRENCY,
+    scale: field.scale ?? 5,
   }))
   confirming.value = false
   attempted.value = false
@@ -88,6 +92,7 @@ function addField() {
       type: 'text',
       options: [],
       currency: DEFAULT_CURRENCY,
+      scale: 5,
     },
   ]
   void nextTick(() => {
@@ -130,6 +135,7 @@ const nextFields = computed(() =>
       type: draft.type,
       options: draft.options.map((option) => option.value),
       currency: draft.currency,
+      scale: draft.scale,
     })),
   ),
 )
@@ -181,6 +187,17 @@ const types: { type: FieldType; labelKey: string }[] = [
   { type: 'rating', labelKey: 'fieldEditor.types.rating' },
   { type: 'progress', labelKey: 'fieldEditor.types.progress' },
 ]
+
+const scaleLabels = computed<Record<RatingScale, string>>(() => ({
+  5: t('fieldEditor.scaleStars'),
+  10: '10',
+  100: '100',
+}))
+
+function setScale(draft: FieldDraft, value: unknown) {
+  const scale = Number(value) as RatingScale
+  if (RATING_SCALES.includes(scale)) draft.scale = scale
+}
 
 const CURRENCIES = [
   'USD',
@@ -420,6 +437,41 @@ async function save() {
                     :value="code"
                   >
                     {{ currencyNames[code] }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <!-- What a score is out of -->
+            <div
+              v-else-if="draft.type === 'rating'"
+              class="flex items-center gap-2 pl-6"
+            >
+              <span class="text-xs font-medium text-muted-foreground">
+                {{ $t('fieldEditor.outOf') }}
+              </span>
+              <Select
+                :model-value="String(draft.scale)"
+                @update:model-value="setScale(draft, $event)"
+              >
+                <SelectTrigger
+                  size="sm"
+                  class="w-36"
+                  :aria-label="
+                    $t('fieldEditor.outOfFor', {
+                      name: draft.name || $t('fieldEditor.newField'),
+                    })
+                  "
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="scale in RATING_SCALES"
+                    :key="scale"
+                    :value="String(scale)"
+                  >
+                    {{ scaleLabels[scale] }}
                   </SelectItem>
                 </SelectContent>
               </Select>

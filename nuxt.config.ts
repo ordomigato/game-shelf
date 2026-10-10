@@ -27,6 +27,18 @@ export default defineNuxtConfig({
       title: 'GameShelf',
     },
   },
+  // Pages that depend on who is signed in render in the browser only. The
+  // server can't know the user, so rendering them there would only produce
+  // a page the browser then has to replace.
+  routeRules: {
+    '/account': { ssr: false },
+    '/account/**': { ssr: false },
+    '/welcome': { ssr: false },
+    '/login': { ssr: false },
+    '/signup': { ssr: false },
+    '/verify': { ssr: false },
+    '/forgot-password': { ssr: false },
+  },
   runtimeConfig: {
     public: {
       cognitoUserPoolId: '',

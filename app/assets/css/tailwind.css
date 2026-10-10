@@ -5,6 +5,7 @@
 
 /* GameShelf type. @nuxt/fonts self-hosts these at build time. */
 @theme {
+  --animate-caret-blink: caret-blink 1.25s ease-out infinite;
   --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
   --font-heading: 'Exo 2', ui-sans-serif, system-ui, sans-serif;
 }
@@ -139,5 +140,17 @@
   h2,
   h3 {
     @apply font-heading tracking-tight;
+  }
+}
+
+@keyframes caret-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 1;
+  }
+  20%,
+  50% {
+    opacity: 0;
   }
 }

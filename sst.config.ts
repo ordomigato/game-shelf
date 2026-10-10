@@ -26,8 +26,47 @@ export default $config({
 
     const userPool = new sst.aws.CognitoUserPool('Users', {
       usernames: ['email'],
+      transform: {
+        userPool: (args) => {
+          args.passwordPolicy = {
+            minimumLength: 8,
+            requireLowercase: true,
+            requireUppercase: true,
+            requireNumbers: true,
+            requireSymbols: false,
+            temporaryPasswordValidityDays: 7,
+          }
+          args.deletionProtection = isProduction ? 'ACTIVE' : 'INACTIVE'
+        },
+      },
     })
-    const userPoolClient = userPool.addClient('WebClient')
+
+    // The site signs in with its own forms over SRP, so the hosted-UI OAuth
+    // flows SST enables by default are switched off.
+    const userPoolClient = userPool.addClient('WebClient', {
+      transform: {
+        client: (args) => {
+          args.explicitAuthFlows = [
+            'ALLOW_USER_SRP_AUTH',
+            'ALLOW_REFRESH_TOKEN_AUTH',
+          ]
+          args.allowedOauthFlows = []
+          args.allowedOauthFlowsUserPoolClient = false
+          args.allowedOauthScopes = []
+          args.callbackUrls = []
+          args.preventUserExistenceErrors = 'ENABLED'
+          args.enableTokenRevocation = true
+          args.accessTokenValidity = 60
+          args.idTokenValidity = 60
+          args.refreshTokenValidity = 30
+          args.tokenValidityUnits = {
+            accessToken: 'minutes',
+            idToken: 'minutes',
+            refreshToken: 'days',
+          }
+        },
+      },
+    })
 
     new sst.aws.Nuxt('Site', {
       link: [

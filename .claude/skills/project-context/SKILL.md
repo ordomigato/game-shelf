@@ -31,10 +31,10 @@ user first.
 - **Nuxt server routes are the backend.** `server/api/` is where anything
   secret or privileged happens: IGDB calls (see `igdb`) and every database
   read and write. The browser never talks to the database directly.
-- **Cognito for accounts.** The browser signs in with Cognito and sends its
-  ID token to server routes. A server route verifies that token before
-  touching user data and takes the user id from the verified token, never
-  from the request body.
+- **Cognito for accounts.** The browser signs in with Amplify against
+  Cognito and sends its access token to server routes, which verify it with
+  `requireAuth` and take the user only from the verified token. Pages that
+  depend on the signed-in user render in the browser only. See `auth`.
 - **Postgres on Neon, through Drizzle.** Neon is serverless Postgres: free
   at this scale, sleeps when idle, no VPC needed. Each SST stage has its
   own Neon branch, reached through the `DatabaseUrl` secret. Relational

@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { Monitor } from '@lucide/vue'
+import { Settings } from '@lucide/vue'
 
 const colorMode = useColorMode()
-
-const current = computed(
-  () => themes.find((theme) => theme.id === colorMode.preference) ?? themes[0],
-)
 </script>
 
 <template>
@@ -14,15 +10,10 @@ const current = computed(
       <Button
         variant="ghost"
         size="icon"
-        aria-label="Change theme"
+        aria-label="Settings"
         class="text-masthead-foreground hover:bg-masthead-foreground/15 hover:text-masthead-foreground aria-expanded:bg-masthead-foreground/15 aria-expanded:text-masthead-foreground"
       >
-        <ClientOnly>
-          <component :is="current?.icon" class="size-5" />
-          <template #fallback>
-            <Monitor class="size-5" />
-          </template>
-        </ClientOnly>
+        <Settings class="size-5" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">

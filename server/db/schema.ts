@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm'
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -22,12 +24,23 @@ const timestamps = {
 
 export const visibility = pgEnum('visibility', ['private', 'public'])
 
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  cognitoSub: text('cognito_sub').notNull().unique(),
-  displayName: text('display_name').notNull(),
-  ...timestamps,
-})
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    cognitoSub: text('cognito_sub').notNull().unique(),
+    /** Chosen after the first sign-in. Null until then. */
+    username: text('username').unique(),
+    displayName: text('display_name'),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      'users_username_format',
+      sql`${table.username} ~ '^[a-z0-9_]{3,20}$'`,
+    ),
+  ],
+)
 
 export const collections = pgTable(
   'collections',

@@ -147,6 +147,67 @@ function onRenamed(saved: LibraryItem) {
   )
 }
 
+// The owner's other collections, for "Got it" and "Move to".
+const mine = ref<CollectionSummary[]>([])
+watch(
+  () => data.value?.isOwner,
+  async (isOwner) => {
+    if (!isOwner || mine.value.length) return
+    try {
+      mine.value = await collections.mine()
+    } catch {
+      // The menu just shows no collections to move to.
+    }
+  },
+  { immediate: true },
+)
+const moveTargets = computed(() =>
+  mine.value.filter((collection) => collection.id !== data.value?.id),
+)
+
+/** Takes a game out of this collection into another, with a toast. */
+async function moveToCollection(itemId: string, collectionId: string) {
+  const target = mine.value.find((collection) => collection.id === collectionId)
+  if (!data.value || !target) return
+  const fromId = data.value.id
+  const before = data.value.items
+  setItems(before.filter((entry) => entry.id !== itemId))
+  try {
+    await collections.moveToCollections(fromId, itemId, [collectionId])
+    toast.success(t('table.movedTo', { collection: titleOf(target) }), {
+      action: {
+        label: t('table.view'),
+        onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
+      },
+    })
+  } catch {
+    setItems(before)
+    toast.error(t('table.moveToFailed'))
+  }
+}
+
+/** Puts a game on the Wishlist or takes it off, from another collection. */
+async function toggleWishlist(itemId: string, on: boolean) {
+  const wishlist = mine.value.find(
+    (collection) => collection.kind === 'wishlist',
+  )
+  if (!data.value || !wishlist) return
+  const mark = (wishlisted: boolean) =>
+    setItems(
+      (data.value?.items ?? []).map((entry) =>
+        entry.id === itemId ? { ...entry, wishlisted } : entry,
+      ),
+    )
+  mark(on)
+  try {
+    if (on) await collections.addItem(wishlist.id, itemId)
+    else await collections.removeItem(wishlist.id, itemId)
+  } catch {
+    mark(!on)
+    toast.error(t('table.wishlistFailed'))
+  }
+}
+
 async function removeItem(itemId: string) {
   if (!data.value) return
   const collectionId = data.value.id
@@ -374,10 +435,14 @@ async function deleteCollection() {
           :fields="data.blueprint.fields"
           :items="data.items"
           :editable="data.isOwner"
+          :move-targets="moveTargets"
+          :is-wishlist="data.kind === 'wishlist'"
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"
           @rename="startRenaming"
+          @move-to="moveToCollection"
+          @wishlist="toggleWishlist"
         />
 
         <VueDraggable
@@ -392,11 +457,16 @@ async function deleteCollection() {
           class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
           @update="onCoverDragged"
         >
-          <li v-for="item in coverItems" :key="item.id">
+          <li
+            v-for="item in coverItems"
+            :key="item.id"
+            class="relative"
+            :class="{ 'is-wishlisted': item.wishlisted }"
+          >
             <component
               :is="item.igdbId ? NuxtLink : 'div'"
               :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
-              class="group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="wishlist-fade group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <GameCover :name="item.name" :cover-id="item.coverId" />
               <span
@@ -406,6 +476,13 @@ async function deleteCollection() {
                 {{ item.name }}
               </span>
             </component>
+            <span
+              v-if="item.wishlisted"
+              class="pointer-events-none absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-card/95 text-primary shadow-md"
+            >
+              <Heart class="size-4 fill-current" aria-hidden="true" />
+              <span class="sr-only">{{ $t('table.wishlisted') }}</span>
+            </span>
           </li>
         </VueDraggable>
         <div

@@ -141,6 +141,17 @@ export function useCollections() {
         { method: 'PUT', body: { afterItemId } },
       ),
 
+    /** Moves a game out of one collection into others, like "Got it". */
+    moveToCollections: (
+      fromCollectionId: string,
+      itemId: string,
+      toCollectionIds: string[],
+    ) =>
+      auth.apiFetch(
+        `/api/collections/${fromCollectionId}/items/${itemId}/move`,
+        { method: 'POST', body: { toCollectionIds } },
+      ),
+
     removeItem: (collectionId: string, itemId: string) =>
       auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
         method: 'DELETE',

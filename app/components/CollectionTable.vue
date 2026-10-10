@@ -14,6 +14,9 @@ import {
   ArrowDownToLine,
   ArrowUpDown,
   ArrowUpToLine,
+  FolderInput,
+  Heart,
+  PackageCheck,
   ChevronLeft,
   ChevronRight,
   Ellipsis,
@@ -29,6 +32,7 @@ import {
 import { VueDraggable } from 'vue-draggable-plus'
 import type {
   CollectionEntry,
+  CollectionSummary,
   FieldDefinition,
   FieldValue,
 } from '#shared/types/collection'
@@ -43,16 +47,25 @@ const props = defineProps<{
   fields: FieldDefinition[]
   items: CollectionEntry[]
   editable: boolean
+  /** The owner's other collections, for "Got it" or "Move to". */
+  moveTargets?: CollectionSummary[]
+  /** In the Wishlist, moving a game out reads as "Got it". */
+  isWishlist?: boolean
 }>()
 const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
   remove: [itemId: string]
   rename: [itemId: string]
+  /** Move the game out of this collection into another. */
+  moveTo: [itemId: string, collectionId: string]
+  /** Put the game on the owner's Wishlist, or take it off. */
+  wishlist: [itemId: string, on: boolean]
   /** Place `itemId` right after `afterItemId`, or first when null. */
   move: [itemId: string, afterItemId: string | null]
 }>()
 
 const { t, locale } = useI18n()
+const titleOf = useCollectionTitle()
 const NuxtLink = resolveComponent('NuxtLink')
 
 // Search and filters
@@ -60,6 +73,14 @@ const NuxtLink = resolveComponent('NuxtLink')
 const query = ref('')
 /** Field id to the values to keep: select options, or "yes"/"no". */
 const filters = ref<Record<string, string[]>>({})
+
+/** Whether rows say if they're on the Wishlist (not on the Wishlist itself). */
+const showWishlist = computed(
+  () =>
+    !props.isWishlist &&
+    props.items.some((item) => item.wishlisted !== undefined),
+)
+const WISHLIST_FILTER = '__wishlist'
 
 const filterableFields = computed(() =>
   props.fields.filter(
@@ -82,6 +103,11 @@ function filterChoices(field: FieldDefinition) {
     : (field.options ?? []).map((option) => ({ value: option, label: option }))
 }
 
+const wishlistChoices = computed(() => [
+  { value: 'yes', label: t('table.onYourWishlist') },
+  { value: 'no', label: t('table.notOnYourWishlist') },
+])
+
 function toggleFilter(fieldId: string, value: string, on: boolean) {
   const current = filters.value[fieldId] ?? []
   filters.value = {
@@ -98,6 +124,10 @@ function clearFilters() {
 }
 
 function matchesFilters(item: CollectionEntry) {
+  const wishlist = filters.value[WISHLIST_FILTER]
+  if (wishlist?.length && !wishlist.includes(item.wishlisted ? 'yes' : 'no')) {
+    return false
+  }
   return props.fields.every((field) => {
     const wanted = filters.value[field.id]
     if (!wanted?.length) return true
@@ -312,7 +342,7 @@ const addedFormat = computed(
           class="pl-8"
         />
       </div>
-      <DropdownMenu v-if="filterableFields.length">
+      <DropdownMenu v-if="filterableFields.length || showWishlist">
         <DropdownMenuTrigger as-child>
           <Button variant="outline">
             <ListFilter />
@@ -323,6 +353,26 @@ const addedFormat = computed(
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" class="w-56">
+          <DropdownMenuSub v-if="showWishlist">
+            <DropdownMenuSubTrigger>{{
+              $t('table.wishlist')
+            }}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuCheckboxItem
+                v-for="choice in wishlistChoices"
+                :key="choice.value"
+                :model-value="
+                  (filters[WISHLIST_FILTER] ?? []).includes(choice.value)
+                "
+                @update:model-value="
+                  toggleFilter(WISHLIST_FILTER, choice.value, $event === true)
+                "
+                @select.prevent
+              >
+                {{ choice.label }}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuSub v-for="field in filterableFields" :key="field.id">
             <DropdownMenuSubTrigger>{{ field.name }}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -420,7 +470,11 @@ const addedFormat = computed(
           :disabled="!reorderable"
           @update="onDragged"
         >
-          <TableRow v-for="item in pageItems" :key="item.id">
+          <TableRow
+            v-for="item in pageItems"
+            :key="item.id"
+            :class="{ 'is-wishlisted': showWishlist && item.wishlisted }"
+          >
             <TableCell v-if="reorderable" class="w-8 pr-0">
               <!-- Keyboard users move games from the row menu instead. -->
               <span
@@ -435,41 +489,78 @@ const addedFormat = computed(
               v-for="cell in rowOf(item).getVisibleCells()"
               :key="cell.id"
               :class="{
-                // Solid, so scrolled cells don't show through, but fading to
-                // the row's half-muted hover colour at the same pace.
-                'sticky left-0 z-10 bg-card transition-colors [tr:hover>&]:bg-[color-mix(in_oklab,var(--card),var(--muted)_50%)]':
-                  cell.column.id === 'name',
+                // See .pinned-cell in tailwind.css.
+                'pinned-cell sticky left-0 z-10': cell.column.id === 'name',
               }"
             >
-              <component
-                :is="item.igdbId ? NuxtLink : 'div'"
+              <div
                 v-if="cell.column.id === 'name'"
-                :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
-                class="flex items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{ 'hover:underline': item.igdbId }"
+                class="flex items-center gap-2"
               >
-                <GameCover
-                  :name="item.name"
-                  :cover-id="item.coverId"
-                  size="thumb"
-                  class="w-8 shrink-0"
-                />
-                <span class="line-clamp-2">{{ item.name }}</span>
-              </component>
+                <component
+                  :is="item.igdbId ? NuxtLink : 'div'"
+                  :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
+                  class="wishlist-fade flex min-w-0 flex-1 items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="{ 'hover:underline': item.igdbId }"
+                >
+                  <GameCover
+                    :name="item.name"
+                    :cover-id="item.coverId"
+                    size="thumb"
+                    class="w-8 shrink-0"
+                  />
+                  <span class="line-clamp-2">{{ item.name }}</span>
+                </component>
+                <!-- On the Wishlist too: owners toggle it, visitors see it. -->
+                <template v-if="showWishlist">
+                  <button
+                    v-if="editable"
+                    type="button"
+                    class="shrink-0 rounded-sm p-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                    :class="
+                      item.wishlisted
+                        ? 'text-primary'
+                        : 'text-muted-foreground/40 hover:text-primary'
+                    "
+                    :aria-label="$t('table.onWishlist', { name: item.name })"
+                    :aria-pressed="item.wishlisted === true"
+                    :title="
+                      item.wishlisted
+                        ? $t('table.removeFromWishlist')
+                        : $t('table.addToWishlist')
+                    "
+                    @click="emit('wishlist', item.id, !item.wishlisted)"
+                  >
+                    <Heart
+                      class="size-4"
+                      :class="{ 'fill-current': item.wishlisted }"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <template v-else-if="item.wishlisted">
+                    <Heart
+                      class="size-4 shrink-0 fill-current text-primary"
+                      aria-hidden="true"
+                    />
+                    <span class="sr-only">{{ $t('table.wishlisted') }}</span>
+                  </template>
+                </template>
+              </div>
               <span
                 v-else-if="cell.column.id === 'addedAt'"
-                class="whitespace-nowrap text-muted-foreground"
+                class="wishlist-fade whitespace-nowrap text-muted-foreground"
               >
                 {{ addedFormat.format(new Date(item.addedAt)) }}
               </span>
-              <FieldCell
-                v-else-if="fieldOf(cell.column.id)"
-                :field="fieldOf(cell.column.id)!"
-                :value="item.data[cell.column.id]"
-                :item-name="item.name"
-                :editable="editable"
-                @save="emit('save', item.id, cell.column.id, $event)"
-              />
+              <div v-else-if="fieldOf(cell.column.id)" class="wishlist-fade">
+                <FieldCell
+                  :field="fieldOf(cell.column.id)!"
+                  :value="item.data[cell.column.id]"
+                  :item-name="item.name"
+                  :editable="editable"
+                  @save="emit('save', item.id, cell.column.id, $event)"
+                />
+              </div>
             </TableCell>
             <TableCell v-if="editable">
               <DropdownMenu>
@@ -483,6 +574,26 @@ const addedFormat = computed(
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-max">
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <PackageCheck v-if="isWishlist" />
+                      <FolderInput v-else />
+                      {{ isWishlist ? $t('table.gotIt') : $t('table.moveTo') }}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent class="w-max">
+                      <DropdownMenuItem
+                        v-for="target in moveTargets ?? []"
+                        :key="target.id"
+                        @select="emit('moveTo', item.id, target.id)"
+                      >
+                        {{ titleOf(target) }}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem v-if="!moveTargets?.length" disabled>
+                        {{ $t('table.noOtherCollections') }}
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
                   <template v-if="reorderable">
                     <DropdownMenuItem
                       :disabled="indexOf(item.id) === 0"

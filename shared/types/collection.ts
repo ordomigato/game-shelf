@@ -76,6 +76,12 @@ export interface LibraryItem {
 
 export interface CollectionEntry extends LibraryItem {
   addedAt: string
+  /**
+   * Whether the game is also on the owner's Wishlist, in other collections.
+   * Left out on the Wishlist itself, and for visitors when the Wishlist is
+   * private.
+   */
+  wishlisted?: boolean
 }
 
 export interface CollectionDetail extends CollectionSummary {

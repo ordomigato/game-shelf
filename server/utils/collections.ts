@@ -126,6 +126,41 @@ export async function listCollections(
 }
 
 /** One collection with its blueprint and items, or 404 if it isn't visible. */
+/**
+ * Which of a collection's items are also on the owner's Wishlist, or null
+ * when that isn't shown: on the Wishlist itself, or to visitors while the
+ * Wishlist is private.
+ */
+async function wishlistedItemIds(
+  ownerId: string,
+  collection: CollectionRow,
+  itemIds: string[],
+  viewerIsOwner: boolean,
+): Promise<Set<string> | null> {
+  if (collection.kind === 'wishlist') return null
+  const db = useDb()
+  const [wishlist] = await db
+    .select({ id: collections.id, visibility: collections.visibility })
+    .from(collections)
+    .where(
+      and(eq(collections.ownerId, ownerId), eq(collections.kind, 'wishlist')),
+    )
+  if (!wishlist || (!viewerIsOwner && wishlist.visibility !== 'public')) {
+    return null
+  }
+  if (!itemIds.length) return new Set()
+  const rows = await db
+    .select({ itemId: collectionItems.itemId })
+    .from(collectionItems)
+    .where(
+      and(
+        eq(collectionItems.collectionId, wishlist.id),
+        inArray(collectionItems.itemId, itemIds),
+      ),
+    )
+  return new Set(rows.map((row) => row.itemId))
+}
+
 export async function getCollectionBySlug(
   ownerId: string,
   slug: string,
@@ -148,9 +183,16 @@ export async function getCollectionBySlug(
     .where(eq(collectionItems.collectionId, found.collection.id))
     .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
 
+  const wishlisted = await wishlistedItemIds(
+    ownerId,
+    found.collection,
+    entries.map((entry) => entry.item.id),
+    viewerIsOwner,
+  )
   const items: CollectionEntry[] = entries.map((entry) => ({
     ...toLibraryItem(entry.item),
     addedAt: entry.addedAt.toISOString(),
+    ...(wishlisted && { wishlisted: wishlisted.has(entry.item.id) }),
   }))
   return {
     ...toSummary(found.collection, items.length),
@@ -385,6 +427,79 @@ export async function addItemToCollections(
       })),
     )
     .onConflictDoNothing()
+}
+
+/**
+ * Moves an item from one of the user's collections to others, like "Got
+ * it" taking a game off the Wishlist into a collection. It goes at the end
+ * of each target. Adding and removing happen in one batch, so the game is
+ * never in neither.
+ */
+export async function moveItemToCollections(
+  ownerId: string,
+  fromCollectionId: string,
+  itemId: string,
+  toCollectionIds: string[],
+): Promise<void> {
+  const targets = [...new Set(toCollectionIds)].filter(
+    (id) => id !== fromCollectionId,
+  )
+  if (!targets.length) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'No target collection',
+    })
+  }
+  await getOwnedCollection(ownerId, fromCollectionId)
+  const db = useDb()
+  const [membership] = await db
+    .select({ itemId: collectionItems.itemId })
+    .from(collectionItems)
+    .where(
+      and(
+        eq(collectionItems.collectionId, fromCollectionId),
+        eq(collectionItems.itemId, itemId),
+      ),
+    )
+  if (!membership) throw notFound()
+  const owned = await db
+    .select({ id: collections.id })
+    .from(collections)
+    .where(
+      and(eq(collections.ownerId, ownerId), inArray(collections.id, targets)),
+    )
+  if (owned.length !== targets.length) throw notFound()
+
+  const ends = await db
+    .select({
+      id: collectionItems.collectionId,
+      last: max(collectionItems.position),
+    })
+    .from(collectionItems)
+    .where(inArray(collectionItems.collectionId, targets))
+    .groupBy(collectionItems.collectionId)
+  const lastPosition = new Map(ends.map((row) => [row.id, row.last ?? 0]))
+
+  await db.batch([
+    db
+      .insert(collectionItems)
+      .values(
+        targets.map((collectionId) => ({
+          collectionId,
+          itemId,
+          position: (lastPosition.get(collectionId) ?? 0) + 1,
+        })),
+      )
+      .onConflictDoNothing(),
+    db
+      .delete(collectionItems)
+      .where(
+        and(
+          eq(collectionItems.collectionId, fromCollectionId),
+          eq(collectionItems.itemId, itemId),
+        ),
+      ),
+  ])
 }
 
 export async function removeItemFromCollection(

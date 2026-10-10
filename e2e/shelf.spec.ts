@@ -123,6 +123,10 @@ test.describe('as the owner', () => {
   }) => {
     let created: unknown
     await page.route('**/api/collections', async (route) => {
+      // The new collection's page also lists the owner's collections.
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ json: [wishlist, zelda] })
+      }
       created = route.request().postDataJSON()
       await route.fulfill({
         status: 201,

@@ -342,7 +342,21 @@
       "amount": "An amount of 0 or more",
       "number": "A number",
       "text": "That's too long"
-    }
+    },
+    "gotIt": "Got it",
+    "moveTo": "Move to",
+    "noOtherCollections": "No other collections yet",
+    "movedTo": "Moved to {collection}",
+    "view": "View",
+    "moveToFailed": "Couldn't move that game. Try again.",
+    "onWishlist": "On your Wishlist: {name}",
+    "addToWishlist": "Add to your Wishlist",
+    "removeFromWishlist": "Take off your Wishlist",
+    "wishlisted": "On the Wishlist",
+    "wishlist": "Wishlist",
+    "onYourWishlist": "On your Wishlist",
+    "notOnYourWishlist": "Not on your Wishlist",
+    "wishlistFailed": "Couldn't update your Wishlist. Try again."
   },
   "fieldEditor": {
     "title": "Fields",

@@ -28,4 +28,8 @@ describe('starterFields', () => {
   it('starts blank collections with no fields', () => {
     expect(starterFields('blank')).toEqual([])
   })
+
+  it('starts the Wishlist with no fields', () => {
+    expect(starterFields('wishlist')).toEqual([])
+  })
 })

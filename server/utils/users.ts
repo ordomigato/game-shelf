@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { Me } from '../../shared/types/user'
 import { users } from '../db/schema'
+import { ensureWishlist } from './collections'
 
 type UserRow = typeof users.$inferSelect
 
@@ -12,7 +13,10 @@ export async function findOrCreateUser(cognitoSub: string): Promise<UserRow> {
     .values({ cognitoSub })
     .onConflictDoNothing({ target: users.cognitoSub })
     .returning()
-  if (created) return created
+  if (created) {
+    await ensureWishlist(created.id)
+    return created
+  }
   const [existing] = await db
     .select()
     .from(users)
@@ -39,14 +43,4 @@ export function toMe(user: UserRow): Me {
     displayName: user.displayName,
     createdAt: user.createdAt.toISOString(),
   }
-}
-
-/** True when a database error is a unique-constraint violation. */
-export function isUniqueViolation(error: unknown): boolean {
-  let current: unknown = error
-  for (let depth = 0; depth < 4 && current; depth++) {
-    if ((current as { code?: unknown }).code === '23505') return true
-    current = (current as { cause?: unknown }).cause
-  }
-  return false
 }

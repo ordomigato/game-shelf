@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isUniqueViolation } from './users'
+import { isUniqueViolation } from './db-errors'
 
 describe('isUniqueViolation', () => {
   it('spots Postgres error 23505, also when wrapped', () => {

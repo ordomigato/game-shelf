@@ -10,7 +10,13 @@ import {
   Table2,
   Trash2,
 } from '@lucide/vue'
-import type { CollectionSummary, FieldValue } from '#shared/types/collection'
+import { VueDraggable } from 'vue-draggable-plus'
+import type {
+  CollectionEntry,
+  CollectionSummary,
+  FieldValue,
+  ItemData,
+} from '#shared/types/collection'
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
@@ -136,6 +142,41 @@ async function removeItem(itemId: string) {
     setItems(before)
     itemError.value = t('table.removeFailed')
   }
+}
+
+/** Puts a game in its new place straight away, undoing it if saving fails. */
+async function moveItem(itemId: string, afterItemId: string | null) {
+  if (!data.value) return
+  itemError.value = ''
+  const collectionId = data.value.id
+  const before = data.value.items
+  setItems(moveAfter(before, itemId, afterItemId))
+  try {
+    await collections.moveItem(collectionId, itemId, afterItemId)
+  } catch {
+    setItems(before)
+    itemError.value = t('table.moveFailed')
+  }
+}
+
+// The covers view as a list the drag-and-drop can rearrange.
+const coverItems = ref<CollectionEntry[]>([])
+watch(
+  () => data.value?.items.slice(0, coverLimit.value) ?? [],
+  (items) => {
+    coverItems.value = items
+  },
+  { immediate: true },
+)
+
+function onCoverDragged(event: { oldIndex?: number; newIndex?: number }) {
+  const { oldIndex, newIndex } = event
+  const items = data.value?.items ?? []
+  const moved = oldIndex === undefined ? undefined : items[oldIndex]
+  if (moved && newIndex !== undefined && oldIndex !== newIndex) {
+    void moveItem(moved.id, afterIdForIndex(items, moved.id, newIndex))
+  }
+  coverItems.value = (data.value?.items ?? []).slice(0, coverLimit.value)
 }
 
 async function deleteCollection() {
@@ -313,13 +354,22 @@ async function deleteCollection() {
           :editable="data.isOwner"
           @save="saveValue"
           @remove="removeItem"
+          @move="moveItem"
         />
 
-        <ul
+        <VueDraggable
           v-else
+          v-model="coverItems"
+          tag="ul"
+          :disabled="!data.isOwner"
+          ghost-class="drag-gap"
+          :animation="150"
+          :delay="250"
+          :delay-on-touch-only="true"
           class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+          @update="onCoverDragged"
         >
-          <li v-for="item in data.items.slice(0, coverLimit)" :key="item.id">
+          <li v-for="item in coverItems" :key="item.id">
             <component
               :is="item.igdbId ? NuxtLink : 'div'"
               :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
@@ -334,7 +384,7 @@ async function deleteCollection() {
               </span>
             </component>
           </li>
-        </ul>
+        </VueDraggable>
         <div
           v-if="view === 'covers' && data.items.length > coverLimit"
           class="text-center"

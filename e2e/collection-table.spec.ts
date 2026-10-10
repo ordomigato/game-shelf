@@ -62,7 +62,7 @@ async function openCollection(page: Page, owner: boolean) {
 
 /** Game names in the order the table shows them. */
 const names = (page: Page) =>
-  page.getByRole('table').getByRole('row').locator('td:first-child')
+  page.getByRole('table').locator('tbody tr').getByRole('link')
 
 test.describe('visitors', () => {
   test('see the fields as columns and can sort by any of them', async ({

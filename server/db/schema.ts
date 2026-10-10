@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import {
   check,
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -130,7 +131,11 @@ export const collectionItems = pgTable(
     itemId: uuid('item_id')
       .notNull()
       .references(() => libraryItems.id, { onDelete: 'cascade' }),
-    position: integer('position').notNull().default(0),
+    /**
+     * The owner's order. A moved game goes halfway between its neighbours,
+     * so a move writes one row. See `moveItemInCollection`.
+     */
+    position: doublePrecision('position').notNull().default(0),
     addedAt: timestamp('added_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

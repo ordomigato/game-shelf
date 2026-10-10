@@ -1,5 +1,6 @@
 import { and, asc, count, eq, inArray, max, sql } from 'drizzle-orm'
 import { createError } from 'h3'
+import type { ChartWidget } from '../../shared/types/charts'
 import type {
   Blueprint,
   BlueprintCollection,
@@ -211,6 +212,7 @@ export async function getCollectionBySlug(
     ...toSummary(found.collection, items.length),
     blueprint,
     items,
+    dashboard: found.collection.dashboard,
     isOwner: viewerIsOwner,
   }
 }
@@ -1120,4 +1122,19 @@ export async function deleteBlueprint(
     throw createError({ statusCode: 409, statusMessage: 'Blueprint in use' })
   }
   await useDb().delete(blueprints).where(eq(blueprints.id, blueprint.id))
+}
+
+/** Replaces the charts on a collection's dashboard. */
+export async function updateDashboard(
+  ownerId: string,
+  collectionId: string,
+  dashboard: ChartWidget[],
+): Promise<ChartWidget[]> {
+  const collection = await getOwnedCollection(ownerId, collectionId)
+  const [saved] = await useDb()
+    .update(collections)
+    .set({ dashboard })
+    .where(eq(collections.id, collection.id))
+    .returning({ dashboard: collections.dashboard })
+  return saved!.dashboard
 }

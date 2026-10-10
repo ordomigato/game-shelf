@@ -66,23 +66,47 @@ async function onSaved(saved: CollectionSummary) {
   }
 }
 
-// Table or covers, remembered on this device.
+// Table or covers, remembered on this device. Charts have their own link
+// (?view=charts), so a dashboard can be shared.
 const VIEW_KEY = 'gameshelf:collection-view'
-const view = ref<'table' | 'covers'>('table')
+type View = 'table' | 'covers' | 'charts'
+const savedView = ref<'table' | 'covers'>('table')
 onMounted(() => {
   try {
-    if (localStorage.getItem(VIEW_KEY) === 'covers') view.value = 'covers'
+    if (localStorage.getItem(VIEW_KEY) === 'covers') savedView.value = 'covers'
   } catch {
     // Storage can be blocked. The table is a fine default.
   }
 })
+const view = computed<View>(() =>
+  route.query.view === 'charts' ? 'charts' : savedView.value,
+)
 function chooseView(value: unknown) {
-  if (value !== 'table' && value !== 'covers') return
-  view.value = value
+  if (value !== 'table' && value !== 'covers' && value !== 'charts') return
+  const { view: _old, ...query } = route.query
+  void navigateTo(
+    { query: value === 'charts' ? { ...query, view: 'charts' } : query },
+    { replace: true },
+  )
+  if (value === 'charts') return
+  savedView.value = value
   try {
     localStorage.setItem(VIEW_KEY, value)
   } catch {
     // Not remembered, which is fine.
+  }
+}
+
+/** Saves the dashboard, showing the change straight away. */
+async function saveDashboard(dashboard: ChartWidget[]) {
+  if (!data.value) return
+  const before = data.value.dashboard
+  data.value = { ...data.value, dashboard }
+  try {
+    await collections.saveDashboard(data.value.id, dashboard)
+  } catch {
+    if (data.value) data.value = { ...data.value, dashboard: before }
+    toast.error(t('charts.saveFailed'))
   }
 }
 
@@ -526,6 +550,15 @@ async function deleteCollection() {
                 $t('collection.covers')
               }}</span>
             </ToggleGroupItem>
+            <ToggleGroupItem
+              value="charts"
+              :aria-label="$t('collection.charts')"
+            >
+              <ChartColumn aria-hidden="true" />
+              <span class="hidden sm:inline">{{
+                $t('collection.charts')
+              }}</span>
+            </ToggleGroupItem>
           </ToggleGroup>
         </div>
 
@@ -542,6 +575,15 @@ async function deleteCollection() {
           @rename="startRenaming"
           @move-to="moveToCollection"
           @wishlist="toggleWishlist"
+        />
+
+        <ChartsDashboard
+          v-else-if="view === 'charts'"
+          :dashboard="data.dashboard"
+          :fields="data.blueprint.fields"
+          :items="data.items"
+          :editable="data.isOwner"
+          @save="saveDashboard"
         />
 
         <VueDraggable

@@ -293,7 +293,8 @@
     "covers": "Covers",
     "showMore": "Show more",
     "editFields": "Edit fields",
-    "addByHand": "Add by hand"
+    "addByHand": "Add by hand",
+    "charts": "Charts"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -529,5 +530,86 @@
     "empty": "No public collections yet. Make one of yours public to be the first.",
     "loadFailed": "Couldn't load collections. Try again.",
     "loadMoreFailed": "Couldn't load more collections. Try again."
+  },
+  "charts": {
+    "add": "Add chart",
+    "addFirst": "Add your first chart",
+    "empty": "No charts yet.",
+    "emptyHint": "Charts are made from this collection's games and fields, like games per status, total spent or progress over time.",
+    "drag": "Drag to move",
+    "actions": "Actions for {title}",
+    "edit": "Edit chart",
+    "size": "Size",
+    "remove": "Remove chart",
+    "sizes": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Wide"
+    },
+    "notSet": "Not set",
+    "other": "Other",
+    "noData": "No games to show yet.",
+    "saveFailed": "Couldn't save the charts. Try again.",
+    "problems": {
+      "fieldGone": "This chart uses a field that was removed or changed. Edit it to pick another."
+    },
+    "kinds": {
+      "number": "Number",
+      "bar": "Bar",
+      "pie": "Pie",
+      "line": "Line"
+    },
+    "ops": {
+      "count": "Count games",
+      "sum": "Total",
+      "average": "Average",
+      "min": "Lowest",
+      "max": "Highest",
+      "percent": "Share ticked"
+    },
+    "titles": {
+      "count": "Games",
+      "sum": "Total {field}",
+      "average": "Average {field}",
+      "min": "Lowest {field}",
+      "max": "Highest {field}",
+      "percent": "{field}",
+      "countBy": "Games by {group}",
+      "sumBy": "Total {field} by {group}",
+      "averageBy": "Average {field} by {group}",
+      "minBy": "Lowest {field} by {group}",
+      "maxBy": "Highest {field} by {group}",
+      "percentBy": "{field} by {group}",
+      "countOverTime": "Games over time",
+      "sumOverTime": "Total {field} over time",
+      "averageOverTime": "Average {field} over time",
+      "minOverTime": "Lowest {field} over time",
+      "maxOverTime": "Highest {field} over time",
+      "percentOverTime": "{field} over time"
+    },
+    "editor": {
+      "addTitle": "Add a chart",
+      "editTitle": "Edit chart",
+      "description": "Charts use this collection's games. The preview shows them as you go.",
+      "kind": "Kind",
+      "measure": "Measure",
+      "measureField": "Field to measure",
+      "groupBy": "Split by",
+      "noGroupable": "Add a choice list, checkbox, score or text field to split games by.",
+      "over": "Over time, by",
+      "whenAdded": "When games were added",
+      "bucket": "Period",
+      "byMonth": "Month",
+      "byYear": "Year",
+      "cumulative": "Show a running total",
+      "title": "Title",
+      "titlePlaceholder": "Leave empty to name it from the settings",
+      "preview": "Preview",
+      "cancel": "Cancel",
+      "save": "Save chart",
+      "add": "Add chart",
+      "needsField": "Pick a field to measure.",
+      "needsGroup": "Pick a field to split the games by."
+    }
   }
 }

@@ -1,4 +1,5 @@
 import { ofetch } from 'ofetch'
+import type { ChartWidget } from '#shared/types/charts'
 import type {
   Blueprint,
   BlueprintDetail,
@@ -190,6 +191,13 @@ export function useCollections() {
         method: 'PATCH',
         body: { name },
       }),
+
+    /** Replaces the charts on a collection's dashboard. */
+    saveDashboard: (collectionId: string, dashboard: ChartWidget[]) =>
+      auth.apiFetch<ChartWidget[]>(
+        `/api/collections/${collectionId}/dashboard`,
+        { method: 'PUT', body: { dashboard } },
+      ),
 
     /** Replaces a collection's fields. Stored values are carried over. */
     updateFields: (

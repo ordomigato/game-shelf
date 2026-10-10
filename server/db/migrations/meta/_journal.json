@@ -43,6 +43,13 @@
       "when": 1791606331957,
       "tag": "0005_fractional_positions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791658951212,
+      "tag": "0006_collection_dashboards",
+      "breakpoints": true
     }
   ]
 }

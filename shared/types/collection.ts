@@ -1,3 +1,5 @@
+import type { ChartWidget } from './charts'
+
 export type FieldType =
   | 'text'
   | 'number'
@@ -121,6 +123,8 @@ export interface CollectionEntry extends LibraryItem {
 export interface CollectionDetail extends CollectionSummary {
   blueprint: Blueprint
   items: CollectionEntry[]
+  /** The charts on its dashboard, in order. */
+  dashboard: ChartWidget[]
   /** Whether the person viewing is the owner (and can edit). */
   isOwner: boolean
 }

@@ -14,6 +14,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { ChartWidget } from '../../shared/types/charts'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
 
 const timestamps = {
@@ -82,6 +83,8 @@ export const collections = pgTable(
     description: text('description'),
     visibility: visibility('visibility').notNull().default('private'),
     kind: collectionKind('kind').notNull().default('custom'),
+    /** The charts on the collection's dashboard, in order. */
+    dashboard: jsonb('dashboard').$type<ChartWidget[]>().notNull().default([]),
     ...timestamps,
   },
   (table) => [

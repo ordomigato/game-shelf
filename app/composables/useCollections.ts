@@ -1,7 +1,9 @@
 import { ofetch } from 'ofetch'
 import type {
+  Blueprint,
   CollectionDetail,
   CollectionSummary,
+  FieldDefinition,
   FieldValue,
   LibraryItem,
 } from '#shared/types/collection'
@@ -97,6 +99,24 @@ export function useCollections() {
     addItem: (collectionId: string, itemId: string) =>
       auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
         method: 'PUT',
+      }),
+
+    /** Renames the user's own copy of a game, in all their collections. */
+    renameItem: (itemId: string, name: string) =>
+      auth.apiFetch<LibraryItem>(`/api/library-items/${itemId}`, {
+        method: 'PATCH',
+        body: { name },
+      }),
+
+    /** Replaces a collection's fields. Stored values are carried over. */
+    updateFields: (
+      collectionId: string,
+      fields: FieldDefinition[],
+      optionRenames: Record<string, Record<string, string>>,
+    ) =>
+      auth.apiFetch<Blueprint>(`/api/collections/${collectionId}/fields`, {
+        method: 'PUT',
+        body: { fields, optionRenames },
       }),
 
     /** Sets an item's values for a collection's fields. `null` clears. */

@@ -3,19 +3,14 @@ import { formatReleaseDate } from './games'
 
 const numberFormats = new Map<string, Intl.NumberFormat>()
 
-function numberFormat(locale: string, fractionDigits?: number) {
-  const key = `${locale}:${fractionDigits ?? ''}`
+function numberFormat(
+  locale: string,
+  options: Intl.NumberFormatOptions = {},
+): Intl.NumberFormat {
+  const key = `${locale}:${JSON.stringify(options)}`
   let format = numberFormats.get(key)
   if (!format) {
-    format = new Intl.NumberFormat(
-      locale,
-      fractionDigits === undefined
-        ? {}
-        : {
-            minimumFractionDigits: fractionDigits,
-            maximumFractionDigits: fractionDigits,
-          },
-    )
+    format = new Intl.NumberFormat(locale, options)
     numberFormats.set(key, format)
   }
   return format
@@ -36,8 +31,13 @@ export function formatFieldValue(
     case 'number':
       return numberFormat(locale).format(Number(value))
     case 'currency':
-      // Fields don't store a currency yet, so show the amount alone.
-      return numberFormat(locale, 2).format(Number(value))
+      // Fields made before currencies existed show the amount alone.
+      return numberFormat(
+        locale,
+        field.currency
+          ? { style: 'currency', currency: field.currency }
+          : { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+      ).format(Number(value))
     case 'progress':
       return `${value}%`
     case 'date':

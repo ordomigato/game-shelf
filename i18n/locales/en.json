@@ -283,7 +283,8 @@
     "view": "View",
     "table": "Table",
     "covers": "Covers",
-    "showMore": "Show more"
+    "showMore": "Show more",
+    "editFields": "Edit fields"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -333,6 +334,64 @@
     "moveUp": "Move up",
     "moveDown": "Move down",
     "moveBottom": "Move to bottom",
-    "moveFailed": "Couldn't move that game. Try again."
+    "moveFailed": "Couldn't move that game. Try again.",
+    "rename": "Rename"
+  },
+  "fieldEditor": {
+    "title": "Fields",
+    "description": "The columns every game in this collection has. Drag to reorder.",
+    "empty": "No fields yet. Add one to start tracking things like price, platform or rating.",
+    "name": "Field name",
+    "namePlaceholder": "Field name, like Platform",
+    "newField": "new field",
+    "typeFor": "Type of {name}",
+    "remove": "Remove {name}",
+    "options": "Choices",
+    "optionFor": "Choice for {name}",
+    "removeOption": "Remove {option}",
+    "emptyOption": "empty choice",
+    "addOption": "Add choice",
+    "currency": "Currency",
+    "currencyFor": "Currency for {name}",
+    "add": "Add field",
+    "cancel": "Cancel",
+    "back": "Go back",
+    "save": "Save fields",
+    "saving": "Saving…",
+    "saveAnyway": "Save and clear",
+    "saveFailed": "Couldn't save the fields. Try again.",
+    "confirmTitle": "Some values will be cleared",
+    "confirmBody": "These games keep everything else. This can't be undone.",
+    "cleared": "{name}: cleared on {count} game | {name}: cleared on {count} games",
+    "types": {
+      "text": "Text",
+      "number": "Number",
+      "currency": "Amount",
+      "date": "Date",
+      "checkbox": "Checkbox",
+      "select": "Choice list",
+      "rating": "Rating (stars)",
+      "progress": "Progress (%)"
+    },
+    "errors": {
+      "tooMany": "A collection can have up to {max} fields.",
+      "nameRequired": "Every field needs a name.",
+      "nameTooLong": "\"{name}\" is too long. Use up to {max} characters.",
+      "duplicateName": "There are two fields called \"{name}\". Give each a different name.",
+      "optionsRequired": "\"{name}\" needs at least one choice, and no empty ones.",
+      "tooManyOptions": "\"{name}\" can have up to {max} choices.",
+      "optionTooLong": "A choice in \"{name}\" is too long. Use up to {max} characters.",
+      "duplicateOption": "\"{name}\" has the same choice twice.",
+      "invalid": "Something about these fields isn't valid. Check them and try again."
+    }
+  },
+  "rename": {
+    "title": "Rename game",
+    "description": "Changes the name in all your collections. The game stays linked to its IGDB page.",
+    "name": "Name",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "failed": "Couldn't rename the game. Try again."
   }
 }

@@ -17,6 +17,9 @@ describe('formatFieldValue', () => {
     expect(formatFieldValue(field('number'), 1234.5)).toBe('1,234.5')
     expect(formatFieldValue(field('currency'), 40)).toBe('40.00')
     expect(formatFieldValue(field('currency'), 1234.5, 'de')).toBe('1.234,50')
+    const price = { ...field('currency'), currency: 'USD' }
+    expect(formatFieldValue(price, 40)).toBe('$40.00')
+    expect(formatFieldValue({ ...price, currency: 'JPY' }, 4000)).toBe('¥4,000')
   })
 
   it('shows progress as a percentage and dates in words', () => {

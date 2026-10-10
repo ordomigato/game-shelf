@@ -3,12 +3,14 @@ import {
   ArrowLeft,
   Ellipsis,
   Heart,
+  LayoutGrid,
   Lock,
   Pencil,
   Plus,
+  Table2,
   Trash2,
 } from '@lucide/vue'
-import type { CollectionSummary } from '#shared/types/collection'
+import type { CollectionSummary, FieldValue } from '#shared/types/collection'
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
@@ -49,6 +51,90 @@ async function onSaved(saved: CollectionSummary) {
     await navigateTo(`${shelfPath.value}/${saved.slug}`, { replace: true })
   } else {
     await refresh()
+  }
+}
+
+// Table or covers, remembered on this device.
+const VIEW_KEY = 'gameshelf:collection-view'
+const view = ref<'table' | 'covers'>('table')
+onMounted(() => {
+  try {
+    if (localStorage.getItem(VIEW_KEY) === 'covers') view.value = 'covers'
+  } catch {
+    // Storage can be blocked. The table is a fine default.
+  }
+})
+function chooseView(value: unknown) {
+  if (value !== 'table' && value !== 'covers') return
+  view.value = value
+  try {
+    localStorage.setItem(VIEW_KEY, value)
+  } catch {
+    // Not remembered, which is fine.
+  }
+}
+
+// The covers view grows by a batch at a time instead of drawing every cover.
+const COVER_BATCH = 60
+const coverLimit = ref(COVER_BATCH)
+
+const itemError = ref('')
+
+// The loaded collection is held shallowly, so changes replace it rather
+// than editing it in place.
+function setItems(items: CollectionEntry[]) {
+  if (!data.value) return
+  data.value = { ...data.value, items, itemCount: items.length }
+}
+
+function setItemData(itemId: string, itemData: ItemData) {
+  setItems(
+    (data.value?.items ?? []).map((entry) =>
+      entry.id === itemId ? { ...entry, data: itemData } : entry,
+    ),
+  )
+}
+
+/** Saves one value straight away in the table, undoing it if saving fails. */
+async function saveValue(
+  itemId: string,
+  fieldId: string,
+  value: FieldValue | null,
+) {
+  const item = data.value?.items.find((entry) => entry.id === itemId)
+  if (!data.value || !item) return
+  itemError.value = ''
+  const before = item.data
+  setItemData(
+    itemId,
+    value === null
+      ? Object.fromEntries(
+          Object.entries(before).filter(([id]) => id !== fieldId),
+        )
+      : { ...before, [fieldId]: value },
+  )
+  try {
+    const saved = await collections.updateValues(data.value.id, itemId, {
+      [fieldId]: value,
+    })
+    setItemData(itemId, saved.data)
+  } catch {
+    setItemData(itemId, before)
+    itemError.value = t('table.saveFailed')
+  }
+}
+
+async function removeItem(itemId: string) {
+  if (!data.value) return
+  itemError.value = ''
+  const collectionId = data.value.id
+  const before = data.value.items
+  setItems(before.filter((entry) => entry.id !== itemId))
+  try {
+    await collections.removeItem(collectionId, itemId)
+  } catch {
+    setItems(before)
+    itemError.value = t('table.removeFailed')
   }
 }
 
@@ -192,26 +278,72 @@ async function deleteCollection() {
         </template>
       </div>
 
-      <ul
-        v-else
-        class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
-      >
-        <li v-for="item in data.items" :key="item.id">
-          <component
-            :is="item.igdbId ? NuxtLink : 'div'"
-            :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
-            class="group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <template v-else>
+        <div class="flex items-center justify-between gap-4">
+          <FormMessage v-if="itemError">{{ itemError }}</FormMessage>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            class="ml-auto"
+            :model-value="view"
+            :aria-label="$t('collection.view')"
+            @update:model-value="chooseView"
           >
-            <GameCover :name="item.name" :cover-id="item.coverId" />
-            <span
-              class="line-clamp-2 text-sm font-semibold"
-              :class="{ 'group-hover:underline': item.igdbId }"
+            <ToggleGroupItem value="table" :aria-label="$t('collection.table')">
+              <Table2 aria-hidden="true" />
+              <span class="hidden sm:inline">{{ $t('collection.table') }}</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="covers"
+              :aria-label="$t('collection.covers')"
             >
-              {{ item.name }}
-            </span>
-          </component>
-        </li>
-      </ul>
+              <LayoutGrid aria-hidden="true" />
+              <span class="hidden sm:inline">{{
+                $t('collection.covers')
+              }}</span>
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
+        <CollectionTable
+          v-if="view === 'table'"
+          :fields="data.blueprint.fields"
+          :items="data.items"
+          :editable="data.isOwner"
+          @save="saveValue"
+          @remove="removeItem"
+        />
+
+        <ul
+          v-else
+          class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+        >
+          <li v-for="item in data.items.slice(0, coverLimit)" :key="item.id">
+            <component
+              :is="item.igdbId ? NuxtLink : 'div'"
+              :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
+              class="group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <GameCover :name="item.name" :cover-id="item.coverId" />
+              <span
+                class="line-clamp-2 text-sm font-semibold"
+                :class="{ 'group-hover:underline': item.igdbId }"
+              >
+                {{ item.name }}
+              </span>
+            </component>
+          </li>
+        </ul>
+        <div
+          v-if="view === 'covers' && data.items.length > coverLimit"
+          class="text-center"
+        >
+          <Button variant="outline" @click="coverLimit += COVER_BATCH">
+            {{ $t('collection.showMore') }}
+          </Button>
+        </div>
+      </template>
 
       <CollectionFormDialog
         v-if="data.isOwner"

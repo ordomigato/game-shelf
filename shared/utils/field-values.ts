@@ -23,6 +23,15 @@ export function normalizeFieldValue(
       return typeof value === 'string' && (field.options ?? []).includes(value)
         ? value
         : undefined
+    case 'multiselect': {
+      if (!Array.isArray(value)) return undefined
+      if (value.some((option) => typeof option !== 'string')) return undefined
+      const options = field.options ?? []
+      if (value.some((option) => !options.includes(option))) return undefined
+      // Stored once each, in the field's option order. Empty clears.
+      const chosen = options.filter((option) => value.includes(option))
+      return chosen.length ? chosen : null
+    }
     case 'date':
       return typeof value === 'string' &&
         /^\d{4}-\d{2}-\d{2}$/.test(value) &&

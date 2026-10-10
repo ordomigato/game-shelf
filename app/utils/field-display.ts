@@ -27,6 +27,7 @@ export function formatFieldValue(
   locale = 'en',
 ): string {
   if (value === undefined) return ''
+  if (Array.isArray(value)) return value.join(', ')
   switch (field.type) {
     case 'number':
       return numberFormat(locale).format(Number(value))
@@ -50,7 +51,8 @@ export function formatFieldValue(
 /**
  * Orders two values of the same field, ascending. Text and select compare
  * as words in the reader's language, numbers numerically, dates by date,
- * checkboxes with ticked first. Empty values are handled by the table,
+ * checkboxes with ticked first, lists of choices by their choices in
+ * order. Empty values are handled by the table,
  * which always puts them last.
  */
 export function compareFieldValues(
@@ -70,9 +72,13 @@ export function compareFieldValues(
     case 'date':
       return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0
     default:
-      return String(a).localeCompare(String(b), locale, {
-        sensitivity: 'base',
-        numeric: true,
-      })
+      return formatFieldValue(field, a).localeCompare(
+        formatFieldValue(field, b),
+        locale,
+        {
+          sensitivity: 'base',
+          numeric: true,
+        },
+      )
   }
 }

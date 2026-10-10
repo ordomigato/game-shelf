@@ -65,7 +65,8 @@ const filterableFields = computed(() =>
   props.fields.filter(
     (field) =>
       field.type === 'checkbox' ||
-      (field.type === 'select' && field.options?.length),
+      ((field.type === 'select' || field.type === 'multiselect') &&
+        field.options?.length),
   ),
 )
 const activeFilterCount = computed(
@@ -104,6 +105,8 @@ function matchesFilters(item: CollectionEntry) {
     if (field.type === 'checkbox') {
       return wanted.includes(value === true ? 'yes' : 'no')
     }
+    // A list of choices matches when it has any of the wanted ones.
+    if (Array.isArray(value)) return value.some((v) => wanted.includes(v))
     return typeof value === 'string' && wanted.includes(value)
   })
 }
@@ -114,8 +117,8 @@ function matchesQuery(item: CollectionEntry) {
   const haystack = [
     item.name,
     ...props.fields
-      .filter((field) => field.type === 'text' || field.type === 'select')
-      .map((field) => item.data[field.id] ?? ''),
+      .filter((field) => ['text', 'select', 'multiselect'].includes(field.type))
+      .map((field) => formatFieldValue(field, item.data[field.id])),
   ]
     .join(' ')
     .toLowerCase()

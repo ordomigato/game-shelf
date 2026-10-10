@@ -105,9 +105,14 @@ function setType(draft: FieldDraft, type: unknown) {
   if (typeof type !== 'string' || !FIELD_TYPES.includes(type as FieldType)) {
     return
   }
+  // Choosing "Choice list" again keeps a multiple-choice list as it is.
+  if (type === 'select' && draft.type === 'multiselect') return
   draft.type = type as FieldType
   if (draft.type === 'select' && !draft.options.length) addOption(draft)
 }
+
+const isChoiceList = (draft: FieldDraft) =>
+  draft.type === 'select' || draft.type === 'multiselect'
 
 function addOption(draft: FieldDraft) {
   draft.options = [...draft.options, { key: newKey(), value: '' }]
@@ -132,7 +137,7 @@ const nextFields = computed(() =>
 const renames = computed<OptionRenames>(() => {
   const result: OptionRenames = {}
   for (const draft of drafts.value) {
-    if (draft.type !== 'select') continue
+    if (!isChoiceList(draft)) continue
     const moved = draft.options.filter(
       (option) =>
         option.original !== undefined &&
@@ -291,7 +296,9 @@ async function save() {
                 maxlength="60"
               />
               <Select
-                :model-value="draft.type"
+                :model-value="
+                  draft.type === 'multiselect' ? 'select' : draft.type
+                "
                 @update:model-value="setType(draft, $event)"
               >
                 <SelectTrigger
@@ -331,10 +338,7 @@ async function save() {
             </div>
 
             <!-- A choice list's options -->
-            <div
-              v-if="draft.type === 'select'"
-              class="flex flex-col gap-2 pl-6"
-            >
+            <div v-if="isChoiceList(draft)" class="flex flex-col gap-2 pl-6">
               <p class="text-xs font-medium text-muted-foreground">
                 {{ $t('fieldEditor.options') }}
               </p>
@@ -378,6 +382,15 @@ async function save() {
               >
                 <Plus /> {{ $t('fieldEditor.addOption') }}
               </Button>
+              <Label class="flex items-center gap-2 font-normal">
+                <Checkbox
+                  :model-value="draft.type === 'multiselect'"
+                  @update:model-value="
+                    draft.type = $event === true ? 'multiselect' : 'select'
+                  "
+                />
+                {{ $t('fieldEditor.allowMultiple') }}
+              </Label>
             </div>
 
             <!-- An amount's currency -->

@@ -13,6 +13,7 @@ export const FIELD_TYPES: FieldType[] = [
   'date',
   'checkbox',
   'select',
+  'multiselect',
   'rating',
   'progress',
 ]
@@ -55,7 +56,7 @@ export function fieldsProblem(
     if (!FIELD_TYPES.includes(field.type))
       return { key: 'fieldEditor.errors.invalid' }
 
-    if (field.type === 'select') {
+    if (field.type === 'select' || field.type === 'multiselect') {
       const options = (field.options ?? []).map((option) => option.trim())
       if (!options.length || options.some((option) => !option)) {
         return { key: 'fieldEditor.errors.optionsRequired', params: { name } }
@@ -94,7 +95,7 @@ export function cleanFields(fields: FieldDefinition[]): FieldDefinition[] {
     id: field.id,
     name: field.name.trim(),
     type: field.type,
-    ...(field.type === 'select' && {
+    ...((field.type === 'select' || field.type === 'multiselect') && {
       options: (field.options ?? []).map((option) => option.trim()),
     }),
     ...(field.type === 'currency' && {
@@ -107,9 +108,10 @@ const NUMERIC: FieldType[] = ['number', 'currency', 'rating', 'progress']
 
 /**
  * A stored value carried over to a field's new definition: renamed with its
- * select option, converted where the types fit (any value to text, numbers
+ * choice options, converted where the types fit (any value to text, numbers
  * between number-like types, text that reads as a number or matches an
- * option), or undefined when it no longer fits and will be cleared.
+ * option, one choice to a list of one and back), or undefined when it no
+ * longer fits and will be cleared. A list keeps the choices that survive.
  */
 export function carryValue(
   value: FieldValue,
@@ -120,7 +122,27 @@ export function carryValue(
   let candidate: unknown = value
   if (before.type === 'select' && typeof value === 'string') {
     candidate = renames[value] ?? value
+  } else if (before.type === 'multiselect' && Array.isArray(value)) {
+    candidate = value.map((option) => renames[option] ?? option)
   }
+
+  if (after.type === 'multiselect') {
+    if (typeof candidate === 'string') candidate = [candidate]
+    if (Array.isArray(candidate)) {
+      const options = after.options ?? []
+      candidate = candidate.filter((option: string) => options.includes(option))
+    }
+  } else if (Array.isArray(candidate)) {
+    // A list into one value: text lists them, a single choice keeps one.
+    candidate =
+      after.type === 'text'
+        ? candidate.join(', ')
+        : candidate.length === 1
+          ? candidate[0]
+          : undefined
+  }
+
+  if (candidate === undefined) return undefined
   if (after.type === 'text' && typeof candidate !== 'string') {
     candidate =
       before.type === 'checkbox'
@@ -135,6 +157,21 @@ export function carryValue(
   if (candidate === undefined) return undefined
   const normalized = normalizeFieldValue(after, candidate)
   return normalized === null ? undefined : normalized
+}
+
+function sameValue(a: FieldValue | undefined, b: FieldValue | undefined) {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => item === b[index])
+  }
+  return a === b
+}
+
+/** Whether carrying `value` over to `carried` loses some or all of it. */
+function isLoss(value: FieldValue, carried: FieldValue | undefined) {
+  if (carried === undefined) return true
+  return Array.isArray(value) && Array.isArray(carried)
+    ? carried.length < value.length
+    : false
 }
 
 /**
@@ -158,7 +195,7 @@ export function migrateItemData(
     const carried = updated
       ? carryValue(value, field, updated, renames[field.id])
       : undefined
-    if (carried !== value) updates.set(field.id, carried)
+    if (!sameValue(carried, value)) updates.set(field.id, carried)
   }
   if (!updates.size) return null
   return Object.fromEntries(
@@ -172,8 +209,8 @@ export function migrateItemData(
 
 /**
  * For each field, how many of `items` would lose their value when saving
- * `after` (removed fields, or values that no longer fit). Renamed options
- * aren't losses. Fields with no losses are left out.
+ * `after` (removed fields, values that no longer fit, or choices dropped
+ * from a list). Renamed options aren't losses. Fields with no losses are left out.
  */
 export function valuesLost(
   items: { data: ItemData }[],
@@ -187,11 +224,13 @@ export function valuesLost(
     const updated = afterById.get(field.id)
     for (const item of items) {
       if (!(field.id in item.data)) continue
+      const value = item.data[field.id]!
       const carried = updated
-        ? carryValue(item.data[field.id]!, field, updated, renames[field.id])
+        ? carryValue(value, field, updated, renames[field.id])
         : undefined
-      if (carried === undefined)
+      if (isLoss(value, carried)) {
         lost.set(field.id, (lost.get(field.id) ?? 0) + 1)
+      }
     }
   }
   return lost

@@ -5,6 +5,7 @@ export type FieldType =
   | 'date'
   | 'checkbox'
   | 'select'
+  | 'multiselect'
   | 'rating'
   | 'progress'
 
@@ -16,7 +17,7 @@ export interface FieldDefinition {
   id: string
   name: string
   type: FieldType
-  /** Allowed values, for `select` fields only. */
+  /** Allowed values, for `select` and `multiselect` fields only. */
   options?: string[]
   /** ISO 4217 code like "USD", for `currency` fields only. */
   currency?: string
@@ -25,9 +26,10 @@ export interface FieldDefinition {
 /**
  * A value as stored: text, select and date (`YYYY-MM-DD`) are strings,
  * number, currency, rating (1 to 5) and progress (0 to 100) are numbers,
- * checkbox is a boolean.
+ * checkbox is a boolean, multiselect is a list of options in the field's
+ * option order.
  */
-export type FieldValue = string | number | boolean
+export type FieldValue = string | number | boolean | string[]
 
 /** An item's values, keyed by `FieldDefinition.id`, across all blueprints. */
 export type ItemData = Record<string, FieldValue>

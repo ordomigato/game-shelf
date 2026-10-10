@@ -558,7 +558,7 @@ function touchesValues(
   renames: Record<string, string> | undefined,
 ): boolean {
   if (!after || after.type !== before.type) return true
-  if (before.type !== 'select') return false
+  if (before.type !== 'select' && before.type !== 'multiselect') return false
   if (renames && Object.keys(renames).length) return true
   const kept = new Set(after.options ?? [])
   return (before.options ?? []).some((option) => !kept.has(option))
@@ -598,11 +598,13 @@ export async function updateCollectionFields(
   for (const field of before) {
     const after = afterById.get(field.id)
     const asked = optionRenames[field.id]
-    if (field.type !== 'select' || after?.type !== 'select' || !asked) continue
+    const isChoice = (type?: string) =>
+      type === 'select' || type === 'multiselect'
+    if (!isChoice(field.type) || !isChoice(after?.type) || !asked) continue
     const valid = Object.entries(asked).filter(
       ([from, to]) =>
         (field.options ?? []).includes(from) &&
-        (after.options ?? []).includes(to),
+        (after!.options ?? []).includes(to),
     )
     if (valid.length) renames[field.id] = Object.fromEntries(valid)
   }

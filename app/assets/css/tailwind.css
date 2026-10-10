@@ -163,6 +163,30 @@
   }
 }
 
+/* A table cell pinned while the row scrolls sideways (the game's name).
+   Solid, so cells scrolling under it don't show through, but matching the
+   row's half-muted colour when it's hovered or has a menu open. */
+.pinned-cell {
+  background: var(--card);
+  transition: background-color 150ms;
+}
+tr:hover > .pinned-cell,
+tr:has([aria-expanded='true']) > .pinned-cell {
+  background: color-mix(in oklab, var(--card), var(--muted) 50%);
+}
+
+/* In a collection, games that are also on the Wishlist fade like a gap in
+   a set. The heart and the row menu stay clear. */
+.wishlist-fade {
+  transition: opacity 150ms;
+}
+.is-wishlisted .wishlist-fade {
+  opacity: 0.5;
+}
+.is-wishlisted:hover .wishlist-fade {
+  opacity: 0.8;
+}
+
 /* While dragging to reorder, the browser's copy follows the cursor and the
    spot where it will land stays empty. */
 .drag-gap {

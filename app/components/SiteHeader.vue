@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import { Compass } from '@lucide/vue'
+</script>
+
 <template>
   <header
     class="border-b-4 border-shelf bg-masthead text-masthead-foreground shadow-[0_2px_0_var(--shelf-edge)]"
@@ -9,6 +13,17 @@
         GameShelf
       </NuxtLink>
       <div class="flex items-center gap-1">
+        <Button
+          as-child
+          variant="ghost"
+          class="text-masthead-foreground hover:bg-masthead-foreground/15 hover:text-masthead-foreground"
+        >
+          <NuxtLink to="/explore">
+            <Compass class="size-5" aria-hidden="true" />
+            <span class="hidden sm:inline">{{ $t('header.explore') }}</span>
+            <span class="sr-only sm:hidden">{{ $t('header.explore') }}</span>
+          </NuxtLink>
+        </Button>
         <UserMenu />
       </div>
     </div>

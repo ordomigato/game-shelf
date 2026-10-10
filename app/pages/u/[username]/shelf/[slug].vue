@@ -6,6 +6,7 @@ import {
   Heart,
   LayoutGrid,
   Lock,
+  PenLine,
   Pencil,
   Plus,
   Table2,
@@ -130,6 +131,7 @@ async function saveValue(
   }
 }
 
+const addingByHand = ref(false)
 const renaming = ref(false)
 const renamingItem = ref<CollectionEntry | null>(null)
 
@@ -357,6 +359,19 @@ async function deleteCollection() {
               {{ $t('collection.addGames') }}
             </NuxtLink>
           </Button>
+          <Button
+            v-if="data.items.length"
+            variant="outline"
+            @click="addingByHand = true"
+          >
+            <PenLine />
+            <span class="hidden sm:inline">{{
+              $t('collection.addByHand')
+            }}</span>
+            <span class="sr-only sm:hidden">{{
+              $t('collection.addByHand')
+            }}</span>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button
@@ -395,11 +410,16 @@ async function deleteCollection() {
           <p class="mt-1 text-sm text-muted-foreground">
             {{ $t('collection.emptyHint') }}
           </p>
-          <Button as-child class="mt-4">
-            <NuxtLink :to="{ path: '/', query: { to: data.slug } }">{{
-              $t('collection.searchGames')
-            }}</NuxtLink>
-          </Button>
+          <div class="mt-4 flex flex-wrap justify-center gap-2">
+            <Button as-child>
+              <NuxtLink :to="{ path: '/', query: { to: data.slug } }">{{
+                $t('collection.searchGames')
+              }}</NuxtLink>
+            </Button>
+            <Button variant="outline" @click="addingByHand = true">
+              <PenLine /> {{ $t('collection.addByHand') }}
+            </Button>
+          </div>
         </template>
       </div>
 
@@ -495,6 +515,12 @@ async function deleteCollection() {
         </div>
       </template>
 
+      <AddByHandDialog
+        v-if="data.isOwner"
+        v-model:open="addingByHand"
+        :collection="data"
+        @added="refresh()"
+      />
       <RenameItemDialog
         v-if="data.isOwner"
         v-model:open="renaming"

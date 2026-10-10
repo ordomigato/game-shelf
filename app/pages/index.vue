@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Search } from '@lucide/vue'
-import type { CollectionSummary } from '#shared/types/collection'
+import { toast } from 'vue-sonner'
+import type { CollectionSummary, LibraryItem } from '#shared/types/collection'
 import type { GameSummary } from '#shared/types/game'
 
 const {
@@ -67,6 +68,17 @@ onMounted(() => {
 })
 
 const tracked = useTrackedGames(games, target)
+
+const addingByHand = ref(false)
+function onAddedByHand(item: LibraryItem) {
+  const collection = target.value
+  if (!collection || !auth.me.value?.username) return
+  const path = `/u/${auth.me.value.username}/shelf/${collection.slug}`
+  toast.success(
+    t('byHand.added', { name: item.name, collection: titleOf(collection) }),
+    { action: { label: t('table.view'), onClick: () => navigateTo(path) } },
+  )
+}
 const titleOf = useCollectionTitle()
 
 function toggleLabel(game: GameSummary) {
@@ -209,6 +221,26 @@ const resultsLabel = computed(() => {
           {{ $t('search.loadMoreFailed') }}
         </p>
       </div>
+    </template>
+
+    <!-- Searching for a collection: games IGDB doesn't have go in by hand. -->
+    <template v-if="target && isSearchable && status === 'success'">
+      <p class="mt-10 text-center text-sm text-muted-foreground">
+        {{ $t('byHand.notFound') }}
+        <button
+          type="button"
+          class="font-medium text-primary underline-offset-4 hover:underline"
+          @click="addingByHand = true"
+        >
+          {{ $t('byHand.addItByHand') }}
+        </button>
+      </p>
+      <AddByHandDialog
+        v-model:open="addingByHand"
+        :collection="target"
+        :initial-name="term"
+        @added="onAddedByHand"
+      />
     </template>
   </div>
 </template>

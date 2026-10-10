@@ -20,6 +20,7 @@ import {
   libraryItems,
 } from '../db/schema'
 import { isUniqueViolation } from './db-errors'
+import { positionBetween } from './positions'
 
 type CollectionRow = typeof collections.$inferSelect
 type BlueprintRow = typeof blueprints.$inferSelect
@@ -391,6 +392,84 @@ export async function removeItemFromCollection(
         eq(collectionItems.itemId, itemId),
       ),
     )
+}
+
+/** A collection's items as shown: by position, then when they were added. */
+async function orderedPositions(
+  collectionId: string,
+): Promise<{ itemId: string; position: number }[]> {
+  return useDb()
+    .select({
+      itemId: collectionItems.itemId,
+      position: collectionItems.position,
+    })
+    .from(collectionItems)
+    .where(eq(collectionItems.collectionId, collectionId))
+    .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
+}
+
+/**
+ * Moves an item to just after `afterItemId` in a collection the user owns,
+ * or to the top when that's null. Writes only the moved row, halfway
+ * between its new neighbours. When moves have squeezed two neighbours too
+ * close together, the collection is renumbered 1, 2, 3… in one statement
+ * first.
+ */
+export async function moveItemInCollection(
+  ownerId: string,
+  collectionId: string,
+  itemId: string,
+  afterItemId: string | null,
+): Promise<void> {
+  if (afterItemId === itemId) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'An item cannot follow itself',
+    })
+  }
+  await getOwnedCollection(ownerId, collectionId)
+  const db = useDb()
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const order = await orderedPositions(collectionId)
+    if (!order.some((row) => row.itemId === itemId)) throw notFound()
+    const others = order.filter((row) => row.itemId !== itemId)
+    const index =
+      afterItemId === null
+        ? -1
+        : others.findIndex((row) => row.itemId === afterItemId)
+    if (afterItemId !== null && index === -1) throw notFound()
+
+    const position = positionBetween(
+      others[index]?.position ?? null,
+      others[index + 1]?.position ?? null,
+    )
+    if (position !== null) {
+      await db
+        .update(collectionItems)
+        .set({ position })
+        .where(
+          and(
+            eq(collectionItems.collectionId, collectionId),
+            eq(collectionItems.itemId, itemId),
+          ),
+        )
+      return
+    }
+    await db.execute(sql`
+      UPDATE collection_items AS ci
+      SET position = ranked.rank
+      FROM (
+        SELECT item_id,
+               row_number() OVER (ORDER BY position, added_at) AS rank
+        FROM collection_items
+        WHERE collection_id = ${collectionId}
+      ) AS ranked
+      WHERE ci.collection_id = ${collectionId}
+        AND ci.item_id = ranked.item_id
+    `)
+  }
+  throw new Error('Could not find room to move the item after renumbering')
 }
 
 /**

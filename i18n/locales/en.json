@@ -325,6 +325,14 @@
     "perPage": "Per page",
     "range": "{first}–{last} of {total}",
     "previousPage": "Previous page",
-    "nextPage": "Next page"
+    "nextPage": "Next page",
+    "yourOrder": "Back to your order",
+    "order": "Order",
+    "drag": "Drag to reorder",
+    "moveTop": "Move to top",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "moveBottom": "Move to bottom",
+    "moveFailed": "Couldn't move that game. Try again."
   }
 }

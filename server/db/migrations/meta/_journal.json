@@ -36,6 +36,13 @@
       "when": 1791594019903,
       "tag": "0004_backfill_wishlists",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791606331957,
+      "tag": "0005_fractional_positions",
+      "breakpoints": true
     }
   ]
 }

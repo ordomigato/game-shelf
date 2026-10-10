@@ -110,6 +110,17 @@ export function useCollections() {
         { method: 'PATCH', body: { values } },
       ),
 
+    /** Moves an item to just after another in a collection (first if null). */
+    moveItem: (
+      collectionId: string,
+      itemId: string,
+      afterItemId: string | null,
+    ) =>
+      auth.apiFetch(
+        `/api/collections/${collectionId}/items/${itemId}/position`,
+        { method: 'PUT', body: { afterItemId } },
+      ),
+
     removeItem: (collectionId: string, itemId: string) =>
       auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
         method: 'DELETE',

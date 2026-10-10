@@ -11,15 +11,21 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  ArrowDownToLine,
   ArrowUpDown,
+  ArrowUpToLine,
   ChevronLeft,
   ChevronRight,
   Ellipsis,
+  GripVertical,
   ListFilter,
+  MoveDown,
+  MoveUp,
   Search,
   Trash2,
   X,
 } from '@lucide/vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import type {
   CollectionEntry,
   FieldDefinition,
@@ -29,7 +35,8 @@ import type {
 /**
  * A collection's games as a table: one column per field in its blueprint.
  * Anyone can sort by a column, search, and filter by select and checkbox
- * fields. Owners edit values in place and remove games.
+ * fields. Owners edit values in place, remove games, and put games in
+ * their own order by dragging or from the row menu.
  */
 const props = defineProps<{
   fields: FieldDefinition[]
@@ -39,6 +46,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
   remove: [itemId: string]
+  /** Place `itemId` right after `afterItemId`, or first when null. */
+  move: [itemId: string, afterItemId: string | null]
 }>()
 
 const { t, locale } = useI18n()
@@ -223,6 +232,51 @@ function setPageSize(size: unknown) {
   }
 }
 
+// Ordering. Only while the table shows the owner's own order: no sort,
+// search or filter, so a row's place on screen is its place in the list.
+const reorderable = computed(
+  () =>
+    props.editable &&
+    !sorting.value.length &&
+    !query.value.trim() &&
+    !activeFilterCount.value,
+)
+
+const rows = computed(() => table.getRowModel().rows)
+const rowsById = computed(() => new Map(rows.value.map((row) => [row.id, row])))
+/** The current page as a list the drag-and-drop can rearrange. */
+const pageItems = ref<CollectionEntry[]>([])
+watch(
+  rows,
+  (current) => {
+    pageItems.value = current.map((row) => row.original)
+  },
+  { immediate: true },
+)
+
+function rowOf(item: CollectionEntry) {
+  return rowsById.value.get(item.id)!
+}
+
+function indexOf(itemId: string) {
+  return props.items.findIndex((item) => item.id === itemId)
+}
+
+/** Moves a game so it ends up at `index` in the whole collection. */
+function moveTo(itemId: string, index: number) {
+  emit('move', itemId, afterIdForIndex(props.items, itemId, index))
+  // Show whatever order the parent settled on, even if it kept the old one.
+  pageItems.value = rows.value.map((row) => row.original)
+}
+
+function onDragged(event: { oldIndex?: number; newIndex?: number }) {
+  const { oldIndex, newIndex } = event
+  if (oldIndex === undefined || newIndex === undefined) return
+  const start = pagination.value.pageIndex * pagination.value.pageSize
+  const moved = props.items[start + oldIndex]
+  if (moved && oldIndex !== newIndex) moveTo(moved.id, start + newIndex)
+}
+
 function fieldOf(columnId: string) {
   return props.fields.find((field) => field.id === columnId)
 }
@@ -282,6 +336,10 @@ const addedFormat = computed(
           </DropdownMenuSub>
         </DropdownMenuContent>
       </DropdownMenu>
+      <Button v-if="sorting.length" variant="ghost" @click="sorting = []">
+        <X />
+        {{ $t('table.yourOrder') }}
+      </Button>
       <Button
         v-if="activeFilterCount || query"
         variant="ghost"
@@ -306,6 +364,9 @@ const addedFormat = computed(
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead v-if="reorderable" class="w-8 pr-0">
+              <span class="sr-only">{{ $t('table.order') }}</span>
+            </TableHead>
             <TableHead
               v-for="header in table.getFlatHeaders()"
               :key="header.id"
@@ -342,10 +403,30 @@ const addedFormat = computed(
             </TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          <TableRow v-for="row in table.getRowModel().rows" :key="row.id">
+        <VueDraggable
+          v-model="pageItems"
+          tag="tbody"
+          data-slot="table-body"
+          class="[&_tr:last-child]:border-0"
+          handle=".drag-handle"
+          ghost-class="drag-gap"
+          :animation="150"
+          :disabled="!reorderable"
+          @update="onDragged"
+        >
+          <TableRow v-for="item in pageItems" :key="item.id">
+            <TableCell v-if="reorderable" class="w-8 pr-0">
+              <!-- Keyboard users move games from the row menu instead. -->
+              <span
+                class="drag-handle flex cursor-grab touch-none items-center justify-center rounded-sm py-1 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
+                :title="$t('table.drag')"
+                aria-hidden="true"
+              >
+                <GripVertical class="size-4" />
+              </span>
+            </TableCell>
             <TableCell
-              v-for="cell in row.getVisibleCells()"
+              v-for="cell in rowOf(item).getVisibleCells()"
               :key="cell.id"
               :class="{
                 // Solid, so scrolled cells don't show through, but fading to
@@ -355,37 +436,33 @@ const addedFormat = computed(
               }"
             >
               <component
-                :is="row.original.igdbId ? NuxtLink : 'div'"
+                :is="item.igdbId ? NuxtLink : 'div'"
                 v-if="cell.column.id === 'name'"
-                :to="
-                  row.original.igdbId
-                    ? `/games/${row.original.igdbId}`
-                    : undefined
-                "
+                :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
                 class="flex items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="{ 'hover:underline': row.original.igdbId }"
+                :class="{ 'hover:underline': item.igdbId }"
               >
                 <GameCover
-                  :name="row.original.name"
-                  :cover-id="row.original.coverId"
+                  :name="item.name"
+                  :cover-id="item.coverId"
                   size="thumb"
                   class="w-8 shrink-0"
                 />
-                <span class="line-clamp-2">{{ row.original.name }}</span>
+                <span class="line-clamp-2">{{ item.name }}</span>
               </component>
               <span
                 v-else-if="cell.column.id === 'addedAt'"
                 class="whitespace-nowrap text-muted-foreground"
               >
-                {{ addedFormat.format(new Date(row.original.addedAt)) }}
+                {{ addedFormat.format(new Date(item.addedAt)) }}
               </span>
               <FieldCell
                 v-else-if="fieldOf(cell.column.id)"
                 :field="fieldOf(cell.column.id)!"
-                :value="row.original.data[cell.column.id]"
-                :item-name="row.original.name"
+                :value="item.data[cell.column.id]"
+                :item-name="item.name"
                 :editable="editable"
-                @save="emit('save', row.original.id, cell.column.id, $event)"
+                @save="emit('save', item.id, cell.column.id, $event)"
               />
             </TableCell>
             <TableCell v-if="editable">
@@ -394,17 +471,42 @@ const addedFormat = computed(
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    :aria-label="
-                      $t('table.rowActions', { name: row.original.name })
-                    "
+                    :aria-label="$t('table.rowActions', { name: item.name })"
                   >
                     <Ellipsis />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-max">
+                  <template v-if="reorderable">
+                    <DropdownMenuItem
+                      :disabled="indexOf(item.id) === 0"
+                      @select="moveTo(item.id, 0)"
+                    >
+                      <ArrowUpToLine /> {{ $t('table.moveTop') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      :disabled="indexOf(item.id) === 0"
+                      @select="moveTo(item.id, indexOf(item.id) - 1)"
+                    >
+                      <MoveUp /> {{ $t('table.moveUp') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      :disabled="indexOf(item.id) === items.length - 1"
+                      @select="moveTo(item.id, indexOf(item.id) + 1)"
+                    >
+                      <MoveDown /> {{ $t('table.moveDown') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      :disabled="indexOf(item.id) === items.length - 1"
+                      @select="moveTo(item.id, items.length - 1)"
+                    >
+                      <ArrowDownToLine /> {{ $t('table.moveBottom') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </template>
                   <DropdownMenuItem
                     class="text-destructive focus:text-destructive"
-                    @select="emit('remove', row.original.id)"
+                    @select="emit('remove', item.id)"
                   >
                     <Trash2 /> {{ $t('table.remove') }}
                   </DropdownMenuItem>
@@ -414,13 +516,15 @@ const addedFormat = computed(
           </TableRow>
           <TableRow v-if="!visibleItems.length">
             <TableCell
-              :colspan="fields.length + (editable ? 3 : 2)"
+              :colspan="
+                fields.length + 2 + Number(editable) + Number(reorderable)
+              "
               class="py-10 text-center text-muted-foreground"
             >
               {{ $t('table.noMatches') }}
             </TableCell>
           </TableRow>
-        </TableBody>
+        </VueDraggable>
       </Table>
     </div>
 

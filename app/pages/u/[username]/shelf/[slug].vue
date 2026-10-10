@@ -12,6 +12,7 @@ import {
   Trash2,
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
+import { toast } from 'vue-sonner'
 import type {
   CollectionEntry,
   CollectionSummary,
@@ -53,7 +54,6 @@ const editing = ref(false)
 const editingFields = ref(false)
 const confirmingDelete = ref(false)
 const deleting = ref(false)
-const deleteError = ref('')
 
 async function onSaved(saved: CollectionSummary) {
   if (saved.slug !== slug.value) {
@@ -87,8 +87,6 @@ function chooseView(value: unknown) {
 const COVER_BATCH = 60
 const coverLimit = ref(COVER_BATCH)
 
-const itemError = ref('')
-
 // The loaded collection is held shallowly, so changes replace it rather
 // than editing it in place.
 function setItems(items: CollectionEntry[]) {
@@ -112,7 +110,6 @@ async function saveValue(
 ) {
   const item = data.value?.items.find((entry) => entry.id === itemId)
   if (!data.value || !item) return
-  itemError.value = ''
   const before = item.data
   setItemData(
     itemId,
@@ -129,7 +126,7 @@ async function saveValue(
     setItemData(itemId, saved.data)
   } catch {
     setItemData(itemId, before)
-    itemError.value = t('table.saveFailed')
+    toast.error(t('table.saveFailed'))
   }
 }
 
@@ -152,7 +149,6 @@ function onRenamed(saved: LibraryItem) {
 
 async function removeItem(itemId: string) {
   if (!data.value) return
-  itemError.value = ''
   const collectionId = data.value.id
   const before = data.value.items
   setItems(before.filter((entry) => entry.id !== itemId))
@@ -160,14 +156,13 @@ async function removeItem(itemId: string) {
     await collections.removeItem(collectionId, itemId)
   } catch {
     setItems(before)
-    itemError.value = t('table.removeFailed')
+    toast.error(t('table.removeFailed'))
   }
 }
 
 /** Puts a game in its new place straight away, undoing it if saving fails. */
 async function moveItem(itemId: string, afterItemId: string | null) {
   if (!data.value) return
-  itemError.value = ''
   const collectionId = data.value.id
   const before = data.value.items
   setItems(moveAfter(before, itemId, afterItemId))
@@ -175,7 +170,7 @@ async function moveItem(itemId: string, afterItemId: string | null) {
     await collections.moveItem(collectionId, itemId, afterItemId)
   } catch {
     setItems(before)
-    itemError.value = t('table.moveFailed')
+    toast.error(t('table.moveFailed'))
   }
 }
 
@@ -202,12 +197,11 @@ function onCoverDragged(event: { oldIndex?: number; newIndex?: number }) {
 async function deleteCollection() {
   if (!data.value) return
   deleting.value = true
-  deleteError.value = ''
   try {
     await collections.remove(data.value.id)
     await navigateTo(shelfPath.value)
   } catch {
-    deleteError.value = t('collection.deleteFailed')
+    toast.error(t('collection.deleteFailed'))
   } finally {
     deleting.value = false
   }
@@ -331,8 +325,6 @@ async function deleteCollection() {
         </div>
       </div>
 
-      <FormMessage v-if="deleteError">{{ deleteError }}</FormMessage>
-
       <div
         v-if="!data.items.length"
         class="rounded-lg border border-dashed py-12 text-center"
@@ -352,7 +344,6 @@ async function deleteCollection() {
 
       <template v-else>
         <div class="flex items-center justify-between gap-4">
-          <FormMessage v-if="itemError">{{ itemError }}</FormMessage>
           <ToggleGroup
             type="single"
             variant="outline"

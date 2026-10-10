@@ -166,9 +166,9 @@ test.describe('signed in', () => {
       .click()
     const menu = page.getByRole('menu')
     await menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }).click()
-    await expect(menu.getByRole('alert')).toHaveText(
-      "Couldn't save that change. Try again.",
-    )
+    await expect(
+      page.getByText("Couldn't save that change. Try again."),
+    ).toBeVisible()
     await expect(
       menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }),
     ).not.toBeChecked()

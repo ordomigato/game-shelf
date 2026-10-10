@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { toast } from 'vue-sonner'
 import type { CollectionSummary } from '#shared/types/collection'
 import type { GameSummary } from '#shared/types/game'
 
@@ -20,7 +21,6 @@ export function useTrackedGames(
   const collections = useCollections()
   const items = ref(new Map<number, string>())
   const saving = ref(new Set<number>())
-  const error = ref('')
   let checked = new Set<number>()
 
   async function check() {
@@ -48,7 +48,6 @@ export function useTrackedGames(
   function reset() {
     checked = new Set()
     items.value = new Map()
-    error.value = ''
   }
 
   onMounted(() => {
@@ -77,7 +76,6 @@ export function useTrackedGames(
     const collection = target.value
     if (!collection || saving.value.has(game.id)) return
     saving.value = new Set(saving.value).add(game.id)
-    error.value = ''
     const itemId = items.value.get(game.id)
     try {
       if (itemId) {
@@ -91,7 +89,7 @@ export function useTrackedGames(
       )
       items.value = new Map(items.value).set(game.id, added.item.id)
     } catch {
-      error.value = t('addToCollection.saveFailed')
+      toast.error(t('addToCollection.saveFailed'))
     } finally {
       const done = new Set(saving.value)
       done.delete(game.id)
@@ -99,5 +97,5 @@ export function useTrackedGames(
     }
   }
 
-  return { items, saving, error, mark, toggle }
+  return { items, saving, mark, toggle }
 }

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import type { Me } from '../../shared/types/user'
+import type { Me, PublicProfile } from '../../shared/types/user'
 import { users } from '../db/schema'
 import { ensureWishlist } from './collections'
 
@@ -34,6 +34,14 @@ export async function findUserByUsername(
     .from(users)
     .where(eq(users.username, username.toLowerCase()))
   return user
+}
+
+export function toPublicProfile(user: UserRow): PublicProfile {
+  return {
+    username: user.username!,
+    displayName: user.displayName,
+    memberSince: user.createdAt.toISOString(),
+  }
 }
 
 export function toMe(user: UserRow): Me {

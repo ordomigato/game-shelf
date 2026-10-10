@@ -267,7 +267,8 @@
     "emptyVisitor": "{username} hasn't shared any collections yet.",
     "loadFailed": "Couldn't load this shelf. Try again.",
     "retry": "Try again",
-    "wishlist": "Wishlist"
+    "wishlist": "Wishlist",
+    "memberSince": "Member since {date}"
   },
   "collection": {
     "back": "Back to {shelf}",
@@ -494,5 +495,22 @@
     "emptyRemoval": "Removing {name}. No games have a value for it.",
     "acknowledge": "I understand these values will be deleted",
     "deleteAndSave": "Delete values and save"
+  },
+  "visibility": {
+    "label": "Who can see this: {current}",
+    "privateHint": "Only you can see it.",
+    "publicHint": "Anyone with the link can see it, and it's listed on your shelf.",
+    "publicWishlistHint": "Anyone with the link can see it. Your other public collections also show which games are on it.",
+    "nowPublic": "Collection is now public",
+    "nowPrivate": "Collection is now private",
+    "failed": "Couldn't change who can see it. Try again."
+  },
+  "share": {
+    "button": "Share",
+    "copied": "Link copied",
+    "copyFailed": "Couldn't copy the link. Here it is: {url}",
+    "makePublicTitle": "Make it public to share?",
+    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your shelf. You can make it private again at any time.",
+    "makePublicConfirm": "Make public and share"
   }
 }

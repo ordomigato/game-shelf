@@ -15,13 +15,29 @@ const { data, status, error, refresh } = useAsyncData(
   { watch: [username] },
 )
 
+const { data: profile } = useAsyncData(
+  () => `profile-${username.value}`,
+  () => collections.profile(username.value),
+  { watch: [username] },
+)
+const { locale } = useI18n()
+const memberSince = computed(() =>
+  profile.value
+    ? new Intl.DateTimeFormat(locale.value, {
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date(profile.value.memberSince))
+    : '',
+)
+const shelfOwner = computed(() => profile.value?.displayName || username.value)
+
 const notFound = computed(() => error.value?.statusCode === 404)
 
 useHead(() => ({
   title: t('app.title', {
     page: isMine.value
       ? t('shelf.myTitle')
-      : t('shelf.userTitle', { username: username.value }),
+      : t('shelf.userTitle', { username: shelfOwner.value }),
   }),
 }))
 
@@ -41,15 +57,34 @@ async function onCreated(collection: CollectionSummary) {
 
     <template v-else>
       <div class="flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-3xl font-bold">
-          {{
-            isMine ? $t('shelf.myTitle') : $t('shelf.userTitle', { username })
-          }}
-        </h1>
-        <Button v-if="isMine" @click="creating = true">
-          <Plus />
-          {{ $t('shelf.newCollection') }}
-        </Button>
+        <div class="flex flex-col gap-1">
+          <h1 class="text-3xl font-bold">
+            {{
+              isMine
+                ? $t('shelf.myTitle')
+                : $t('shelf.userTitle', { username: shelfOwner })
+            }}
+          </h1>
+          <p v-if="profile" class="text-sm text-muted-foreground">
+            @{{ profile.username }} ·
+            {{ $t('shelf.memberSince', { date: memberSince }) }}
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <ShareButton
+            :path="`/u/${username}/shelf`"
+            :title="
+              isMine
+                ? $t('shelf.myTitle')
+                : $t('shelf.userTitle', { username: shelfOwner })
+            "
+            is-public
+          />
+          <Button v-if="isMine" @click="creating = true">
+            <Plus />
+            {{ $t('shelf.newCollection') }}
+          </Button>
+        </div>
       </div>
 
       <div

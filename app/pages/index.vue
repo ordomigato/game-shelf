@@ -19,12 +19,19 @@ const {
 } = useGameSearch()
 
 // Someone can type before the page has finished loading. Vue would reset the
-// box to empty when it takes over, so keep whatever was already typed.
+// box to empty when it takes over, so keep whatever was already typed, and
+// put it back once Vue has taken over. Putting it back any earlier changes
+// the page during the takeover (say, showing "type at least 2 characters"),
+// which Vue reports as a mismatch with the server's page.
+let typedEarly = ''
 onBeforeMount(() => {
   const field = document.getElementById(
     'game-search',
   ) as HTMLInputElement | null
-  if (field?.value && field.value !== input.value) input.value = field.value
+  typedEarly = field?.value ?? ''
+})
+onMounted(() => {
+  if (typedEarly && typedEarly !== input.value) input.value = typedEarly
 })
 
 // `?to=<slug>` searches on behalf of one of the user's collections: each

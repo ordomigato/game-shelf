@@ -186,3 +186,27 @@ test('show more adds the next page', async ({ page }) => {
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Show more' })).toBeHidden()
 })
+
+test('keeps a search typed before the page finished loading', async ({
+  page,
+}) => {
+  await stubSearch(page, (_q, pageNumber) => ({
+    body: { games: makeGames(2), page: pageNumber, hasMore: false },
+  }))
+  let releaseScripts!: () => void
+  const scriptsHeld = new Promise<void>((resolve) => (releaseScripts = resolve))
+  await page.route('**/_nuxt/**', async (route) => {
+    if (route.request().resourceType() === 'script') await scriptsHeld
+    await route.continue()
+  })
+
+  await page.goto('/', { waitUntil: 'commit' })
+  const box = page.getByRole('searchbox', { name: 'Search games' })
+  await box.fill('zelda')
+  releaseScripts()
+
+  await expect(
+    page.getByRole('heading', { name: 'Zelda Game 1' }),
+  ).toBeVisible()
+  await expect(box).toHaveValue('zelda')
+})

@@ -124,3 +124,23 @@ export interface CollectionDetail extends CollectionSummary {
   /** Whether the person viewing is the owner (and can edit). */
   isOwner: boolean
 }
+
+/** A public collection as listed on Explore. */
+export interface ExploreCollection {
+  id: string
+  title: string
+  slug: string
+  kind: CollectionKind
+  description: string | null
+  itemCount: number
+  /** When it last changed or had a game added, as an ISO timestamp. */
+  activeAt: string
+  owner: { username: string; displayName: string | null }
+  /** Up to four of its first games, for a strip of covers. */
+  preview: { name: string; coverId: string | null }[]
+}
+
+export interface ExplorePage {
+  collections: ExploreCollection[]
+  hasMore: boolean
+}

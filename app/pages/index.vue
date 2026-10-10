@@ -103,6 +103,16 @@ const showTooShort = computed(
     input.value.trim().length > 0 &&
     input.value.trim().length < MIN_SEARCH_LENGTH,
 )
+// Rendered on the server, so a link to GameShelf says what it is.
+useSeoMeta({
+  description: () => t('preview.site'),
+  ogSiteName: 'GameShelf',
+  ogType: 'website',
+  ogTitle: 'GameShelf',
+  ogDescription: () => t('preview.site'),
+  twitterCard: 'summary',
+})
+
 const resultsLabel = computed(() => {
   if (!isSearchable.value || status.value !== 'success') return ''
   return t(

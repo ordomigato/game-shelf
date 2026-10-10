@@ -12,6 +12,10 @@ const srcset = computed(() =>
     ? `${igdbImageUrl(props.coverId, 'cover_big')} 1x, ${igdbImageUrl(props.coverId, 'cover_big_2x')} 2x`
     : undefined,
 )
+const generated = computed(() => {
+  const { from, to } = generatedCoverColors(props.name)
+  return { backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }
+})
 </script>
 
 <template>
@@ -27,10 +31,7 @@ const srcset = computed(() =>
       decoding="async"
       class="size-full object-cover"
     />
-    <div
-      v-else
-      class="flex size-full items-end bg-gradient-to-br from-shelf to-masthead p-3"
-    >
+    <div v-else class="flex size-full items-end p-3" :style="generated">
       <span
         class="line-clamp-4 font-heading text-lg leading-tight font-bold text-white"
       >

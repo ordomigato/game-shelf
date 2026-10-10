@@ -435,3 +435,25 @@ export async function updateItemValues(
     .returning()
   return toLibraryItem(updated!)
 }
+
+/**
+ * Which of the given IGDB games are in at least one of the user's
+ * collections. Lets search results mark games the user already tracks.
+ */
+export async function trackedIgdbIds(
+  ownerId: string,
+  igdbIds: number[],
+): Promise<number[]> {
+  if (igdbIds.length === 0) return []
+  const rows = await useDb()
+    .selectDistinct({ igdbId: libraryItems.igdbId })
+    .from(libraryItems)
+    .innerJoin(collectionItems, eq(collectionItems.itemId, libraryItems.id))
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        inArray(libraryItems.igdbId, igdbIds),
+      ),
+    )
+  return rows.flatMap((row) => (row.igdbId === null ? [] : [row.igdbId]))
+}

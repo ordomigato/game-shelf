@@ -24,6 +24,43 @@ onBeforeMount(() => {
   if (field?.value && field.value !== input.value) input.value = field.value
 })
 
+// Mark results the signed-in user already has. Checked in the browser only,
+// after the page has hydrated, and only for games not checked yet.
+const auth = useAuth()
+const collections = useCollections()
+const trackedIds = ref(new Set<number>())
+const checkedIds = new Set<number>()
+
+async function checkTracked() {
+  await auth.ensureLoaded()
+  if (auth.status.value !== 'signedIn') return
+  const ids = games.value
+    .map((game) => game.id)
+    .filter((id) => !checkedIds.has(id))
+  if (!ids.length) return
+  ids.forEach((id) => checkedIds.add(id))
+  try {
+    const tracked = await collections.tracked(ids)
+    trackedIds.value = new Set([...trackedIds.value, ...tracked])
+  } catch {
+    // Only a hint. The menu loads the real state when opened.
+    ids.forEach((id) => checkedIds.delete(id))
+  }
+}
+
+function setTracked(id: number, tracked: boolean) {
+  const next = new Set(trackedIds.value)
+  if (tracked) next.add(id)
+  else next.delete(id)
+  trackedIds.value = next
+}
+
+onMounted(() => {
+  onNuxtReady(() => {
+    watch(games, () => void checkTracked(), { immediate: true })
+  })
+})
+
 const showSkeletons = computed(
   () => isSearchable.value && status.value === 'pending' && !games.value.length,
 )
@@ -115,7 +152,11 @@ const resultsLabel = computed(() => {
         :class="{ 'opacity-60 transition-opacity': status === 'pending' }"
       >
         <li v-for="game in games" :key="game.id">
-          <GameCard :game="game" />
+          <GameCard
+            :game="game"
+            :tracked="trackedIds.has(game.id)"
+            @update:tracked="setTracked(game.id, $event)"
+          />
         </li>
       </ul>
       <div v-if="hasMore" class="mt-10 text-center">

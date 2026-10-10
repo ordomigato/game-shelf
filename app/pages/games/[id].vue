@@ -23,6 +23,24 @@ useHead(() => ({
   title: game.value ? t('app.title', { page: game.value.name }) : 'GameShelf',
 }))
 
+// Show whether the game is already in a collection. Browser only, once the
+// page has hydrated, so the server-rendered button never changes under Vue.
+const auth = useAuth()
+const collections = useCollections()
+const tracked = ref(false)
+onMounted(() => {
+  onNuxtReady(async () => {
+    await auth.ensureLoaded()
+    if (auth.status.value !== 'signedIn' || !game.value) return
+    try {
+      const membership = await collections.membership(game.value.id)
+      tracked.value = membership.collectionIds.length > 0
+    } catch {
+      // Only a hint. The menu loads the real state when opened.
+    }
+  })
+})
+
 function goBack() {
   if (window.history.state?.back) router.back()
   else void navigateTo('/')
@@ -58,6 +76,16 @@ function goBack() {
               })
             }}
           </p>
+          <div class="mt-4">
+            <AddToCollectionMenu
+              v-model:tracked="tracked"
+              :game="{
+                igdbId: game.id,
+                name: game.name,
+                coverId: game.coverId,
+              }"
+            />
+          </div>
         </div>
 
         <dl class="grid gap-4 text-sm sm:grid-cols-2">

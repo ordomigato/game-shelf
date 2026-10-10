@@ -279,5 +279,14 @@
     "cancel": "Cancel",
     "deleteFailed": "Couldn't delete the collection. Try again.",
     "loadFailed": "Couldn't load this collection. Try again."
+  },
+  "addToCollection": {
+    "button": "Add to collection",
+    "inCollections": "In your collections",
+    "heading": "Add to",
+    "loading": "Loading your collections…",
+    "loadFailed": "Couldn't load your collections. Try again.",
+    "saveFailed": "Couldn't save that change. Try again.",
+    "newCollection": "New collection…"
   }
 }

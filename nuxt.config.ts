@@ -63,11 +63,17 @@ export default defineNuxtConfig({
     public: {
       cognitoUserPoolId: '',
       cognitoClientId: '',
+      // Share of visits that report Core Web Vitals (0 to 1). Set with
+      // NUXT_PUBLIC_VITALS_SAMPLE_RATE.
+      vitalsSampleRate: 0.25,
     },
   },
   nitro: {
     // E2E tests build with NITRO_PRESET=node-server so they can run locally.
     preset: process.env.NITRO_PRESET ?? 'aws-lambda',
+    // Lets server code find the current request (useEvent), so database and
+    // IGDB time can be added to the request's log line.
+    experimental: { asyncContext: true },
     typescript: {
       tsConfig: {
         include: ['../sst-env.d.ts'],

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Request timing reads Nitro's request context, which tests don't have.
+vi.mock('./request-timing', () => ({ recordTiming: vi.fn() }))
+
 vi.mock('sst', () => ({
   Resource: {
     TwitchClientId: { value: 'client-id' },

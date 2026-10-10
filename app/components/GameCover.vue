@@ -1,14 +1,23 @@
 <script setup lang="ts">
-const props = defineProps<{
-  name: string
-  coverId: string | null
-}>()
-
-const src = computed(() =>
-  props.coverId ? igdbImageUrl(props.coverId, 'cover_big') : null,
+const props = withDefaults(
+  defineProps<{
+    name: string
+    coverId: string | null
+    /** `thumb` is a small cover next to a name, as in the table. */
+    size?: 'full' | 'thumb'
+  }>(),
+  { size: 'full' },
 )
+
+const src = computed(() => {
+  if (!props.coverId) return null
+  return igdbImageUrl(
+    props.coverId,
+    props.size === 'thumb' ? 'cover_small' : 'cover_big',
+  )
+})
 const srcset = computed(() =>
-  props.coverId
+  props.coverId && props.size === 'full'
     ? `${igdbImageUrl(props.coverId, 'cover_big')} 1x, ${igdbImageUrl(props.coverId, 'cover_big_2x')} 2x`
     : undefined,
 )
@@ -20,19 +29,27 @@ const generated = computed(() => {
 
 <template>
   <div
-    class="relative aspect-[3/4] overflow-hidden rounded-md bg-muted shadow-sm ring-1 ring-border"
+    class="relative aspect-[3/4] overflow-hidden bg-muted ring-1 ring-border"
+    :class="size === 'thumb' ? 'rounded-sm' : 'rounded-md shadow-sm'"
   >
     <img
       v-if="src"
       :src="src"
       :srcset="srcset"
-      :alt="$t('game.coverAlt', { name })"
+      :alt="size === 'thumb' ? '' : $t('game.coverAlt', { name })"
       loading="lazy"
       decoding="async"
       class="size-full object-cover"
     />
-    <div v-else class="flex size-full items-end p-3" :style="generated">
+    <!-- A thumbnail sits next to the name, so it skips the title. -->
+    <div
+      v-else
+      class="flex size-full items-end p-3"
+      :style="generated"
+      aria-hidden="true"
+    >
       <span
+        v-if="size === 'full'"
         class="line-clamp-4 font-heading text-lg leading-tight font-bold text-white"
       >
         {{ name }}

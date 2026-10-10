@@ -279,7 +279,11 @@
     "cancel": "Cancel",
     "deleteFailed": "Couldn't delete the collection. Try again.",
     "loadFailed": "Couldn't load this collection. Try again.",
-    "addGames": "Add games"
+    "addGames": "Add games",
+    "view": "View",
+    "table": "Table",
+    "covers": "Covers",
+    "showMore": "Show more"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -294,5 +298,33 @@
     "done": "Done",
     "addTo": "Add {name} to {collection}",
     "removeFrom": "Remove {name} from {collection}"
+  },
+  "table": {
+    "name": "Name",
+    "added": "Added",
+    "search": "Search this collection",
+    "filter": "Filter",
+    "clearFilters": "Clear",
+    "showing": "Showing {shown} of {total}",
+    "ticked": "Ticked",
+    "notTicked": "Not ticked",
+    "actions": "Actions",
+    "rowActions": "Actions for {name}",
+    "remove": "Remove from collection",
+    "noMatches": "No games match. Try another search or clear the filters.",
+    "editValue": "{field} for {name}",
+    "empty": "empty",
+    "none": "None",
+    "yes": "Yes",
+    "rate": "{count} star | {count} stars",
+    "stars": "{count} star | {count} stars",
+    "noRating": "Not rated",
+    "saveFailed": "Couldn't save that change. Try again.",
+    "removeFailed": "Couldn't remove that game. Try again.",
+    "pages": "Pages",
+    "perPage": "Per page",
+    "range": "{first}–{last} of {total}",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
   }
 }

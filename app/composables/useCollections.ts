@@ -2,6 +2,7 @@ import { ofetch } from 'ofetch'
 import type {
   CollectionDetail,
   CollectionSummary,
+  FieldValue,
   LibraryItem,
 } from '#shared/types/collection'
 import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
@@ -97,6 +98,17 @@ export function useCollections() {
       auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
         method: 'PUT',
       }),
+
+    /** Sets an item's values for a collection's fields. `null` clears. */
+    updateValues: (
+      collectionId: string,
+      itemId: string,
+      values: Record<string, FieldValue | null>,
+    ) =>
+      auth.apiFetch<LibraryItem>(
+        `/api/collections/${collectionId}/items/${itemId}`,
+        { method: 'PATCH', body: { values } },
+      ),
 
     removeItem: (collectionId: string, itemId: string) =>
       auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {

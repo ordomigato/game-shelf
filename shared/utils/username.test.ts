@@ -13,13 +13,18 @@ describe('usernameProblem', () => {
   })
 
   it('rejects names that are too short or too long', () => {
-    expect(usernameProblem('ab')).toMatch(/at least 3/)
-    expect(usernameProblem('a'.repeat(21))).toMatch(/at most 20/)
+    expect(usernameProblem('ab')).toEqual({
+      key: 'username.problems.tooShort',
+      params: { min: 3 },
+    })
+    expect(usernameProblem('a'.repeat(21))?.key).toBe(
+      'username.problems.tooLong',
+    )
   })
 
   it('rejects other characters', () => {
-    expect(usernameProblem('jeremy-g')).toMatch(/letters, numbers/)
-    expect(usernameProblem('jérémy')).toMatch(/letters, numbers/)
-    expect(usernameProblem('a b c')).toMatch(/letters, numbers/)
+    for (const name of ['jeremy-g', 'jérémy', 'a b c']) {
+      expect(usernameProblem(name)?.key).toBe('username.problems.characters')
+    }
   })
 })

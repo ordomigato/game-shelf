@@ -19,13 +19,17 @@ describe('newPasswordProblem', () => {
   })
 
   it('reports missing rules before a mismatch', () => {
-    expect(newPasswordProblem('short', 'other')).toMatch(/at least 8/)
-    expect(newPasswordProblem('abcdefg1', 'abcdefg1')).toMatch(/capital/)
+    expect(newPasswordProblem('short', 'other')?.key).toBe(
+      'password.problems.rules',
+    )
+    expect(newPasswordProblem('abcdefg1', 'abcdefg1')?.key).toBe(
+      'password.problems.rules',
+    )
   })
 
   it('reports a mismatch', () => {
-    expect(newPasswordProblem('Abcdefg1', 'Abcdefg2')).toBe(
-      "The passwords don't match.",
+    expect(newPasswordProblem('Abcdefg1', 'Abcdefg2')?.key).toBe(
+      'password.problems.mismatch',
     )
   })
 })

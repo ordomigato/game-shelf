@@ -9,12 +9,13 @@ import { Monitor, Moon, Sun } from '@lucide/vue'
  */
 export interface ThemeOption {
   id: string
-  label: string
+  /** i18n key for the theme's name. */
+  labelKey: string
   icon: Component
 }
 
 export const themes: ThemeOption[] = [
-  { id: 'system', label: 'System', icon: Monitor },
-  { id: 'light', label: 'Light', icon: Sun },
-  { id: 'dark', label: 'Dark', icon: Moon },
+  { id: 'system', labelKey: 'theme.system', icon: Monitor },
+  { id: 'light', labelKey: 'theme.light', icon: Sun },
+  { id: 'dark', labelKey: 'theme.dark', icon: Moon },
 ]

@@ -40,7 +40,7 @@ const hiddenPlatforms = computed(() =>
       <ul
         v-if="game.platforms.length"
         class="flex flex-wrap gap-1"
-        aria-label="Platforms"
+        :aria-label="$t('game.platforms')"
       >
         <li
           v-for="platform in visiblePlatforms"
@@ -55,7 +55,9 @@ const hiddenPlatforms = computed(() =>
               <button
                 type="button"
                 class="rounded-4xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :aria-label="`Show ${platforms.hiddenCount} more platform${platforms.hiddenCount === 1 ? '' : 's'}`"
+                :aria-label="
+                  $t('game.showMorePlatforms', platforms.hiddenCount)
+                "
                 @click="expanded = true"
               >
                 <Badge

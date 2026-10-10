@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'guest' })
-useHead({ title: 'Sign in · GameShelf' })
+
+const { t } = useI18n()
+useHead(() => ({ title: t('app.title', { page: t('signIn.pageTitle') }) }))
 
 const route = useRoute()
 const auth = useAuth()
@@ -10,10 +12,8 @@ const error = ref('')
 const submitting = ref(false)
 
 const notice = computed(() => {
-  if (route.query.verified)
-    return 'Your email is verified. Sign in to continue.'
-  if (route.query.reset)
-    return 'Your password is changed. Sign in with the new one.'
+  if (route.query.verified) return t('signIn.verified')
+  if (route.query.reset) return t('signIn.passwordChanged')
   return ''
 })
 
@@ -37,7 +37,7 @@ async function submit() {
       await navigateTo(redirect)
     }
   } catch (e) {
-    error.value = authErrorMessage(e)
+    error.value = t(authErrorKey(e))
   } finally {
     submitting.value = false
   }
@@ -45,12 +45,12 @@ async function submit() {
 </script>
 
 <template>
-  <AuthCard title="Sign in" description="Welcome back to your shelf.">
+  <AuthCard :title="$t('signIn.title')" :description="$t('signIn.description')">
     <form class="flex flex-col gap-4" @submit.prevent="submit">
       <FormMessage v-if="notice" tone="success">{{ notice }}</FormMessage>
       <FormMessage v-if="error">{{ error }}</FormMessage>
       <div class="flex flex-col gap-2">
-        <Label for="email">Email</Label>
+        <Label for="email">{{ $t('fields.email') }}</Label>
         <Input
           id="email"
           v-model="email"
@@ -61,12 +61,12 @@ async function submit() {
       </div>
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
-          <Label for="password">Password</Label>
+          <Label for="password">{{ $t('fields.password') }}</Label>
           <NuxtLink
             to="/forgot-password"
             class="text-sm text-primary hover:underline"
           >
-            Forgot password?
+            {{ $t('signIn.forgotPassword') }}
           </NuxtLink>
         </div>
         <PasswordInput
@@ -76,14 +76,14 @@ async function submit() {
         />
       </div>
       <Button type="submit" :disabled="submitting">
-        {{ submitting ? 'Signing in…' : 'Sign in' }}
+        {{ submitting ? $t('signIn.submitting') : $t('signIn.submit') }}
       </Button>
     </form>
     <template #footer>
       <p>
-        New to GameShelf?
+        {{ $t('signIn.newHere') }}
         <NuxtLink to="/signup" class="font-medium text-primary hover:underline">
-          Create an account
+          {{ $t('signIn.createAccount') }}
         </NuxtLink>
       </p>
     </template>

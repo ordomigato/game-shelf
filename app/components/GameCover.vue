@@ -22,7 +22,7 @@ const srcset = computed(() =>
       v-if="src"
       :src="src"
       :srcset="srcset"
-      :alt="`Cover of ${name}`"
+      :alt="$t('game.coverAlt', { name })"
       loading="lazy"
       decoding="async"
       class="size-full object-cover"

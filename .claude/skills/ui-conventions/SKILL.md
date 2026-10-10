@@ -63,6 +63,9 @@ that when the first one lands.
 
 ## Vue and Nuxt idiom
 
+- No hard-coded user-facing text, including aria-labels and alt text. Use
+  `$t()` and add the message to `i18n/locales/en.json`. See `i18n`.
+
 - `<script setup lang="ts">` only. No Options API, no Vuex. Shared state is
   a composable (`useState` or a module-level `ref`), not a store library,
   unless the user asks for one.

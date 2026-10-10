@@ -1,6 +1,10 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'guest' })
-useHead({ title: 'Reset your password · GameShelf' })
+
+const { t } = useI18n()
+useHead(() => ({
+  title: t('app.title', { page: t('resetPassword.pageTitle') }),
+}))
 
 const auth = useAuth()
 const step = ref<'email' | 'reset'>('email')
@@ -18,17 +22,17 @@ async function sendCode() {
     await auth.requestPasswordReset(email.value.trim())
     step.value = 'reset'
   } catch (e) {
-    error.value = authErrorMessage(e)
+    error.value = t(authErrorKey(e))
   } finally {
     submitting.value = false
   }
 }
 
 async function reset() {
-  error.value =
-    code.value.length === 6 ? '' : 'Enter the 6-digit code from the email.'
-  error.value ||=
-    newPasswordProblem(newPassword.value, confirmation.value) ?? ''
+  const problem = newPasswordProblem(newPassword.value, confirmation.value)
+  if (code.value.length !== 6) error.value = t('resetPassword.codeMissing')
+  else if (problem) error.value = t(problem.key, problem.params ?? {})
+  else error.value = ''
   if (error.value) return
   submitting.value = true
   try {
@@ -39,7 +43,7 @@ async function reset() {
     )
     await navigateTo({ path: '/login', query: { reset: '1' } })
   } catch (e) {
-    error.value = authErrorMessage(e)
+    error.value = t(authErrorKey(e))
   } finally {
     submitting.value = false
   }
@@ -48,11 +52,11 @@ async function reset() {
 
 <template>
   <AuthCard
-    title="Reset your password"
+    :title="$t('resetPassword.title')"
     :description="
       step === 'email'
-        ? 'Enter your email and we will send you a code.'
-        : `If an account exists for ${email.trim()}, we sent it a 6-digit code. Enter it with a new password.`
+        ? $t('resetPassword.askEmail')
+        : $t('resetPassword.codeSent', { email: email.trim() })
     "
   >
     <form
@@ -62,7 +66,7 @@ async function reset() {
     >
       <FormMessage v-if="error">{{ error }}</FormMessage>
       <div class="flex flex-col gap-2">
-        <Label for="email">Email</Label>
+        <Label for="email">{{ $t('fields.email') }}</Label>
         <Input
           id="email"
           v-model="email"
@@ -72,28 +76,32 @@ async function reset() {
         />
       </div>
       <Button type="submit" :disabled="submitting">
-        {{ submitting ? 'Sending…' : 'Send code' }}
+        {{
+          submitting
+            ? $t('resetPassword.sending')
+            : $t('resetPassword.sendCode')
+        }}
       </Button>
     </form>
     <form v-else class="flex flex-col gap-4" @submit.prevent="reset">
       <FormMessage v-if="error">{{ error }}</FormMessage>
       <div class="flex flex-col gap-2">
-        <Label>Code</Label>
+        <Label>{{ $t('fields.code') }}</Label>
         <CodeInput v-model="code" />
       </div>
       <NewPasswordFields
         v-model:password="newPassword"
         v-model:confirmation="confirmation"
-        label="New password"
+        :label="$t('fields.newPassword')"
       />
       <Button type="submit" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Save new password' }}
+        {{ submitting ? $t('resetPassword.saving') : $t('resetPassword.save') }}
       </Button>
     </form>
     <template #footer>
-      <NuxtLink to="/login" class="text-primary hover:underline"
-        >Back to sign in</NuxtLink
-      >
+      <NuxtLink to="/login" class="text-primary hover:underline">
+        {{ $t('resetPassword.backToSignIn') }}
+      </NuxtLink>
     </template>
   </AuthCard>
 </template>

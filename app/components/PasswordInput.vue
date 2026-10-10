@@ -24,7 +24,9 @@ const visible = ref(false)
     <button
       type="button"
       class="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      :aria-label="visible ? 'Hide password' : 'Show password'"
+      :aria-label="
+        visible ? $t('fields.hidePassword') : $t('fields.showPassword')
+      "
       :aria-pressed="visible"
       @click="visible = !visible"
     >

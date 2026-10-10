@@ -1,5 +1,8 @@
 <script setup lang="ts">
-useHead({ title: 'Settings · GameShelf' })
+const { t } = useI18n()
+useHead(() => ({
+  title: t('app.title', { page: t('account.settings.pageTitle') }),
+}))
 
 const auth = useAuth()
 const error = ref('')
@@ -12,7 +15,7 @@ async function deleteAccount() {
     await auth.deleteAccount()
     await navigateTo('/')
   } catch {
-    error.value = "We couldn't delete your account. Try again."
+    error.value = t('account.settings.deleteFailed')
   } finally {
     deleting.value = false
   }
@@ -22,38 +25,42 @@ async function deleteAccount() {
 <template>
   <Card class="border-destructive/40">
     <CardHeader>
-      <CardTitle
-        ><h2 class="text-lg font-semibold">Delete account</h2></CardTitle
-      >
-      <CardDescription>
-        This deletes your account, your collections and everything in them. It
-        can't be undone.
-      </CardDescription>
+      <CardTitle>
+        <h2 class="text-lg font-semibold">
+          {{ $t('account.settings.deleteTitle') }}
+        </h2>
+      </CardTitle>
+      <CardDescription>{{
+        $t('account.settings.deleteDescription')
+      }}</CardDescription>
     </CardHeader>
     <CardContent class="flex flex-col gap-4">
       <FormMessage v-if="error">{{ error }}</FormMessage>
       <AlertDialog>
         <AlertDialogTrigger as-child>
-          <Button variant="destructive" class="self-start"
-            >Delete account</Button
-          >
+          <Button variant="destructive" class="self-start">
+            {{ $t('account.settings.deleteButton') }}
+          </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogTitle>{{
+              $t('account.settings.confirmTitle')
+            }}</AlertDialogTitle>
             <AlertDialogDescription>
-              Your account, collections and everything in them will be deleted.
-              This can't be undone.
+              {{ $t('account.settings.confirmBody') }}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep my account</AlertDialogCancel>
+            <AlertDialogCancel>{{
+              $t('account.settings.keep')
+            }}</AlertDialogCancel>
             <AlertDialogAction
               class="bg-destructive text-white hover:bg-destructive/90"
               :disabled="deleting"
               @click="deleteAccount"
             >
-              Delete account
+              {{ $t('account.settings.deleteButton') }}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -96,6 +96,21 @@ export function useCollections() {
         { method: 'POST', body: { ...game, collectionIds } },
       ),
 
+    /** Adds a game IGDB doesn't have, by name, to one collection. */
+    addManualGame: (name: string, collectionId: string) =>
+      auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
+        '/api/library-items',
+        {
+          method: 'POST',
+          body: {
+            igdbId: null,
+            name,
+            coverId: null,
+            collectionIds: [collectionId],
+          },
+        },
+      ),
+
     addItem: (collectionId: string, itemId: string) =>
       auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
         method: 'PUT',

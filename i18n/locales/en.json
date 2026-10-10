@@ -284,7 +284,8 @@
     "table": "Table",
     "covers": "Covers",
     "showMore": "Show more",
-    "editFields": "Edit fields"
+    "editFields": "Edit fields",
+    "addByHand": "Add by hand"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -418,5 +419,18 @@
     "save": "Save",
     "saving": "Saving…",
     "failed": "Couldn't rename the game. Try again."
+  },
+  "byHand": {
+    "title": "Add a game by hand",
+    "description": "For games IGDB doesn't have, like homebrew or bootlegs. It goes into {collection}, with a cover made from its name.",
+    "name": "Name",
+    "namePlaceholder": "Game name",
+    "cancel": "Cancel",
+    "add": "Add game",
+    "adding": "Adding…",
+    "failed": "Couldn't add the game. Try again.",
+    "added": "Added {name} to {collection}",
+    "notFound": "Can't find it?",
+    "addItByHand": "Add it by hand"
   }
 }

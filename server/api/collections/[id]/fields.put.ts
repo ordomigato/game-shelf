@@ -13,6 +13,9 @@ const bodySchema = z.object({
         type: z.enum(FIELD_TYPES as [string, ...string[]]),
         options: z.array(z.string().max(200)).max(100).optional(),
         currency: z.string().max(3).optional(),
+        scale: z
+          .union([z.literal(5), z.literal(10), z.literal(100)])
+          .optional(),
       }),
     )
     .max(MAX_FIELDS),

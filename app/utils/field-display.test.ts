@@ -30,6 +30,7 @@ describe('formatFieldValue', () => {
   it('shows text, selects, ratings and checkboxes as they are', () => {
     expect(formatFieldValue(field('text'), 'Mint')).toBe('Mint')
     expect(formatFieldValue(field('rating'), 4)).toBe('4')
+    expect(formatFieldValue({ ...field('rating'), scale: 10 }, 8)).toBe('8/10')
     expect(formatFieldValue(field('checkbox'), true)).toBe('true')
   })
 })

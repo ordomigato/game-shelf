@@ -37,6 +37,24 @@ describe('normalizeFieldValue', () => {
   })
 })
 
+describe('normalizeFieldValue for scores', () => {
+  const stars = { id: 'r', name: 'Rating', type: 'rating' as const }
+  it('takes whole stars from 1 to 5 by default', () => {
+    expect(normalizeFieldValue(stars, 5)).toBe(5)
+    expect(normalizeFieldValue(stars, 0)).toBeUndefined()
+    expect(normalizeFieldValue(stars, 6)).toBeUndefined()
+    expect(normalizeFieldValue(stars, 2.5)).toBeUndefined()
+  })
+
+  it('takes 0 up to a larger scale', () => {
+    const outOf10 = { ...stars, scale: 10 as const }
+    expect(normalizeFieldValue(outOf10, 0)).toBe(0)
+    expect(normalizeFieldValue(outOf10, 10)).toBe(10)
+    expect(normalizeFieldValue(outOf10, 11)).toBeUndefined()
+    expect(normalizeFieldValue({ ...stars, scale: 100 as const }, 85)).toBe(85)
+  })
+})
+
 describe('normalizeFieldValue for multiple choice', () => {
   const genres = {
     id: 'g',

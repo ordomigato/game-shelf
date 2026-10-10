@@ -41,6 +41,11 @@ export function formatFieldValue(
       ).format(Number(value))
     case 'progress':
       return `${value}%`
+    case 'rating':
+      // Stars draw themselves. Other scales read as "8/10".
+      return (field.scale ?? 5) === 5
+        ? String(value)
+        : `${value}/${field.scale}`
     case 'date':
       return formatReleaseDate(String(value), locale)
     default:

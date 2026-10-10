@@ -49,12 +49,16 @@ export function normalizeFieldValue(
       return typeof value === 'number' && Number.isFinite(value) && value >= 0
         ? Math.round(value * 100) / 100
         : undefined
-    case 'rating':
+    case 'rating': {
+      // Stars start at one. Scores out of 10 or 100 can be zero.
+      const scale = field.scale ?? 5
+      const lowest = scale === 5 ? 1 : 0
       return Number.isInteger(value) &&
-        (value as number) >= 1 &&
-        (value as number) <= 5
+        (value as number) >= lowest &&
+        (value as number) <= scale
         ? (value as number)
         : undefined
+    }
     case 'progress':
       return typeof value === 'number' && value >= 0 && value <= 100
         ? Math.round(value)

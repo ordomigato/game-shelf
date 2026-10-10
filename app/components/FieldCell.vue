@@ -30,14 +30,22 @@ const editLabel = computed(() =>
 const NONE = '__none__'
 
 const editing = ref(false)
-const draft = ref('')
+// Number inputs hand back numbers, text inputs strings.
+const draft = ref<string | number>('')
 const input = useTemplateRef<{ $el: HTMLInputElement }>('input')
+const hintId = useId()
+
+/** A score out of 5 shows stars. Out of 10 or 100, it edits like a number. */
+const isStars = computed(
+  () => props.field.type === 'rating' && (props.field.scale ?? 5) === 5,
+)
 
 const inputType = computed(() => {
   switch (props.field.type) {
     case 'number':
     case 'currency':
     case 'progress':
+    case 'rating':
       return 'number'
     case 'date':
       return 'date'
@@ -54,21 +62,60 @@ async function startEditing() {
   input.value?.$el.select?.()
 }
 
-/** The draft as a value to save, null to clear, or undefined if invalid. */
-function parseDraft(): FieldValue | null | undefined {
-  const raw = draft.value.trim()
+/**
+ * The draft as it would be stored (rounded where the field rounds), null to
+ * clear, or undefined when it doesn't fit the field.
+ */
+const parsed = computed((): FieldValue | null | undefined => {
+  const raw = String(draft.value).trim()
   if (raw === '') return null
-  if (inputType.value !== 'number') return raw
+  if (inputType.value !== 'number') return normalizeFieldValue(props.field, raw)
   const number = Number(raw)
-  return Number.isFinite(number) ? number : undefined
+  return Number.isFinite(number)
+    ? normalizeFieldValue(props.field, number)
+    : undefined
+})
+
+/** What the box takes, shown when the draft doesn't fit. */
+const hint = computed(() => {
+  if (parsed.value !== undefined) return ''
+  switch (props.field.type) {
+    case 'rating':
+      return t('table.hints.score', { max: props.field.scale ?? 5 })
+    case 'progress':
+      return t('table.hints.percentage')
+    case 'currency':
+      return t('table.hints.amount')
+    case 'number':
+      return t('table.hints.number')
+    default:
+      return t('table.hints.text')
+  }
+})
+
+/** Shown after the box, so it's clear what a number means. */
+const suffix = computed(() => {
+  if (props.field.type === 'progress') return '%'
+  if (props.field.type === 'rating') return `/ ${props.field.scale ?? 5}`
+  return ''
+})
+
+/** Saves on Enter. A value that doesn't fit stays open with its hint. */
+function commit() {
+  if (!editing.value || parsed.value === undefined) return
+  finish(parsed.value)
 }
 
-function commit() {
+/** Leaving the box saves a value that fits and puts back one that doesn't. */
+function onBlur() {
   if (!editing.value) return
+  if (parsed.value === undefined) cancel()
+  else finish(parsed.value)
+}
+
+function finish(next: FieldValue | null) {
   editing.value = false
-  const next = parseDraft()
-  if (next === undefined || next === (props.value ?? null)) return
-  emit('save', next)
+  if (next !== (props.value ?? null)) emit('save', next)
 }
 
 function cancel() {
@@ -115,7 +162,7 @@ function choose(option: unknown) {
 
   <!-- Rating: click a star to rate, click the same star again to clear -->
   <div
-    v-else-if="field.type === 'rating'"
+    v-else-if="isStars"
     class="flex items-center"
     :role="editable ? 'group' : 'img'"
     :aria-label="
@@ -222,22 +269,59 @@ function choose(option: unknown) {
 
   <!-- Text, number, currency, date and progress -->
   <template v-else>
-    <Input
-      v-if="editing"
-      ref="input"
-      v-model="draft"
-      :type="inputType"
-      :step="field.type === 'currency' ? '0.01' : 'any'"
-      :min="
-        field.type === 'currency' || field.type === 'progress' ? 0 : undefined
-      "
-      :max="field.type === 'progress' ? 100 : undefined"
-      :aria-label="editLabel"
-      class="h-8 min-w-32"
-      @keydown.enter.prevent="commit"
-      @keydown.escape.prevent="cancel"
-      @blur="commit"
-    />
+    <template v-if="editing">
+      <!--
+        The hint floats outside the table, which would otherwise clip it on
+        the last row. Screen readers get the hidden copy below instead.
+      -->
+      <Tooltip :open="Boolean(hint)">
+        <TooltipTrigger as-child>
+          <div class="flex items-center gap-1.5">
+            <Input
+              ref="input"
+              v-model="draft"
+              :type="inputType"
+              :step="
+                field.type === 'currency'
+                  ? '0.01'
+                  : field.type === 'rating'
+                    ? '1'
+                    : 'any'
+              "
+              :min="
+                ['currency', 'progress', 'rating'].includes(field.type)
+                  ? 0
+                  : undefined
+              "
+              :max="
+                field.type === 'progress'
+                  ? 100
+                  : field.type === 'rating'
+                    ? (field.scale ?? 5)
+                    : undefined
+              "
+              :aria-label="editLabel"
+              :aria-invalid="Boolean(hint)"
+              :aria-describedby="hint ? hintId : undefined"
+              class="h-8 min-w-24"
+              @keydown.enter.prevent="commit"
+              @keydown.escape.prevent="cancel"
+              @blur="onBlur"
+            />
+            <span
+              v-if="suffix"
+              class="shrink-0 text-muted-foreground tabular-nums"
+              aria-hidden="true"
+              >{{ suffix }}</span
+            >
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" align="start" aria-hidden="true">{{
+          hint
+        }}</TooltipContent>
+      </Tooltip>
+      <span :id="hintId" class="sr-only">{{ hint }}</span>
+    </template>
     <component
       :is="editable ? 'button' : 'div'"
       v-else
@@ -249,7 +333,7 @@ function choose(option: unknown) {
       :class="[
         editable &&
           'outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring',
-        (field.type === 'number' || field.type === 'currency') &&
+        ['number', 'currency', 'rating'].includes(field.type) &&
           'justify-end tabular-nums',
       ]"
       @click="editable && startEditing()"

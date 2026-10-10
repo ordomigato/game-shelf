@@ -2,18 +2,25 @@ import { and, asc, count, eq, inArray, max, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import type {
   Blueprint,
+  BlueprintCollection,
+  BlueprintDetail,
+  BlueprintImpact,
+  BlueprintSummary,
   CollectionDetail,
   CollectionEntry,
   CollectionSummary,
   FieldDefinition,
+  ItemData,
   LibraryItem,
 } from '../../shared/types/collection'
 import {
   cleanFields,
   fieldsProblem,
   migrateItemData,
+  valuesLost,
   type OptionRenames,
 } from '../../shared/utils/field-changes'
+import { copyFields, copyValues } from '../../shared/utils/blueprint-names'
 import { applyFieldValues } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import {
@@ -194,12 +201,179 @@ export async function getCollectionBySlug(
     addedAt: entry.addedAt.toISOString(),
     ...(wishlisted && { wishlisted: wishlisted.has(entry.item.id) }),
   }))
+  const blueprint = toBlueprint(found.blueprint)
+  if (viewerIsOwner) {
+    blueprint.usedBy = found.blueprint.shared
+      ? await countCollectionsUsing(ownerId, found.blueprint.id)
+      : 1
+  }
   return {
     ...toSummary(found.collection, items.length),
-    blueprint: toBlueprint(found.blueprint),
+    blueprint,
     items,
     isOwner: viewerIsOwner,
   }
+}
+
+/** How many of the user's collections use a blueprint. */
+async function countCollectionsUsing(
+  ownerId: string,
+  blueprintId: string,
+): Promise<number> {
+  const [{ value } = { value: 0 }] = await useDb()
+    .select({ value: count() })
+    .from(collections)
+    .where(
+      and(
+        eq(collections.ownerId, ownerId),
+        eq(collections.blueprintId, blueprintId),
+      ),
+    )
+  return value
+}
+
+/** A blueprint the user owns, or 404. */
+async function getOwnedBlueprint(
+  ownerId: string,
+  blueprintId: string,
+): Promise<BlueprintRow> {
+  const [row] = await useDb()
+    .select()
+    .from(blueprints)
+    .where(and(eq(blueprints.id, blueprintId), eq(blueprints.ownerId, ownerId)))
+  if (!row) throw notFound()
+  return row
+}
+
+/** The user's blueprints (shared blueprints), by name. */
+export async function listBlueprints(
+  ownerId: string,
+): Promise<BlueprintSummary[]> {
+  const rows = await useDb()
+    .select({
+      id: blueprints.id,
+      name: blueprints.name,
+      fieldCount: sql<number>`jsonb_array_length(${blueprints.fields})::int`,
+      // Spelled out: Drizzle leaves the outer table off the column, so the
+      // subquery would compare collections with itself.
+      usedBy: sql<number>`(
+        select count(*)::int from collections as used
+        where used.blueprint_id = blueprints.id
+      )`,
+    })
+    .from(blueprints)
+    .where(and(eq(blueprints.ownerId, ownerId), eq(blueprints.shared, true)))
+    .orderBy(sql`lower(${blueprints.name})`, asc(blueprints.createdAt))
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name ?? '',
+    fieldCount: row.fieldCount,
+    usedBy: row.usedBy,
+  }))
+}
+
+/**
+ * Turns a collection's private blueprint into a named blueprint the user
+ * can pick for new collections. The collection keeps using it. 409 when
+ * another of the user's sets has the same name, ignoring case.
+ */
+export async function shareCollectionFields(
+  ownerId: string,
+  collectionId: string,
+  name: string,
+): Promise<Blueprint> {
+  const collection = await getOwnedCollection(ownerId, collectionId)
+  const current = await getOwnedBlueprint(ownerId, collection.blueprintId)
+  if (current.shared) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Already a blueprint',
+    })
+  }
+  const db = useDb()
+  // The name check sits in the update itself, so the row is only changed
+  // when no other set of the user's has that name.
+  const [saved] = await db
+    .update(blueprints)
+    .set({ shared: true, name })
+    .where(
+      and(
+        eq(blueprints.id, current.id),
+        eq(blueprints.ownerId, ownerId),
+        sql`not exists (
+          select 1 from ${blueprints} as other
+          where other.owner_id = ${ownerId}
+            and other.shared
+            and lower(other.name) = lower(${name})
+            and other.id <> ${current.id}
+        )`,
+      ),
+    )
+    .returning()
+  if (!saved) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Blueprint name taken',
+    })
+  }
+  return { ...toBlueprint(saved), usedBy: 1 }
+}
+
+/**
+ * Gives a collection its own private copy of the blueprint it uses. The
+ * copy keeps every field id, so stored values stay valid. The user's other
+ * collections keep the set.
+ */
+export async function detachCollectionFields(
+  ownerId: string,
+  collectionId: string,
+): Promise<Blueprint> {
+  const collection = await getOwnedCollection(ownerId, collectionId)
+  const set = await getOwnedBlueprint(ownerId, collection.blueprintId)
+  if (!set.shared) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Not a blueprint',
+    })
+  }
+  const db = useDb()
+  const blueprintId = crypto.randomUUID()
+  // New field ids, with this collection's values copied over, so the copy
+  // shares nothing with the blueprint's other collections.
+  const { fields, idMap } = copyFields(set.fields)
+  const games = await db
+    .select({ id: libraryItems.id, data: libraryItems.data })
+    .from(collectionItems)
+    .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
+    .where(eq(collectionItems.collectionId, collection.id))
+  const valueCopies = games.flatMap((game) => {
+    const data = copyValues(game.data, idMap)
+    return data
+      ? [
+          db
+            .update(libraryItems)
+            .set({ data })
+            .where(eq(libraryItems.id, game.id)),
+        ]
+      : []
+  })
+  const [[copy]] = await db.batch([
+    db
+      .insert(blueprints)
+      .values({ id: blueprintId, ownerId, fields })
+      .returning(),
+    db
+      .update(collections)
+      .set({ blueprintId })
+      .where(
+        and(
+          eq(collections.id, collection.id),
+          eq(collections.ownerId, ownerId),
+        ),
+      ),
+    ...valueCopies,
+  ])
+  return { ...toBlueprint(copy!), usedBy: 1 }
 }
 
 /** A collection the user owns, or 404. */
@@ -220,18 +394,55 @@ export async function getOwnedCollection(
 const nameTaken = () =>
   createError({ statusCode: 409, statusMessage: 'Collection name taken' })
 
-/** Creates a collection with a private copy of a starter blueprint. */
+/**
+ * Creates a collection with either a private copy of a starter blueprint,
+ * or one of the user's blueprints, used as is. A `blueprintId` that isn't
+ * one of the user's sets is a 404.
+ */
 export async function createCollection(
   ownerId: string,
   input: {
     title: string
     description: string | null
-    starter: StarterBlueprint
-  },
+  } & (
+    | { starter: StarterBlueprint }
+    /** `copy` gives the collection its own copy of the blueprint's fields. */
+    | { blueprintId: string; copy?: boolean }
+  ),
 ): Promise<CollectionSummary> {
   const db = useDb()
-  const blueprintId = crypto.randomUUID()
+  const details = {
+    ownerId,
+    title: input.title,
+    slug: slugify(input.title),
+    description: input.description,
+  }
   try {
+    if ('blueprintId' in input) {
+      const set = await getOwnedBlueprint(ownerId, input.blueprintId)
+      if (!set.shared) throw notFound()
+      if (!input.copy) {
+        const [created] = await db
+          .insert(collections)
+          .values({ ...details, blueprintId: set.id })
+          .returning()
+        return toSummary(created!, 0)
+      }
+      const blueprintId = crypto.randomUUID()
+      const [, [created]] = await db.batch([
+        db.insert(blueprints).values({
+          id: blueprintId,
+          ownerId,
+          fields: copyFields(set.fields).fields,
+        }),
+        db
+          .insert(collections)
+          .values({ ...details, blueprintId })
+          .returning(),
+      ])
+      return toSummary(created!, 0)
+    }
+    const blueprintId = crypto.randomUUID()
     const [, [created]] = await db.batch([
       db.insert(blueprints).values({
         id: blueprintId,
@@ -240,13 +451,7 @@ export async function createCollection(
       }),
       db
         .insert(collections)
-        .values({
-          ownerId,
-          blueprintId,
-          title: input.title,
-          slug: slugify(input.title),
-          description: input.description,
-        })
+        .values({ ...details, blueprintId })
         .returning(),
     ])
     return toSummary(created!, 0)
@@ -681,27 +886,21 @@ function touchesValues(
   return (before.options ?? []).some((option) => !kept.has(option))
 }
 
-/**
- * Replaces the fields of a collection the user owns, and carries the
- * user's stored values over: values for removed fields are dropped, values
- * for changed fields converted or dropped when they no longer fit, renamed
- * select options renamed. All in one batch, so it happens fully or not at
- * all. Returns the saved blueprint.
- */
-export async function updateCollectionFields(
-  ownerId: string,
-  collectionId: string,
-  input: FieldDefinition[],
-  optionRenames: OptionRenames = {},
-): Promise<Blueprint> {
-  const collection = await getOwnedCollection(ownerId, collectionId)
-  const db = useDb()
-  const [blueprint] = await db
-    .select()
-    .from(blueprints)
-    .where(eq(blueprints.id, collection.blueprintId))
-  if (!blueprint) throw notFound()
+/** What saving new fields would do, worked out before anything is written. */
+interface FieldChangePlan {
+  before: FieldDefinition[]
+  fields: FieldDefinition[]
+  renames: OptionRenames
+  /** The owner's games whose stored values change, with their new values. */
+  updates: { id: string; data: ItemData }[]
+}
 
+async function planFieldChanges(
+  ownerId: string,
+  blueprint: BlueprintRow,
+  input: FieldDefinition[],
+  optionRenames: OptionRenames,
+): Promise<FieldChangePlan> {
   const fields = cleanFields(input)
   const problem = fieldsProblem(fields)
   if (problem) {
@@ -712,11 +911,11 @@ export async function updateCollectionFields(
   const before = blueprint.fields
   const afterById = new Map(fields.map((field) => [field.id, field]))
   const renames: OptionRenames = {}
+  const isChoice = (type?: string) =>
+    type === 'select' || type === 'multiselect'
   for (const field of before) {
     const after = afterById.get(field.id)
     const asked = optionRenames[field.id]
-    const isChoice = (type?: string) =>
-      type === 'select' || type === 'multiselect'
     if (!isChoice(field.type) || !isChoice(after?.type) || !asked) continue
     const valid = Object.entries(asked).filter(
       ([from, to]) =>
@@ -732,7 +931,7 @@ export async function updateCollectionFields(
     )
     .map((field) => field.id)
   const items = touched.length
-    ? await db
+    ? await useDb()
         .select({ id: libraryItems.id, data: libraryItems.data })
         .from(libraryItems)
         .where(
@@ -745,25 +944,180 @@ export async function updateCollectionFields(
           ),
         )
     : []
-  const itemUpdates = items.flatMap((item) => {
+  const updates = items.flatMap((item) => {
     const data = migrateItemData(item.data, before, fields, renames)
-    return data
-      ? [
-          db
-            .update(libraryItems)
-            .set({ data })
-            .where(eq(libraryItems.id, item.id)),
-        ]
-      : []
+    return data ? [{ id: item.id, data }] : []
   })
+  return { before, fields, renames, updates }
+}
 
+/**
+ * Replaces a blueprint's fields and carries the owner's stored values over:
+ * values for removed fields are dropped, values for changed fields
+ * converted or dropped when they no longer fit, renamed select options
+ * renamed. All in one batch, so it happens fully or not at all. Every
+ * collection using the blueprint sees the change.
+ */
+export async function updateBlueprintFields(
+  ownerId: string,
+  blueprintId: string,
+  input: FieldDefinition[],
+  optionRenames: OptionRenames = {},
+): Promise<Blueprint> {
+  const blueprint = await getOwnedBlueprint(ownerId, blueprintId)
+  const plan = await planFieldChanges(ownerId, blueprint, input, optionRenames)
+  const db = useDb()
   const [[saved]] = await db.batch([
     db
       .update(blueprints)
-      .set({ fields })
+      .set({ fields: plan.fields })
       .where(eq(blueprints.id, blueprint.id))
       .returning(),
-    ...itemUpdates,
+    ...plan.updates.map((update) =>
+      db
+        .update(libraryItems)
+        .set({ data: update.data })
+        .where(eq(libraryItems.id, update.id)),
+    ),
   ])
   return toBlueprint(saved!)
+}
+
+/** Replaces the fields of a collection the user owns. See above. */
+export async function updateCollectionFields(
+  ownerId: string,
+  collectionId: string,
+  input: FieldDefinition[],
+  optionRenames: OptionRenames = {},
+): Promise<Blueprint> {
+  const collection = await getOwnedCollection(ownerId, collectionId)
+  return updateBlueprintFields(
+    ownerId,
+    collection.blueprintId,
+    input,
+    optionRenames,
+  )
+}
+
+/** The owner's collections using a blueprint, with how many games each has. */
+async function collectionsUsing(
+  ownerId: string,
+  blueprintId: string,
+): Promise<BlueprintCollection[]> {
+  const rows = await useDb()
+    .select({
+      id: collections.id,
+      title: collections.title,
+      slug: collections.slug,
+      kind: collections.kind,
+      itemCount: sql<number>`(
+        select count(*)::int from collection_items as entry
+        where entry.collection_id = collections.id
+      )`,
+    })
+    .from(collections)
+    .where(
+      and(
+        eq(collections.ownerId, ownerId),
+        eq(collections.blueprintId, blueprintId),
+      ),
+    )
+    .orderBy(sql`lower(${collections.title})`)
+  return rows
+}
+
+/**
+ * What saving new fields on a blueprint would change, without saving: the
+ * collections that use it, and per field how many of their games would
+ * lose a value.
+ */
+export async function previewBlueprintFields(
+  ownerId: string,
+  blueprintId: string,
+  input: FieldDefinition[],
+  optionRenames: OptionRenames = {},
+): Promise<BlueprintImpact> {
+  const blueprint = await getOwnedBlueprint(ownerId, blueprintId)
+  const plan = await planFieldChanges(ownerId, blueprint, input, optionRenames)
+  const using = await collectionsUsing(ownerId, blueprint.id)
+  const games = using.length
+    ? await useDb()
+        .selectDistinct({ id: libraryItems.id, data: libraryItems.data })
+        .from(collectionItems)
+        .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
+        .where(
+          inArray(
+            collectionItems.collectionId,
+            using.map((collection) => collection.id),
+          ),
+        )
+    : []
+  const lost = valuesLost(games, plan.before, plan.fields, plan.renames)
+  return {
+    collections: using,
+    lost: plan.before
+      .filter((field) => lost.has(field.id))
+      .map((field) => ({ name: field.name, count: lost.get(field.id)! })),
+  }
+}
+
+/** A blueprint with the collections that use it, for its own page. */
+export async function getBlueprintDetail(
+  ownerId: string,
+  blueprintId: string,
+): Promise<BlueprintDetail> {
+  const blueprint = await getOwnedBlueprint(ownerId, blueprintId)
+  if (!blueprint.shared) throw notFound()
+  const using = await collectionsUsing(ownerId, blueprint.id)
+  return {
+    ...toBlueprint(blueprint),
+    usedBy: using.length,
+    collections: using,
+  }
+}
+
+/** Renames one of the user's blueprints. Names are unique per user. */
+export async function renameBlueprint(
+  ownerId: string,
+  blueprintId: string,
+  name: string,
+): Promise<Blueprint> {
+  const blueprint = await getOwnedBlueprint(ownerId, blueprintId)
+  if (!blueprint.shared) throw notFound()
+  const [saved] = await useDb()
+    .update(blueprints)
+    .set({ name })
+    .where(
+      and(
+        eq(blueprints.id, blueprint.id),
+        sql`not exists (
+          select 1 from ${blueprints} as other
+          where other.owner_id = ${ownerId}
+            and other.shared
+            and lower(other.name) = lower(${name})
+            and other.id <> ${blueprint.id}
+        )`,
+      ),
+    )
+    .returning()
+  if (!saved) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Blueprint name taken',
+    })
+  }
+  return toBlueprint(saved)
+}
+
+/** Deletes one of the user's blueprints, once no collection uses it. */
+export async function deleteBlueprint(
+  ownerId: string,
+  blueprintId: string,
+): Promise<void> {
+  const blueprint = await getOwnedBlueprint(ownerId, blueprintId)
+  if (!blueprint.shared) throw notFound()
+  if (await countCollectionsUsing(ownerId, blueprint.id)) {
+    throw createError({ statusCode: 409, statusMessage: 'Blueprint in use' })
+  }
+  await useDb().delete(blueprints).where(eq(blueprints.id, blueprint.id))
 }

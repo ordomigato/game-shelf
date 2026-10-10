@@ -127,10 +127,15 @@ test('a choice list can allow more than one choice, and back', async ({
   // Genres: several to one would clear Tetris Attack's two genres.
   await checkboxes.nth(0).click()
   await dialog.getByRole('button', { name: 'Save fields' }).click()
-  await expect(dialog.getByRole('listitem')).toHaveText([
-    'Genres: cleared on 1 game',
+  await expect(dialog.getByRole('alert').getByRole('listitem')).toHaveText([
+    'Genres: deleted from 1 game',
   ])
-  await dialog.getByRole('button', { name: 'Save and clear' }).click()
+  await dialog
+    .getByRole('checkbox', {
+      name: 'I understand these values will be deleted',
+    })
+    .click()
+  await dialog.getByRole('button', { name: 'Delete values and save' }).click()
   await expect(dialog).toBeHidden()
   expect(saved[0]!.fields.map((field) => [field.id, field.type])).toEqual([
     ['genres', 'select'],

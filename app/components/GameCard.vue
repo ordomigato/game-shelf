@@ -2,8 +2,6 @@
 import type { GameSummary } from '#shared/types/game'
 
 const props = defineProps<{ game: GameSummary }>()
-/** Whether the game is already in one of the user's collections. */
-const tracked = defineModel<boolean>('tracked', { default: false })
 
 const expanded = ref(false)
 
@@ -17,7 +15,7 @@ const hiddenPlatforms = computed(() =>
 </script>
 
 <template>
-  <article class="relative flex flex-col gap-2">
+  <article class="cover-actions relative flex flex-col gap-2">
     <NuxtLink
       :to="`/games/${game.id}`"
       class="group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -38,12 +36,9 @@ const hiddenPlatforms = computed(() =>
         </p>
       </div>
     </NuxtLink>
-    <div class="absolute top-2 right-2">
-      <AddToCollectionMenu
-        v-model:tracked="tracked"
-        variant="icon"
-        :game="{ igdbId: game.id, name: game.name, coverId: game.coverId }"
-      />
+    <!-- A button over the cover's corner, like Add to collection. -->
+    <div v-if="$slots.action" class="absolute top-2 right-2">
+      <slot name="action" />
     </div>
     <div class="flex flex-col gap-1.5">
       <ul

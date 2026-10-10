@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Search } from '@lucide/vue'
+import type { CollectionSummary } from '#shared/types/collection'
+import type { GameSummary } from '#shared/types/game'
 
 const {
   input,
@@ -24,42 +26,55 @@ onBeforeMount(() => {
   if (field?.value && field.value !== input.value) input.value = field.value
 })
 
-// Mark results the signed-in user already has. Checked in the browser only,
-// after the page has hydrated, and only for games not checked yet.
+// `?to=<slug>` searches on behalf of one of the user's collections: each
+// result's button then adds or removes the game there in one click.
+// Without it, the button opens the Add to collection menu.
+const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const auth = useAuth()
 const collections = useCollections()
-const trackedIds = ref(new Set<number>())
-const checkedIds = new Set<number>()
+const targetSlug = computed(() =>
+  typeof route.query.to === 'string' ? route.query.to : null,
+)
+const mine = ref<CollectionSummary[]>([])
+const target = computed(
+  () => mine.value.find((c) => c.slug === targetSlug.value) ?? null,
+)
 
-async function checkTracked() {
+async function loadTarget() {
+  if (!targetSlug.value || mine.value.length) return
   await auth.ensureLoaded()
-  if (auth.status.value !== 'signedIn') return
-  const ids = games.value
-    .map((game) => game.id)
-    .filter((id) => !checkedIds.has(id))
-  if (!ids.length) return
-  ids.forEach((id) => checkedIds.add(id))
+  if (auth.status.value !== 'signedIn') {
+    await navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
   try {
-    const tracked = await collections.tracked(ids)
-    trackedIds.value = new Set([...trackedIds.value, ...tracked])
+    mine.value = await collections.mine()
   } catch {
-    // Only a hint. The menu loads the real state when opened.
-    ids.forEach((id) => checkedIds.delete(id))
+    // Search still works, just without the collection.
   }
 }
 
-function setTracked(id: number, tracked: boolean) {
-  const next = new Set(trackedIds.value)
-  if (tracked) next.add(id)
-  else next.delete(id)
-  trackedIds.value = next
+function changeTarget(slug: string) {
+  void router.replace({ query: { ...route.query, to: slug } })
 }
 
 onMounted(() => {
   onNuxtReady(() => {
-    watch(games, () => void checkTracked(), { immediate: true })
+    watch(targetSlug, () => void loadTarget(), { immediate: true })
   })
 })
+
+const tracked = useTrackedGames(games, target)
+const titleOf = useCollectionTitle()
+
+function toggleLabel(game: GameSummary) {
+  const values = { name: game.name, collection: titleOf(target.value!) }
+  return tracked.items.value.has(game.id)
+    ? t('addToCollection.removeFrom', values)
+    : t('addToCollection.addTo', values)
+}
 
 const showSkeletons = computed(
   () => isSearchable.value && status.value === 'pending' && !games.value.length,
@@ -69,7 +84,6 @@ const showTooShort = computed(
     input.value.trim().length > 0 &&
     input.value.trim().length < MIN_SEARCH_LENGTH,
 )
-const { t } = useI18n()
 const resultsLabel = computed(() => {
   if (!isSearchable.value || status.value !== 'success') return ''
   return t(
@@ -82,6 +96,24 @@ const resultsLabel = computed(() => {
 
 <template>
   <div>
+    <div
+      v-if="target && auth.me.value?.username"
+      class="mb-8 flex flex-col gap-2"
+    >
+      <AddingToBar
+        :target="target"
+        :collections="mine"
+        :username="auth.me.value.username"
+        @change="changeTarget"
+      />
+      <p
+        v-if="tracked.error.value"
+        role="alert"
+        class="text-sm text-destructive"
+      >
+        {{ tracked.error.value }}
+      </p>
+    </div>
     <section
       class="mx-auto max-w-2xl text-center transition-[padding]"
       :class="isSearchable ? 'pt-2 pb-8' : 'py-16'"
@@ -152,11 +184,28 @@ const resultsLabel = computed(() => {
         :class="{ 'opacity-60 transition-opacity': status === 'pending' }"
       >
         <li v-for="game in games" :key="game.id">
-          <GameCard
-            :game="game"
-            :tracked="trackedIds.has(game.id)"
-            @update:tracked="setTracked(game.id, $event)"
-          />
+          <GameCard :game="game">
+            <template #action>
+              <CoverActionButton
+                v-if="target"
+                :state="tracked.items.value.has(game.id) ? 'remove' : 'add'"
+                :label="toggleLabel(game)"
+                :disabled="tracked.saving.value.has(game.id)"
+                @click="tracked.toggle(game)"
+              />
+              <AddToCollectionMenu
+                v-else
+                variant="icon"
+                :game="{
+                  igdbId: game.id,
+                  name: game.name,
+                  coverId: game.coverId,
+                }"
+                :tracked="tracked.items.value.has(game.id)"
+                @update:tracked="tracked.mark(game.id, $event)"
+              />
+            </template>
+          </GameCard>
         </li>
       </ul>
       <div v-if="hasMore" class="mt-10 text-center">

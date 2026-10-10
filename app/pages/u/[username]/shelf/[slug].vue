@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ArrowLeft, Ellipsis, Heart, Lock, Pencil, Trash2 } from '@lucide/vue'
+import {
+  ArrowLeft,
+  Ellipsis,
+  Heart,
+  Lock,
+  Pencil,
+  Plus,
+  Trash2,
+} from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 const NuxtLink = resolveComponent('NuxtLink')
@@ -132,29 +140,37 @@ async function deleteCollection() {
           </p>
         </div>
 
-        <DropdownMenu v-if="data.isOwner">
-          <DropdownMenuTrigger as-child>
-            <Button
-              variant="outline"
-              size="icon"
-              :aria-label="$t('collection.actions')"
-            >
-              <Ellipsis />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem @select="editing = true">
-              <Pencil /> {{ $t('collection.edit') }}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              v-if="data.kind !== 'wishlist'"
-              class="text-destructive focus:text-destructive"
-              @select="confirmingDelete = true"
-            >
-              <Trash2 /> {{ $t('collection.delete') }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div v-if="data.isOwner" class="flex items-center gap-2">
+          <Button v-if="data.items.length" as-child>
+            <NuxtLink :to="{ path: '/', query: { to: data.slug } }">
+              <Plus />
+              {{ $t('collection.addGames') }}
+            </NuxtLink>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="outline"
+                size="icon"
+                :aria-label="$t('collection.actions')"
+              >
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @select="editing = true">
+                <Pencil /> {{ $t('collection.edit') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                v-if="data.kind !== 'wishlist'"
+                class="text-destructive focus:text-destructive"
+                @select="confirmingDelete = true"
+              >
+                <Trash2 /> {{ $t('collection.delete') }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <FormMessage v-if="deleteError">{{ deleteError }}</FormMessage>
@@ -169,7 +185,9 @@ async function deleteCollection() {
             {{ $t('collection.emptyHint') }}
           </p>
           <Button as-child class="mt-4">
-            <NuxtLink to="/">{{ $t('collection.searchGames') }}</NuxtLink>
+            <NuxtLink :to="{ path: '/', query: { to: data.slug } }">{{
+              $t('collection.searchGames')
+            }}</NuxtLink>
           </Button>
         </template>
       </div>

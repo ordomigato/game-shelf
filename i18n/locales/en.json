@@ -278,7 +278,8 @@
     "deleteConfirm": "Delete collection",
     "cancel": "Cancel",
     "deleteFailed": "Couldn't delete the collection. Try again.",
-    "loadFailed": "Couldn't load this collection. Try again."
+    "loadFailed": "Couldn't load this collection. Try again.",
+    "addGames": "Add games"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -287,6 +288,11 @@
     "loading": "Loading your collections…",
     "loadFailed": "Couldn't load your collections. Try again.",
     "saveFailed": "Couldn't save that change. Try again.",
-    "newCollection": "New collection…"
+    "newCollection": "New collection…",
+    "addingTo": "Adding to {collection}",
+    "change": "Change",
+    "done": "Done",
+    "addTo": "Add {name} to {collection}",
+    "removeFrom": "Remove {name} from {collection}"
   }
 }

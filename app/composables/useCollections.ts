@@ -68,10 +68,19 @@ export function useCollections() {
         `/api/library-items/igdb/${igdbId}`,
       ),
 
-    /** Of these IGDB games, the ones already in a collection. */
-    tracked: (igdbIds: number[]) =>
-      auth.apiFetch<number[]>(
-        `/api/library-items/igdb?ids=${igdbIds.join(',')}`,
+    /**
+     * Of these IGDB games, the ones already in a collection (any of the
+     * user's, or only `collectionId`), with their item ids.
+     */
+    tracked: (igdbIds: number[], collectionId?: string) =>
+      auth.apiFetch<{ igdbId: number; itemId: string }[]>(
+        '/api/library-items/igdb',
+        {
+          query: {
+            ids: igdbIds.join(','),
+            collection: collectionId,
+          },
+        },
       ),
 
     /** Adds an IGDB game to the library (once) and to these collections. */

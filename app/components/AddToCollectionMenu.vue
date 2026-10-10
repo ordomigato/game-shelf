@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookmarkCheck, BookmarkPlus, Heart, Plus } from '@lucide/vue'
+import { CircleCheck, CirclePlus, Heart, Plus } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /**
@@ -121,20 +121,14 @@ async function onCreated(collection: CollectionSummary) {
 <template>
   <DropdownMenu :open="open" @update:open="onOpenChange">
     <DropdownMenuTrigger as-child>
-      <Button
+      <CoverActionButton
         v-if="variant === 'icon'"
-        size="icon"
-        variant="secondary"
-        class="size-8 rounded-full shadow-md"
-        :aria-label="`${label}: ${game.name}`"
-        :title="label"
-      >
-        <BookmarkCheck v-if="tracked" class="text-primary" />
-        <BookmarkPlus v-else />
-      </Button>
+        :state="tracked ? 'have' : 'add'"
+        :label="`${label}: ${game.name}`"
+      />
       <Button v-else :variant="tracked ? 'outline' : 'default'">
-        <BookmarkCheck v-if="tracked" />
-        <BookmarkPlus v-else />
+        <CircleCheck v-if="tracked" />
+        <CirclePlus v-else />
         {{ label }}
       </Button>
     </DropdownMenuTrigger>

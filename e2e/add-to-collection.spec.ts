@@ -63,7 +63,7 @@ test.describe('signed in', () => {
     let asked = ''
     await page.route('**/api/library-items/igdb?**', (route) => {
       asked = new URL(route.request().url()).searchParams.get('ids') ?? ''
-      return route.fulfill({ json: [2] })
+      return route.fulfill({ json: [{ igdbId: 2, itemId }] })
     })
     await searchZelda(page)
     await expect(
@@ -209,7 +209,7 @@ test.describe('signed in', () => {
       }),
     )
     await page.route('**/api/library-items/igdb?**', (route) =>
-      route.fulfill({ json: [1] }),
+      route.fulfill({ json: [{ igdbId: 1, itemId }] }),
     )
     // Game pages render on the server, out of reach of browser stubs, so
     // open it from search like a person would.
@@ -223,4 +223,111 @@ test.describe('signed in', () => {
       page.getByRole('menuitemcheckbox', { name: 'NES Games' }),
     ).toBeChecked()
   })
+
+  test.describe('from a collection', () => {
+    test('adds and removes games in one click', async ({ page }) => {
+      const asked: string[] = []
+      await page.route('**/api/library-items/igdb?**', (route) => {
+        asked.push(
+          new URL(route.request().url()).searchParams.get('collection') ?? '',
+        )
+        return route.fulfill({ json: [{ igdbId: 2, itemId }] })
+      })
+      let created: unknown
+      await page.route('**/api/library-items', (route) => {
+        created = route.request().postDataJSON()
+        return route.fulfill({
+          json: {
+            item: {
+              id: '44444444-4444-4444-8444-444444444444',
+              igdbId: 1,
+              name: 'Zelda Game 1',
+              coverId: null,
+              data: {},
+            },
+            collectionIds: [nes.id],
+          },
+        })
+      })
+      const removed: string[] = []
+      await page.route('**/api/collections/*/items/*', (route) => {
+        removed.push(route.request().url().split('/api/')[1]!)
+        return route.fulfill({ status: 204 })
+      })
+
+      await page.route('**/api/games/search?**', (route) =>
+        route.fulfill({ json: { games, page: 1, hasMore: false } }),
+      )
+      await page.goto('/?to=nes-games')
+      await expect(page.getByText('Adding to NES Games')).toBeVisible()
+      await page.getByRole('searchbox', { name: 'Search games' }).fill('zelda')
+
+      const remove2 = page.getByRole('button', {
+        name: 'Remove Zelda Game 2 from NES Games',
+      })
+      await expect(remove2).toBeVisible()
+      expect(asked).toContain(nes.id)
+
+      await page
+        .getByRole('button', { name: 'Add Zelda Game 1 to NES Games' })
+        .click()
+      await expect(
+        page.getByRole('button', {
+          name: 'Remove Zelda Game 1 from NES Games',
+        }),
+      ).toBeVisible()
+      expect(created).toEqual({
+        igdbId: 1,
+        name: 'Zelda Game 1',
+        coverId: null,
+        collectionIds: [nes.id],
+      })
+
+      await remove2.click()
+      await expect(
+        page.getByRole('button', { name: 'Add Zelda Game 2 to NES Games' }),
+      ).toBeVisible()
+      expect(removed).toEqual([`collections/${nes.id}/items/${itemId}`])
+
+      await expect(page.getByRole('link', { name: 'Done' })).toHaveAttribute(
+        'href',
+        '/u/retro_fan/shelf/nes-games',
+      )
+    })
+
+    test('can switch to another collection', async ({ page }) => {
+      const asked: string[] = []
+      await page.route('**/api/library-items/igdb?**', (route) => {
+        asked.push(
+          new URL(route.request().url()).searchParams.get('collection') ?? '',
+        )
+        return route.fulfill({ json: [] })
+      })
+      await page.route('**/api/games/search?**', (route) =>
+        route.fulfill({ json: { games, page: 1, hasMore: false } }),
+      )
+      // Search renders on the server when the URL has a term, out of reach
+      // of browser stubs, so type it.
+      await page.goto('/?to=nes-games')
+      await expect(page.getByText('Adding to NES Games')).toBeVisible()
+      await page.getByRole('searchbox', { name: 'Search games' }).fill('zelda')
+      await page.getByRole('button', { name: 'Change' }).click()
+      await page.getByRole('menuitemradio', { name: 'Wishlist' }).click()
+
+      await expect(page.getByText('Adding to Wishlist')).toBeVisible()
+      await expect(page).toHaveURL(/to=wishlist/)
+      await expect(page).toHaveURL(/q=zelda/)
+      await expect(
+        page.getByRole('button', { name: 'Add Zelda Game 1 to Wishlist' }),
+      ).toBeVisible()
+      await expect.poll(() => asked).toContain(wishlist.id)
+    })
+  })
+})
+
+test('searching for a collection asks signed-out visitors to sign in', async ({
+  page,
+}) => {
+  await page.goto('/?to=nes-games')
+  await expect(page).toHaveURL(/\/login\?redirect=/)
 })

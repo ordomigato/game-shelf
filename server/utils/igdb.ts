@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { Resource } from 'sst'
 import { log } from './log'
+import { recordTiming } from './request-timing'
 
 type IgdbEndpoint = 'games'
 
@@ -26,6 +27,8 @@ async function getToken(forceRefresh = false): Promise<string> {
   }
 
   let response: Response
+  // Getting a token is part of talking to IGDB, so it counts as IGDB time.
+  const started = Date.now()
   try {
     response = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
@@ -38,6 +41,8 @@ async function getToken(forceRefresh = false): Promise<string> {
   } catch (error) {
     log('error', 'twitch.unreachable', { message: String(error) })
     throw unavailable()
+  } finally {
+    recordTiming('igdb', Date.now() - started)
   }
   if (!response.ok) {
     log('error', 'twitch.token_failed', { status: response.status })
@@ -80,7 +85,9 @@ export async function igdbRequest<T>(
         },
         body: query,
       })
-      return { response, durationMs: Date.now() - started }
+      const durationMs = Date.now() - started
+      recordTiming('igdb', durationMs)
+      return { response, durationMs }
     } catch (error) {
       log('error', 'igdb.unreachable', {
         endpoint,

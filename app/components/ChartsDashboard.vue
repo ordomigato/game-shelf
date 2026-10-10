@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ChartColumn, Plus } from '@lucide/vue'
+import { ChartColumn, Plus, Sparkles } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { ChartSize, ChartWidget } from '#shared/types/charts'
 import type { FieldDefinition } from '#shared/types/collection'
-import { MAX_CHARTS, type ChartItem } from '#shared/utils/charts'
+import { MAX_CHARTS, suggestCharts, type ChartItem } from '#shared/utils/charts'
 
 /**
  * A collection's charts, in a grid of three columns (one on phones).
@@ -68,6 +68,20 @@ function remove(widget: ChartWidget) {
   )
 }
 
+/** Charts that suit the fields and aren't on the dashboard yet. */
+const suggestions = computed(() =>
+  suggestCharts(props.fields, widgets.value).slice(
+    0,
+    Math.max(MAX_CHARTS - widgets.value.length, 0),
+  ),
+)
+const suggesting = ref(false)
+
+function addSuggested(added: ChartWidget[]) {
+  suggesting.value = false
+  emit('save', [...widgets.value, ...added])
+}
+
 function onReordered() {
   emit('save', [...widgets.value])
 }
@@ -81,7 +95,14 @@ const span: Record<ChartSize, string> = {
 
 <template>
   <div class="flex flex-col gap-4">
-    <div v-if="editable && widgets.length" class="flex justify-end">
+    <div v-if="editable && widgets.length" class="flex justify-end gap-2">
+      <Button
+        v-if="suggestions.length"
+        variant="outline"
+        @click="suggesting = true"
+      >
+        <Sparkles /> {{ $t('charts.suggestions.button') }}
+      </Button>
       <Button :disabled="widgets.length >= MAX_CHARTS" @click="startAdding">
         <Plus /> {{ $t('charts.add') }}
       </Button>
@@ -100,6 +121,19 @@ const span: Record<ChartSize, string> = {
         <Button @click="startAdding">
           <Plus /> {{ $t('charts.addFirst') }}
         </Button>
+        <div
+          v-if="suggestions.length"
+          class="mt-4 flex w-full max-w-2xl flex-col gap-3 px-4 text-left"
+        >
+          <p class="text-sm font-medium">
+            {{ $t('charts.suggestions.title') }}
+          </p>
+          <ChartSuggestions
+            :suggestions="suggestions"
+            :fields="fields"
+            @add="addSuggested"
+          />
+        </div>
       </template>
     </div>
 
@@ -126,6 +160,22 @@ const span: Record<ChartSize, string> = {
         />
       </li>
     </VueDraggable>
+
+    <Dialog v-if="editable" v-model:open="suggesting">
+      <DialogContent class="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t('charts.suggestions.title') }}</DialogTitle>
+          <DialogDescription>{{
+            $t('charts.suggestions.description')
+          }}</DialogDescription>
+        </DialogHeader>
+        <ChartSuggestions
+          :suggestions="suggestions"
+          :fields="fields"
+          @add="addSuggested"
+        />
+      </DialogContent>
+    </Dialog>
 
     <ChartEditorDialog
       v-if="editable"

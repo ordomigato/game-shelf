@@ -328,3 +328,77 @@ export function defaultTitle(
     },
   }
 }
+
+/** What makes two charts the same, whatever their title, size or id. */
+function chartSignature(widget: ChartWidget): string {
+  return JSON.stringify([
+    widget.kind,
+    widget.measure,
+    widget.groupBy ?? null,
+    widget.timeline ?? null,
+  ])
+}
+
+/**
+ * Charts that suit a collection's fields, leaving out ones already on its
+ * dashboard: the game count, totals of amounts, averages of scores and
+ * percentages, the share of boxes ticked, games split by each choice list
+ * (a pie for a few choices, bars for more), and growth over time.
+ */
+export function suggestCharts(
+  fields: FieldDefinition[],
+  existing: ChartWidget[],
+  newId: () => string = () => crypto.randomUUID(),
+): ChartWidget[] {
+  const base = { title: '' }
+  const ideas: Omit<ChartWidget, 'id'>[] = [
+    { ...base, kind: 'number', size: 'small', measure: { op: 'count' } },
+  ]
+  for (const field of fields) {
+    if (field.type === 'currency') {
+      ideas.push({
+        ...base,
+        kind: 'number',
+        size: 'small',
+        measure: { op: 'sum', fieldId: field.id },
+      })
+    } else if (field.type === 'rating' || field.type === 'progress') {
+      ideas.push({
+        ...base,
+        kind: 'number',
+        size: 'small',
+        measure: { op: 'average', fieldId: field.id },
+      })
+    } else if (field.type === 'checkbox') {
+      ideas.push({
+        ...base,
+        kind: 'number',
+        size: 'small',
+        measure: { op: 'percent', fieldId: field.id },
+      })
+    }
+  }
+  for (const field of fields) {
+    if (field.type !== 'select' && field.type !== 'multiselect') continue
+    const few = (field.options ?? []).length <= 5
+    ideas.push({
+      ...base,
+      kind: few ? 'pie' : 'bar',
+      size: few ? 'small' : 'medium',
+      measure: { op: 'count' },
+      groupBy: field.id,
+    })
+  }
+  ideas.push({
+    ...base,
+    kind: 'line',
+    size: 'large',
+    measure: { op: 'count' },
+    timeline: { source: 'addedAt', bucket: 'month', cumulative: true },
+  })
+
+  const taken = new Set(existing.map(chartSignature))
+  return ideas
+    .map((idea) => ({ ...idea, id: newId() }) as ChartWidget)
+    .filter((widget) => !taken.has(chartSignature(widget)))
+}

@@ -610,6 +610,14 @@
       "add": "Add chart",
       "needsField": "Pick a field to measure.",
       "needsGroup": "Pick a field to split the games by."
+    },
+    "suggestions": {
+      "button": "Suggestions",
+      "title": "Suggested for this collection",
+      "description": "Charts that suit this collection's fields. You can change any of them after adding.",
+      "add": "Add",
+      "addOne": "Add {title}",
+      "addAll": "Add all {count}"
     }
   }
 }

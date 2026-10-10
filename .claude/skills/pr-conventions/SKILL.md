@@ -65,7 +65,11 @@ covers the difference.
 
 ## Base branch
 
-PRs target `main`.
+PRs target `main`. Avoid stacking a PR on another PR's branch. If you
+must, say so in the body, and before it's merged check that its base is
+`main`: a stacked PR merged after its base has already merged lands on
+the old branch and never reaches `main` (this happened to Explore, #28,
+which had to be re-opened as #29).
 
 ## Where this doesn't apply
 

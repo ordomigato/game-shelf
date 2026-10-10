@@ -199,3 +199,51 @@ test('the charts view has its own link', async ({ page }) => {
   await page.getByRole('button', { name: 'Charts' }).click()
   await expect(page).toHaveURL(/view=charts/)
 })
+
+test('suggests charts for an empty dashboard', async ({ page }) => {
+  const saves = await openCharts(page)
+  const suggested = page
+    .getByText('Suggested for this collection')
+    .locator('..')
+  await expect(suggested.getByRole('listitem')).toHaveText([
+    /Games/,
+    /Total Price paid/,
+    /Games by Status/,
+    /Games over time/,
+  ])
+  await suggested.getByRole('button', { name: 'Add all 4' }).click()
+  await expect(
+    page.getByRole('region', { name: 'Games by Status' }),
+  ).toBeVisible()
+  expect(saves[0]!.map((w) => (w as { kind: string }).kind)).toEqual([
+    'number',
+    'number',
+    'pie',
+    'line',
+  ])
+})
+
+test('offers the rest as suggestions once there are charts', async ({
+  page,
+}) => {
+  const saves = await openCharts(page, { dashboard: [numberWidget] })
+  await page.getByRole('button', { name: 'Suggestions' }).click()
+  const dialog = page.getByRole('dialog', {
+    name: 'Suggested for this collection',
+  })
+  // The total spent is already there, so it isn't suggested again.
+  await expect(dialog.getByText('Total Price paid')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Add Games by Status' }).click()
+  await expect(dialog).toBeHidden()
+  expect(saves[0]).toEqual([
+    numberWidget,
+    {
+      id: expect.any(String),
+      kind: 'pie',
+      title: '',
+      size: 'small',
+      measure: { op: 'count' },
+      groupBy: 'status',
+    },
+  ])
+})

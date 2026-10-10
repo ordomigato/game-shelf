@@ -6,6 +6,7 @@ import {
   defaultTitle,
   groupValues,
   measureValue,
+  suggestCharts,
   timeSeries,
   type ChartItem,
 } from './charts'
@@ -219,5 +220,55 @@ describe('defaultTitle', () => {
       key: 'charts.titles.sumBy',
       params: { field: 'Price', group: 'Status' },
     })
+  })
+})
+
+describe('suggestCharts', () => {
+  let n = 0
+  const newId = () => `s${++n}`
+
+  it('suggests charts that suit the fields', () => {
+    const kinds = suggestCharts(fields, [], newId).map((widget) => [
+      widget.kind,
+      widget.measure.op,
+      widget.groupBy ?? widget.timeline?.source ?? '',
+    ])
+    expect(kinds).toEqual([
+      ['number', 'count', ''],
+      ['number', 'sum', ''],
+      ['number', 'average', ''],
+      ['number', 'percent', ''],
+      ['pie', 'count', 'status'],
+      ['pie', 'count', 'genres'],
+      ['line', 'count', 'addedAt'],
+    ])
+  })
+
+  it('uses bars when a choice list has many choices', () => {
+    const many: FieldDefinition[] = [
+      {
+        id: 'platform',
+        name: 'Platform',
+        type: 'select',
+        options: ['A', 'B', 'C', 'D', 'E', 'F'],
+      },
+    ]
+    const bar = suggestCharts(many, [], newId).find((w) => w.groupBy)
+    expect(bar).toMatchObject({ kind: 'bar', size: 'medium' })
+  })
+
+  it('leaves out charts already on the dashboard, whatever they are called', () => {
+    const existing = [widget({ id: 'mine', title: 'My games', size: 'large' })]
+    const suggested = suggestCharts(fields, existing, newId)
+    expect(
+      suggested.some((w) => w.kind === 'number' && w.measure.op === 'count'),
+    ).toBe(false)
+  })
+
+  it('always offers the game count and growth, even with no fields', () => {
+    expect(suggestCharts([], [], newId).map((w) => w.kind)).toEqual([
+      'number',
+      'line',
+    ])
   })
 })

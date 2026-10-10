@@ -129,6 +129,38 @@ describe('carryValue', () => {
   })
 })
 
+describe('carryValue with multiple choice', () => {
+  const genres: FieldDefinition = {
+    id: 's',
+    name: 'Genres',
+    type: 'multiselect',
+    options: ['Backlog', 'Playing', 'Finished'],
+  }
+
+  it('turns one choice into a list of one, losslessly', () => {
+    expect(carryValue('Playing', status, genres)).toEqual(['Playing'])
+  })
+
+  it('keeps a list of one when going back to one choice', () => {
+    expect(carryValue(['Finished'], genres, status)).toBe('Finished')
+    expect(carryValue(['Backlog', 'Finished'], genres, status)).toBeUndefined()
+  })
+
+  it('renames choices and keeps the ones that survive', () => {
+    const after = { ...genres, options: ['Backlog', 'On it'] }
+    expect(
+      carryValue(['Playing', 'Finished'], genres, after, { Playing: 'On it' }),
+    ).toEqual(['On it'])
+    expect(carryValue(['Finished'], genres, after)).toBeUndefined()
+  })
+
+  it('lists the choices as text', () => {
+    expect(
+      carryValue(['Backlog', 'Finished'], genres, { ...genres, type: 'text' }),
+    ).toBe('Backlog, Finished')
+  })
+})
+
 describe('migrateItemData', () => {
   const before = [text, number, status]
 
@@ -158,6 +190,33 @@ describe('migrateItemData', () => {
         s: { Playing: 'On it' },
       }),
     ).toEqual({ s: 'On it', x: 'y' })
+  })
+})
+
+describe('valuesLost with multiple choice', () => {
+  it('counts a list that loses some of its choices', () => {
+    const genres: FieldDefinition = {
+      id: 'g',
+      name: 'Genres',
+      type: 'multiselect',
+      options: ['RPG', 'Action'],
+    }
+    const items = [{ data: { g: ['RPG', 'Action'] } }, { data: { g: ['RPG'] } }]
+    expect(
+      valuesLost(items, [genres], [{ ...genres, options: ['RPG'] }]),
+    ).toEqual(new Map([['g', 1]]))
+  })
+
+  it('does not count an unchanged list', () => {
+    const genres: FieldDefinition = {
+      id: 'g',
+      name: 'Genres',
+      type: 'multiselect',
+      options: ['RPG'],
+    }
+    expect(
+      migrateItemData({ g: ['RPG'] }, [genres], [{ ...genres }]),
+    ).toBeNull()
   })
 })
 

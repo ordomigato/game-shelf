@@ -383,7 +383,8 @@
       "optionTooLong": "A choice in \"{name}\" is too long. Use up to {max} characters.",
       "duplicateOption": "\"{name}\" has the same choice twice.",
       "invalid": "Something about these fields isn't valid. Check them and try again."
-    }
+    },
+    "allowMultiple": "Allow more than one choice"
   },
   "rename": {
     "title": "Rename game",

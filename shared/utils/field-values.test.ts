@@ -37,6 +37,32 @@ describe('normalizeFieldValue', () => {
   })
 })
 
+describe('normalizeFieldValue for multiple choice', () => {
+  const genres = {
+    id: 'g',
+    name: 'Genres',
+    type: 'multiselect' as const,
+    options: ['RPG', 'Action', 'Puzzle'],
+  }
+
+  it('keeps known choices once each, in the field order', () => {
+    expect(normalizeFieldValue(genres, ['Puzzle', 'RPG', 'Puzzle'])).toEqual([
+      'RPG',
+      'Puzzle',
+    ])
+  })
+
+  it('treats an empty list as clearing', () => {
+    expect(normalizeFieldValue(genres, [])).toBeNull()
+  })
+
+  it('rejects unknown choices and anything that is not a list of text', () => {
+    expect(normalizeFieldValue(genres, ['RPG', 'Racing'])).toBeUndefined()
+    expect(normalizeFieldValue(genres, 'RPG')).toBeUndefined()
+    expect(normalizeFieldValue(genres, [1])).toBeUndefined()
+  })
+})
+
 describe('applyFieldValues', () => {
   const fields: FieldDefinition[] = [
     { id: 'price', name: 'Price', type: 'currency' },

@@ -4,9 +4,10 @@ import type { FieldDefinition, FieldValue } from '#shared/types/collection'
 
 /**
  * One item's value for one field, in the collection table. Owners edit in
- * place: checkboxes, ratings and selects save on click; text, numbers and
- * dates turn into an input, saving on Enter or when focus leaves, and
- * cancelling on Escape. Emits the new value, or null to clear it.
+ * place: checkboxes, ratings, selects and multiple choices save on click;
+ * text, numbers and dates turn into an input, saving on Enter or when focus
+ * leaves, and cancelling on Escape. Emits the new value, or null to clear
+ * it.
  */
 const props = defineProps<{
   field: FieldDefinition
@@ -78,6 +79,18 @@ function rate(stars: number) {
   emit('save', props.value === stars ? null : stars)
 }
 
+const chosen = computed(() => (Array.isArray(props.value) ? props.value : []))
+
+function toggleChoice(option: string, on: boolean) {
+  const next = on
+    ? [...chosen.value, option]
+    : chosen.value.filter((choice) => choice !== option)
+  const ordered = (props.field.options ?? []).filter((choice) =>
+    next.includes(choice),
+  )
+  emit('save', ordered.length ? ordered : null)
+}
+
 function choose(option: unknown) {
   if (typeof option !== 'string') return
   const next = option === NONE ? null : option
@@ -137,6 +150,45 @@ function choose(option: unknown) {
       />
     </component>
   </div>
+
+  <!-- Multiple choice: tags, and a checklist that saves each tick -->
+  <template v-else-if="field.type === 'multiselect'">
+    <DropdownMenu v-if="editable">
+      <DropdownMenuTrigger as-child>
+        <button
+          type="button"
+          class="flex min-h-8 w-full min-w-32 flex-wrap items-center gap-1 rounded-md px-2 py-1 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          :aria-label="`${editLabel}: ${text || $t('table.empty')}`"
+        >
+          <Badge v-for="choice in chosen" :key="choice" variant="secondary">
+            {{ choice }}
+          </Badge>
+          <span
+            v-if="!chosen.length"
+            class="text-muted-foreground/60"
+            aria-hidden="true"
+            >—</span
+          >
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" class="w-max min-w-48">
+        <DropdownMenuCheckboxItem
+          v-for="option in field.options ?? []"
+          :key="option"
+          :model-value="chosen.includes(option)"
+          @update:model-value="toggleChoice(option, $event === true)"
+          @select.prevent
+        >
+          {{ option }}
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    <div v-else class="flex flex-wrap gap-1">
+      <Badge v-for="choice in chosen" :key="choice" variant="secondary">
+        {{ choice }}
+      </Badge>
+    </div>
+  </template>
 
   <!-- Select -->
   <template v-else-if="field.type === 'select'">

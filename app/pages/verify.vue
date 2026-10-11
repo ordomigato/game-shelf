@@ -47,6 +47,7 @@ async function resend() {
   <AuthCard v-if="email" :title="$t('verify.title')">
     <div class="flex flex-col gap-5">
       <i18n-t
+        scope="global"
         keypath="verify.sentTo"
         tag="p"
         class="text-sm text-muted-foreground"
@@ -65,7 +66,7 @@ async function resend() {
       </form>
     </div>
     <template #footer>
-      <i18n-t keypath="verify.notReceived" tag="p">
+      <i18n-t scope="global" keypath="verify.notReceived" tag="p">
         <template #resend>
           <button
             type="button"

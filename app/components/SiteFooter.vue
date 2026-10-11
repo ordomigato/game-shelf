@@ -7,7 +7,7 @@
         <p>GameShelf</p>
         <ThemeSwitcher />
       </div>
-      <i18n-t keypath="footer.igdbCredit" tag="p">
+      <i18n-t scope="global" keypath="footer.igdbCredit" tag="p">
         <template #igdb>
           <a
             href="https://www.igdb.com"

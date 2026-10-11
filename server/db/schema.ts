@@ -150,6 +150,29 @@ export const collectionItems = pgTable(
 )
 
 /**
+ * Collections a user pinned to the top of their sidebar, in their order.
+ * Per user rather than a column on collections, so people sharing a
+ * collection can pin it or not.
+ */
+export const pinnedCollections = pgTable(
+  'pinned_collections',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    collectionId: uuid('collection_id')
+      .notNull()
+      .references(() => collections.id, { onDelete: 'cascade' }),
+    /** Halfway between neighbours on a move, like `collection_items`. */
+    position: doublePrecision('position').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.collectionId] }),
+    index('pinned_collections_collection_id_idx').on(table.collectionId),
+  ],
+)
+
+/**
  * Counters for rate limits, one row per action and person (or address),
  * for the current fixed window. See `server/utils/rate-limit.ts`.
  */

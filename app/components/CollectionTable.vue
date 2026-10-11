@@ -466,6 +466,7 @@ const addedFormat = computed(
           class="[&_tr:last-child]:border-0"
           handle=".drag-handle"
           ghost-class="drag-gap"
+          chosen-class="drag-chosen"
           :animation="150"
           :disabled="!reorderable"
           @update="onDragged"

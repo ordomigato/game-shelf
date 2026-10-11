@@ -21,6 +21,7 @@ const summary = (
 const wishlist = summary('Wishlist', '2026-01-01T00:00:00.000Z', {
   kind: 'wishlist',
   itemCount: 12,
+  pinnedPosition: 1,
 })
 
 async function signedInWith(page: Page, collections: unknown[]) {
@@ -68,7 +69,7 @@ test.describe('visitors', () => {
 })
 
 test.describe('signed in', () => {
-  test('the sidebar lists the Wishlist, then recently changed collections', async ({
+  test('the sidebar lists pinned collections, then recently changed ones', async ({
     page,
   }) => {
     await signedInWith(page, [
@@ -78,12 +79,12 @@ test.describe('signed in', () => {
     ])
     await page.goto('/blueprints')
     const sidebar = page.getByRole('complementary')
-    const list = sidebar.getByRole('list', { name: 'Collections' })
-    await expect(list.getByRole('link')).toHaveText([
-      /Wishlist\s*12/,
-      /NES Games\s*3/,
-      /Atari\s*3/,
-    ])
+    await expect(
+      sidebar.getByRole('list', { name: 'Pinned' }).getByRole('listitem'),
+    ).toHaveText([/Wishlist\s*12/])
+    await expect(
+      sidebar.getByRole('list', { name: 'Collections' }).getByRole('listitem'),
+    ).toHaveText([/NES Games\s*3/, /Atari\s*3/])
     await expect(
       sidebar.getByRole('link', { name: 'Blueprints' }),
     ).toHaveAttribute('aria-current', 'page')
@@ -97,7 +98,7 @@ test.describe('signed in', () => {
     await signedInWith(page, [wishlist, ...many])
     await page.goto('/blueprints')
     const list = page.getByRole('list', { name: 'Collections' })
-    await expect(list.getByRole('link')).toHaveCount(9)
+    await expect(list.getByRole('listitem')).toHaveCount(9)
     await expect(
       list.getByRole('link', { name: 'View all 11' }),
     ).toHaveAttribute('href', '/u/retro_fan/shelf')

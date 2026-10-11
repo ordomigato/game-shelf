@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { VueDraggable } from 'vue-draggable-plus'
 import {
   ChevronDown,
   Compass,
-  Heart,
   LayoutTemplate,
   Library,
   Plus,
@@ -11,18 +11,17 @@ import {
 } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
-/** How many collections the sidebar lists before "View all". */
+/** How many unpinned collections the sidebar lists before "View all". */
 const SHOWN_COLLECTIONS = 8
 
 /**
- * The signed-in layout's sidebar: the main sections, then the user's
- * collections (Wishlist first, then the most recently changed).
+ * The signed-in layout's sidebar: the main sections, the collections the
+ * user pinned (in their order), then the rest, most recently changed first.
  */
 const props = defineProps<{ shelfPath: string }>()
 
 const route = useRoute()
-const titleOf = useCollectionTitle()
-const { list, refresh } = useMyCollections()
+const { list, refresh, pinned, unpinned, pin, unpin } = useMyCollections()
 
 onMounted(() => {
   if (list.value === null) onNuxtReady(() => void refresh())
@@ -37,21 +36,50 @@ const open = useCookie<boolean>('gs_sidebar_collections', {
   maxAge: 60 * 60 * 24 * 365,
 })
 
-const sorted = computed(() =>
-  [...(list.value ?? [])].sort(
-    (a, b) =>
-      Number(b.kind === 'wishlist') - Number(a.kind === 'wishlist') ||
-      b.updatedAt.localeCompare(a.updatedAt),
-  ),
-)
-const shown = computed(() => sorted.value.slice(0, SHOWN_COLLECTIONS))
-const hiddenCount = computed(() => sorted.value.length - shown.value.length)
+const shown = computed(() => unpinned.value.slice(0, SHOWN_COLLECTIONS))
+const hiddenCount = computed(() => unpinned.value.length - shown.value.length)
 
 const collectionPath = (collection: CollectionSummary) =>
   `${props.shelfPath}/${collection.slug}`
-const dotStyle = (collection: CollectionSummary) => ({
-  background: generatedCoverColors(collection.title).from,
-})
+const isCurrent = (collection: CollectionSummary) =>
+  route.path === collectionPath(collection)
+
+function togglePin(collection: CollectionSummary) {
+  if (collection.pinnedPosition == null) void pin(collection)
+  else void unpin(collection)
+}
+
+// The drag list works on its own copy, kept in step with the pins.
+const pinnedOrder = ref<CollectionSummary[]>([])
+watch(pinned, (value) => (pinnedOrder.value = [...value]), { immediate: true })
+
+/** Saves a pin's new place: after the one above it, or first. */
+function placeAt(collection: CollectionSummary, index: number) {
+  const others = pinned.value.filter((other) => other.id !== collection.id)
+  void pin(collection, index === 0 ? null : others[index - 1]!.id)
+}
+
+function onDragged(event: { oldIndex?: number; newIndex?: number }) {
+  const { oldIndex, newIndex } = event
+  if (oldIndex === undefined || newIndex === undefined) return
+  const moved = pinned.value[oldIndex]
+  if (moved && oldIndex !== newIndex) placeAt(moved, newIndex)
+}
+
+/** Arrow keys on a pin's grip move it up or down one place. */
+async function moveBy(collection: CollectionSummary, offset: -1 | 1) {
+  const index = pinned.value.findIndex((other) => other.id === collection.id)
+  const target = index + offset
+  if (index === -1 || target < 0 || target >= pinned.value.length) return
+  placeAt(collection, target)
+  // Keep focus on the grip, which moved with its row.
+  await nextTick()
+  document
+    .querySelector<HTMLElement>(
+      `[data-pin-id="${collection.id}"] .sidebar-grip`,
+    )
+    ?.focus()
+}
 
 const sections = computed(() => [
   {
@@ -113,6 +141,52 @@ const itemClass =
       </NuxtLink>
     </nav>
 
+    <h2
+      id="sidebar-pinned"
+      class="mt-4 px-2.5 py-1 font-sans text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+    >
+      {{ $t('sidebar.pinned') }}
+    </h2>
+    <ul
+      v-if="list === null"
+      aria-labelledby="sidebar-pinned"
+      class="flex flex-col gap-0.5"
+    >
+      <li v-for="n in 3" :key="n" class="flex h-8 items-center gap-2.5 px-2.5">
+        <Skeleton class="size-2.5 rounded-sm" />
+        <Skeleton class="h-3 flex-1" />
+      </li>
+    </ul>
+    <p
+      v-else-if="!pinned.length"
+      class="mx-1 rounded-md border border-dashed border-sidebar-border px-2.5 py-2 text-xs text-muted-foreground"
+    >
+      {{ $t('sidebar.pinHint') }}
+    </p>
+    <VueDraggable
+      v-else
+      v-model="pinnedOrder"
+      tag="ul"
+      aria-labelledby="sidebar-pinned"
+      class="flex flex-col gap-0.5"
+      handle=".sidebar-grip"
+      ghost-class="drag-gap"
+      :animation="150"
+      @update="onDragged"
+    >
+      <SidebarCollection
+        v-for="collection in pinnedOrder"
+        :key="collection.id"
+        :data-pin-id="collection.id"
+        :collection="collection"
+        :to="collectionPath(collection)"
+        :current="isCurrent(collection)"
+        pinned
+        @toggle-pin="togglePin(collection)"
+        @move="moveBy(collection, $event)"
+      />
+    </VueDraggable>
+
     <div class="mt-4 flex items-center gap-0.5 pr-1 pl-2.5">
       <h2
         id="sidebar-collections"
@@ -156,47 +230,21 @@ const itemClass =
       aria-labelledby="sidebar-collections"
       class="flex flex-col gap-0.5"
     >
-      <template v-if="list === null">
-        <li
-          v-for="n in 4"
-          :key="n"
-          class="flex h-8 items-center gap-2.5 px-2.5"
-        >
-          <Skeleton class="size-2.5 rounded-sm" />
-          <Skeleton class="h-3 flex-1" />
-        </li>
-      </template>
-      <li v-for="collection in shown" :key="collection.id">
-        <NuxtLink
-          :to="collectionPath(collection)"
-          :class="itemClass"
-          :aria-current="
-            route.path === collectionPath(collection) ? 'page' : undefined
-          "
-        >
-          <Heart
-            v-if="collection.kind === 'wishlist'"
-            class="size-3.5 shrink-0 fill-current text-primary"
-            aria-hidden="true"
-          />
-          <span
-            v-else
-            class="size-2.5 shrink-0 rounded-sm"
-            :style="dotStyle(collection)"
-            aria-hidden="true"
-          />
-          <span class="min-w-0 flex-1 truncate">{{ titleOf(collection) }}</span>
-          <span class="text-xs text-muted-foreground tabular-nums">
-            {{ collection.itemCount }}
-          </span>
-        </NuxtLink>
-      </li>
+      <SidebarCollection
+        v-for="collection in shown"
+        :key="collection.id"
+        :collection="collection"
+        :to="collectionPath(collection)"
+        :current="isCurrent(collection)"
+        :pinned="false"
+        @toggle-pin="togglePin(collection)"
+      />
       <li v-if="hiddenCount > 0">
         <NuxtLink
           :to="shelfPath"
           class="block rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:text-sidebar-foreground"
         >
-          {{ $t('sidebar.viewAll', { count: sorted.length }) }}
+          {{ $t('sidebar.viewAll', { count: list?.length ?? 0 }) }}
         </NuxtLink>
       </li>
     </ul>

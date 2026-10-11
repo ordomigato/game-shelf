@@ -10,6 +10,8 @@ import {
   LayoutGrid,
   PenLine,
   Pencil,
+  Pin,
+  PinOff,
   Plus,
   Table2,
   Trash2,
@@ -295,6 +297,27 @@ function setBlueprint(blueprint: Blueprint) {
   data.value = { ...data.value, blueprint }
 }
 
+// Pinning to the sidebar, from the same list the sidebar uses. Phones
+// have no sidebar, so load the list here if nothing has yet.
+const sidebar = useMyCollections()
+const sidebarEntry = computed(
+  () =>
+    sidebar.list.value?.find((entry) => entry.id === data.value?.id) ?? null,
+)
+watch(
+  () => data.value?.isOwner,
+  (isOwner) => {
+    if (isOwner && sidebar.list.value === null) void sidebar.refresh()
+  },
+  { immediate: true },
+)
+function togglePin() {
+  const entry = sidebarEntry.value
+  if (!entry) return
+  if (entry.pinnedPosition == null) void sidebar.pin(entry)
+  else void sidebar.unpin(entry)
+}
+
 /**
  * Downloads this collection as a CSV file, built right here from the games
  * already on the page.
@@ -505,6 +528,14 @@ async function deleteCollection() {
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="editingFields = true">
                   <Columns3 /> {{ $t('collection.editFields') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="sidebarEntry" @select="togglePin">
+                  <template v-if="sidebarEntry.pinnedPosition == null">
+                    <Pin /> {{ $t('collection.pin') }}
+                  </template>
+                  <template v-else>
+                    <PinOff /> {{ $t('collection.unpin') }}
+                  </template>
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="importing = true">
                   <Upload /> {{ $t('collection.importCsv') }}

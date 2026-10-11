@@ -23,7 +23,15 @@
     "collections": "Collections",
     "newCollection": "New collection",
     "toggleCollections": "Show or hide collections",
-    "viewAll": "View all {count}"
+    "viewAll": "View all {count}",
+    "pinned": "Pinned",
+    "pinHint": "Pin collections to keep them here.",
+    "pin": "Pin {name}",
+    "unpin": "Unpin {name}",
+    "reorder": "Reorder {name}. Use the up and down arrow keys.",
+    "pinFailed": "Couldn't pin {name}. Try again.",
+    "unpinFailed": "Couldn't unpin {name}. Try again.",
+    "moveFailed": "Couldn't move {name}. Try again."
   },
   "theme": {
     "label": "Theme",
@@ -317,7 +325,9 @@
     "addByHand": "Add by hand",
     "charts": "Charts",
     "exportCsv": "Export CSV",
-    "importCsv": "Import CSV"
+    "importCsv": "Import CSV",
+    "pin": "Pin to sidebar",
+    "unpin": "Unpin from sidebar"
   },
   "addToCollection": {
     "button": "Add to collection",

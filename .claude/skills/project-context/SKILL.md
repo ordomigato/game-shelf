@@ -15,9 +15,9 @@ Each collection has columns the user defines (a collector tracks price and
 quantity, a player tracks console and progress), and IGDB search only
 pre-fills new items. Users own their data. Public collections can be
 browsed by others, with posts and comments planned around them. `main` is v3, a clean rewrite with no
-shared history. The `v1` tag holds the original (Nuxt 2, Heroku, Firebase)
+shared history. The `archive/v1` tag holds the original (Nuxt 2, Heroku, Firebase)
 and the `v2` branch an abandoned Netlify attempt. Read them for behavior
-with `git show v1:<path>`, but don't port their architecture.
+with `git show archive/v1:<path>`, but don't port their architecture.
 
 ## Settled decisions
 

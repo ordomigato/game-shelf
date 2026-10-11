@@ -1,6 +1,6 @@
 name: Deploy
 
-# Deploys production when a version tag (v3.0.0) is pushed, or a GitHub
+# Deploys production when a version tag (v1.2.0) is pushed, or a GitHub
 # release is published with one. The tagged commit must be on main.
 on:
   push:

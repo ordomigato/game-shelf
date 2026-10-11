@@ -95,7 +95,7 @@ here:
 ## Production deploys
 
 Production deploys from GitHub Actions (`.github/workflows/deploy.yml`)
-when the user pushes a version tag (`v3.1.0`) on a commit on `main`, or
+when the user pushes a version tag (`v1.2.0`; releases start at `v1.0.0`) on a commit on `main`, or
 publishes a release with one. Merging to `main` doesn't deploy. The job
 migrates the database, runs `sst deploy`, then smoke-tests the site.
 Migrations run before the new code, so they must stay additive.

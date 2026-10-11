@@ -33,7 +33,7 @@ the commit is made. A `pre-commit` hook runs eslint and prettier on staged
 files through lint-staged. There's no CI yet, so the local hooks are the
 only check. Never bypass them with `--no-verify`.
 
-Commits in the archived `v1` tag and the `v2` branch predate the
+Commits in the `archive/v1` tag and the `v2` branch predate the
 convention, so don't copy their style.
 
 ## Examples

@@ -25,7 +25,12 @@ function choose(slug: unknown) {
   <div
     class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 shadow-sm"
   >
-    <i18n-t keypath="addToCollection.addingTo" tag="p" class="min-w-0">
+    <i18n-t
+      scope="global"
+      keypath="addToCollection.addingTo"
+      tag="p"
+      class="min-w-0"
+    >
       <template #collection>
         <strong class="font-semibold">{{ titleOf(target) }}</strong>
       </template>

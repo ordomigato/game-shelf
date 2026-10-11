@@ -446,6 +446,7 @@ async function deleteCollection() {
           </p>
           <i18n-t
             v-if="data.isOwner && data.blueprint.shared"
+            scope="global"
             keypath="blueprints.fromBlueprint"
             tag="p"
             class="text-sm text-muted-foreground"

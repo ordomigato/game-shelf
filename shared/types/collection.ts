@@ -100,6 +100,11 @@ export interface CollectionSummary {
   kind: CollectionKind
   itemCount: number
   updatedAt: string
+  /**
+   * Where it's pinned in the signed-in user's sidebar, null if it isn't.
+   * Only on their own list (`GET /api/collections`).
+   */
+  pinnedPosition?: number | null
 }
 
 export interface LibraryItem {

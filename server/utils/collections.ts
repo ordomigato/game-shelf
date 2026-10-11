@@ -33,6 +33,7 @@ import {
   collectionItems,
   collections,
   libraryItems,
+  pinnedCollections,
 } from '../db/schema'
 import { isUniqueViolation } from './db-errors'
 import { positionBetween } from './positions'
@@ -107,7 +108,13 @@ export async function ensureWishlist(ownerId: string): Promise<void> {
   // Another request created it first: drop the unused blueprint.
   if (inserted.length === 0) {
     await db.delete(blueprints).where(eq(blueprints.id, blueprintId))
+    return
   }
+  // New users start with their Wishlist pinned to the sidebar.
+  await db
+    .insert(pinnedCollections)
+    .values({ userId: ownerId, collectionId: inserted[0]!.id, position: 1 })
+    .onConflictDoNothing()
 }
 
 /** A user's collections, Wishlist first, with item counts. */

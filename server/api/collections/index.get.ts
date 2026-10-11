@@ -1,10 +1,17 @@
 import type { CollectionSummary } from '../../../shared/types/collection'
 
-/** The signed-in user's collections, Wishlist first. */
+/** The signed-in user's collections, Wishlist first, with their sidebar pins. */
 export default defineEventHandler(
   async (event): Promise<CollectionSummary[]> => {
     const { sub } = await requireAuth(event)
     const user = await findOrCreateUser(sub)
-    return listCollections(user.id, { publicOnly: false })
+    const [list, pins] = await Promise.all([
+      listCollections(user.id, { publicOnly: false }),
+      pinPositions(user.id),
+    ])
+    return list.map((collection) => ({
+      ...collection,
+      pinnedPosition: pins.get(collection.id) ?? null,
+    }))
   },
 )

@@ -1,0 +1,39 @@
+name: Audit
+
+# Reports known vulnerabilities in dependencies. Not a required check: a red
+# result doesn't block merging, since most advisories are in build tooling
+# and wait on upstream releases. Runs when dependencies change, weekly for
+# new advisories, and by hand from the Actions tab.
+on:
+  pull_request:
+    paths: [package.json, package-lock.json]
+  push:
+    branches: [main]
+    paths: [package.json, package-lock.json]
+  schedule:
+    - cron: '0 13 * * 1' # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Reads package-lock.json only, so no install is needed.
+      - name: npm audit
+        run: |
+          {
+            echo '## npm audit'
+            echo '```'
+            npm audit || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          npm audit --audit-level=high

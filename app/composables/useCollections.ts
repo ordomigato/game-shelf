@@ -22,6 +22,15 @@ import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
  */
 export function useCollections() {
   const auth = useAuth()
+  const sidebar = useMyCollections()
+
+  /** Refreshes the sidebar's collections once a change has saved. */
+  function refreshing<T>(request: Promise<T>): Promise<T> {
+    return request.then((result) => {
+      void sidebar.refresh()
+      return result
+    })
+  }
 
   async function viewerFetch<T>(url: string): Promise<T> {
     await auth.ensureLoaded()
@@ -56,10 +65,12 @@ export function useCollections() {
         { starter: StarterBlueprint } | { blueprintId: string; copy?: boolean }
       ),
     ) =>
-      auth.apiFetch<CollectionSummary>('/api/collections', {
-        method: 'POST',
-        body: input,
-      }),
+      refreshing(
+        auth.apiFetch<CollectionSummary>('/api/collections', {
+          method: 'POST',
+          body: input,
+        }),
+      ),
 
     /** The signed-in user's blueprints. */
     blueprints: () => auth.apiFetch<BlueprintSummary[]>('/api/blueprints'),
@@ -123,13 +134,15 @@ export function useCollections() {
         visibility?: CollectionVisibility
       },
     ) =>
-      auth.apiFetch<CollectionSummary>(`/api/collections/${id}`, {
-        method: 'PATCH',
-        body: changes,
-      }),
+      refreshing(
+        auth.apiFetch<CollectionSummary>(`/api/collections/${id}`, {
+          method: 'PATCH',
+          body: changes,
+        }),
+      ),
 
     remove: (id: string) =>
-      auth.apiFetch(`/api/collections/${id}`, { method: 'DELETE' }),
+      refreshing(auth.apiFetch(`/api/collections/${id}`, { method: 'DELETE' })),
 
     /** The signed-in user's own collections, Wishlist first. */
     mine: () => auth.apiFetch<CollectionSummary[]>('/api/collections'),
@@ -160,30 +173,36 @@ export function useCollections() {
       game: { igdbId: number; name: string; coverId: string | null },
       collectionIds: string[],
     ) =>
-      auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
-        '/api/library-items',
-        { method: 'POST', body: { ...game, collectionIds } },
+      refreshing(
+        auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
+          '/api/library-items',
+          { method: 'POST', body: { ...game, collectionIds } },
+        ),
       ),
 
     /** Adds a game IGDB doesn't have, by name, to one collection. */
     addManualGame: (name: string, collectionId: string) =>
-      auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
-        '/api/library-items',
-        {
-          method: 'POST',
-          body: {
-            igdbId: null,
-            name,
-            coverId: null,
-            collectionIds: [collectionId],
+      refreshing(
+        auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
+          '/api/library-items',
+          {
+            method: 'POST',
+            body: {
+              igdbId: null,
+              name,
+              coverId: null,
+              collectionIds: [collectionId],
+            },
           },
-        },
+        ),
       ),
 
     addItem: (collectionId: string, itemId: string) =>
-      auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
-        method: 'PUT',
-      }),
+      refreshing(
+        auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
+          method: 'PUT',
+        }),
+      ),
 
     /** Renames the user's own copy of a game, in all their collections. */
     renameItem: (itemId: string, name: string) =>
@@ -242,14 +261,18 @@ export function useCollections() {
       itemId: string,
       toCollectionIds: string[],
     ) =>
-      auth.apiFetch(
-        `/api/collections/${fromCollectionId}/items/${itemId}/move`,
-        { method: 'POST', body: { toCollectionIds } },
+      refreshing(
+        auth.apiFetch(
+          `/api/collections/${fromCollectionId}/items/${itemId}/move`,
+          { method: 'POST', body: { toCollectionIds } },
+        ),
       ),
 
     removeItem: (collectionId: string, itemId: string) =>
-      auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
-        method: 'DELETE',
-      }),
+      refreshing(
+        auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
+          method: 'DELETE',
+        }),
+      ),
   }
 }

@@ -8,7 +8,22 @@
     "signOut": "Sign out",
     "myShelf": "My shelf",
     "blueprints": "Blueprints",
-    "explore": "Explore"
+    "explore": "Explore",
+    "search": "Search",
+    "searchLabel": "Search games",
+    "searchPlaceholder": "Search games",
+    "createAccount": "Create account",
+    "settings": "Settings",
+    "accountMenu": "Account menu",
+    "shelf": "Shelf"
+  },
+  "sidebar": {
+    "mainLabel": "Main",
+    "moreLabel": "More",
+    "collections": "Collections",
+    "newCollection": "New collection",
+    "toggleCollections": "Show or hide collections",
+    "viewAll": "View all {count}"
   },
   "theme": {
     "label": "Theme",

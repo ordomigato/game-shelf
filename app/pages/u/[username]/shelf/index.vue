@@ -43,6 +43,18 @@ useHead(() => ({
 
 const creating = ref(false)
 
+// The sidebar's New collection button links here with `?new=1`.
+const router = useRouter()
+watch(
+  [isMine, () => route.query.new],
+  ([mine, wantsNew]) => {
+    if (!mine || wantsNew !== '1') return
+    creating.value = true
+    void router.replace({ query: { ...route.query, new: undefined } })
+  },
+  { immediate: true },
+)
+
 async function onCreated(collection: CollectionSummary) {
   await navigateTo(`/u/${username.value}/shelf/${collection.slug}`)
 }

@@ -31,6 +31,7 @@ const open = defineModel<boolean>('open', { default: false })
 
 const { t } = useI18n()
 const auth = useAuth()
+const sidebar = useMyCollections()
 
 type Step = 'file' | 'map' | 'match' | 'review' | 'importing' | 'done'
 const step = ref<Step>('file')
@@ -306,6 +307,8 @@ async function runImport() {
     result.value = totals
     step.value = 'done'
     emit('imported')
+  } finally {
+    void sidebar.refresh()
   }
 }
 </script>

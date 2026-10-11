@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildGameQuery,
+  buildMatchQuery,
   buildSearchQuery,
   escapeApicalypseString,
   MAX_SCREENSHOTS,
@@ -207,5 +208,14 @@ describe('toGameDetails', () => {
       screenshotIds: [],
       igdbUrl: null,
     })
+  })
+})
+
+describe('buildMatchQuery', () => {
+  it('searches like search does, for fewer results', () => {
+    const query = buildMatchQuery('Say "Hi"')
+    expect(query).toContain('search "Say \\"Hi\\"";')
+    expect(query).toContain('where version_parent = null')
+    expect(query).toMatch(/limit 10;$/)
   })
 })

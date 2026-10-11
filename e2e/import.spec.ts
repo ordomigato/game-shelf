@@ -13,8 +13,32 @@ const fields = [
   { id: 'beaten', name: 'Beaten', type: 'checkbox' },
 ]
 
-async function openCollection(page: Page) {
+const summary = (id: number, name: string, year: number) => ({
+  id,
+  name,
+  coverId: null,
+  year,
+  platforms: ['NES'],
+})
+
+async function openCollection(page: Page, matches: unknown[] = []) {
   await signInAs(page, { username: 'retro_fan' })
+  await page.route('**/api/import/match', (route) => {
+    const { names } = route.request().postDataJSON() as { names: string[] }
+    return route.fulfill({
+      json: names.map(
+        (name) =>
+          (matches as { name: string }[]).find(
+            (match) => match.name === name,
+          ) ?? {
+            name,
+            confidence: 'none',
+            suggestion: null,
+            candidates: [],
+          },
+      ),
+    })
+  })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/u/retro_fan/collections/nes-games', (route) =>
     route.fulfill({
@@ -99,9 +123,13 @@ test('imports a file, matching columns and reporting what does not fit', async (
   ).toHaveText('Amount')
   await dialog.getByRole('button', { name: 'Review' }).click()
 
+  // The game without an IGDB ID is looked up by name, and not found.
+  await expect(dialog.getByText('Not found on IGDB')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Review' }).click()
+
   await expect(dialog.getByText('2 games will be imported.')).toBeVisible()
-  await expect(dialog.getByText('1 linked to IGDB by their ID')).toBeVisible()
-  await expect(dialog.getByText('1 added by hand (no IGDB ID)')).toBeVisible()
+  await expect(dialog.getByText('1 linked to IGDB')).toBeVisible()
+  await expect(dialog.getByText('1 added by hand')).toBeVisible()
   await expect(dialog.getByText('New fields: Price paid')).toBeVisible()
   await expect(
     dialog.getByText('New choices for Status: Playing'),
@@ -166,4 +194,79 @@ test('explains an empty file', async ({ page }) => {
   await openCollection(page)
   await chooseFile(page, 'Name,Status\r\n')
   await expect(page.getByText('That file has no rows to import.')).toBeVisible()
+})
+
+test('matches games without an IGDB ID by name, for checking', async ({
+  page,
+}) => {
+  const sent = await openCollection(page, [
+    {
+      name: 'super metroid',
+      confidence: 'exact',
+      suggestion: 1103,
+      candidates: [summary(1103, 'Super Metroid', 1994)],
+    },
+    {
+      name: 'zelda 1',
+      confidence: 'close',
+      suggestion: 1022,
+      candidates: [
+        summary(1022, 'The Legend of Zelda', 1986),
+        summary(1025, 'Zelda II: The Adventure of Link', 1987),
+      ],
+    },
+  ])
+  await chooseFile(
+    page,
+    'Name,Status\r\nsuper metroid,Finished\r\nzelda 1,Backlog\r\n',
+  )
+  const dialog = page.getByRole('dialog', { name: 'Import from a CSV file' })
+  await dialog.getByRole('button', { name: 'Review' }).click()
+
+  // Exact matches are hidden by default: only the one to check shows.
+  const toCheck = dialog.getByRole('combobox', { name: /^IGDB game for / })
+  await expect(toCheck).toHaveCount(1)
+  await expect(dialog.getByText('Closest match: check it')).toBeVisible()
+  await dialog
+    .getByRole('checkbox', { name: /Only show the ones to check/ })
+    .click()
+  await expect(toCheck).toHaveCount(2)
+
+  await dialog.getByRole('combobox', { name: 'IGDB game for zelda 1' }).click()
+  await page
+    .getByRole('option', { name: 'Zelda II: The Adventure of Link (1987)' })
+    .click()
+  await dialog.getByRole('button', { name: 'Review' }).click()
+  await expect(dialog.getByText('2 linked to IGDB')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Import 2 games' }).click()
+  await expect(dialog.getByText('Import finished')).toBeVisible()
+
+  // Matched games take their IGDB title and link.
+  expect(sent[0]!.rows).toEqual([
+    { name: 'Super Metroid', igdbId: 1103, values: { status: 'Finished' } },
+    {
+      name: 'Zelda II: The Adventure of Link',
+      igdbId: 1025,
+      values: { status: 'Backlog' },
+    },
+  ])
+})
+
+test('can skip matching and add them all by hand', async ({ page }) => {
+  const sent = await openCollection(page, [
+    {
+      name: 'zelda 1',
+      confidence: 'close',
+      suggestion: 1022,
+      candidates: [summary(1022, 'The Legend of Zelda', 1986)],
+    },
+  ])
+  await chooseFile(page, 'Name\r\nzelda 1\r\n')
+  const dialog = page.getByRole('dialog', { name: 'Import from a CSV file' })
+  await dialog.getByRole('button', { name: 'Review' }).click()
+  await dialog.getByRole('button', { name: 'Skip matching' }).click()
+  await expect(dialog.getByText('1 added by hand')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Import 1 game' }).click()
+  await expect(dialog.getByText('Import finished')).toBeVisible()
+  expect(sent[0]!.rows).toEqual([{ name: 'zelda 1', igdbId: null, values: {} }])
 })

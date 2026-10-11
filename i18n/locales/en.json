@@ -659,8 +659,8 @@
     },
     "needsName": "Choose which column holds the game's name.",
     "summary": "{count} game will be imported. | {count} games will be imported.",
-    "linked": "{count} linked to IGDB by their ID | {count} linked to IGDB by their ID | {count} linked to IGDB by their ID",
-    "byHand": "{count} added by hand (no IGDB ID) | {count} added by hand (no IGDB ID) | {count} added by hand (no IGDB ID)",
+    "linked": "{count} linked to IGDB | {count} linked to IGDB | {count} linked to IGDB",
+    "byHand": "{count} added by hand | {count} added by hand | {count} added by hand",
     "newFields": "New fields: {fields}",
     "newChoices": "New choices for {field}: {choices}",
     "updateNote": "Games already in your library get the file's values. Empty cells never erase anything.",
@@ -683,6 +683,20 @@
     "next": "Review",
     "start": "Import {count} game | Import {count} games",
     "close": "Done",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "match": {
+      "progress": "Finding games on IGDB: {done} of {total}…",
+      "hint": "{count} games had no IGDB ID, so we looked them up by name. Check the matches, or add any by hand.",
+      "onlyUnsure": "Only show the ones to check ({count})",
+      "allExact": "Every game matched its IGDB title exactly. Nothing to check.",
+      "exact": "Same title on IGDB",
+      "close": "Closest match: check it",
+      "none": "Not found on IGDB",
+      "choice": "IGDB game for {name}",
+      "byHand": "Add by hand (no IGDB link)",
+      "skip": "Skip matching",
+      "stop": "Stop and add the rest by hand",
+      "failed": "Couldn't finish looking games up. The ones found are below, and the rest will be added by hand."
+    }
   }
 }

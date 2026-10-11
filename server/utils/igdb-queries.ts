@@ -47,6 +47,21 @@ export function buildSearchQuery(term: string): string {
   ].join(' ')
 }
 
+/** Candidates fetched per name when matching an import to IGDB. */
+export const MATCH_POOL_SIZE = 10
+
+/**
+ * Searches IGDB for one imported game's name, like search does but for
+ * fewer results. (IGDB's multiquery, which batches queries, ignores
+ * `search`, so each name is its own request.)
+ */
+export function buildMatchQuery(name: string): string {
+  return buildSearchQuery(name).replace(
+    `limit ${SEARCH_POOL_SIZE};`,
+    `limit ${MATCH_POOL_SIZE};`,
+  )
+}
+
 const POPULARITY_WEIGHT = 2
 const RELEVANCE_DECAY = 25
 

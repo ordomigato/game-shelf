@@ -2,6 +2,12 @@
 import { FileUp } from '@lucide/vue'
 import type { Blueprint, FieldType } from '#shared/types/collection'
 import {
+  MATCH_BATCH_SIZE,
+  MAX_MATCH_NAMES,
+  normalizeTitle,
+  type NameMatch,
+} from '#shared/utils/game-match'
+import {
   autoMap,
   IMPORT_CHUNK_SIZE,
   MAX_IMPORT_ROWS,
@@ -26,7 +32,7 @@ const open = defineModel<boolean>('open', { default: false })
 const { t } = useI18n()
 const auth = useAuth()
 
-type Step = 'file' | 'map' | 'review' | 'importing' | 'done'
+type Step = 'file' | 'map' | 'match' | 'review' | 'importing' | 'done'
 const step = ref<Step>('file')
 const fileName = ref('')
 const fileError = ref('')
@@ -140,7 +146,7 @@ const types: { type: FieldType; labelKey: string }[] = [
 ]
 
 const plan = computed(() =>
-  step.value === 'map' || step.value === 'review'
+  step.value === 'map' || step.value === 'match' || step.value === 'review'
     ? planImport(
         headers.value,
         rows.value,
@@ -149,8 +155,110 @@ const plan = computed(() =>
       )
     : null,
 )
+// Matching games without an IGDB id by name, once per distinct title.
+const matches = ref(new Map<string, NameMatch>())
+/** The IGDB game chosen for each title, or null to add it by hand. */
+const choices = ref(new Map<string, number | null>())
+const matching = ref(false)
+const matchedCount = ref(0)
+const stopMatching = ref(false)
+const matchError = ref('')
+const onlyUnsure = ref(true)
+
+const unmatchedTitles = computed(() => {
+  const titles = new Map<string, string>()
+  for (const row of plan.value?.rows ?? []) {
+    if (row.igdbId !== null) continue
+    const key = normalizeTitle(row.name)
+    if (!titles.has(key)) titles.set(key, row.name)
+  }
+  return [...titles.entries()].slice(0, MAX_MATCH_NAMES)
+})
+
+async function goToMatching() {
+  if (!unmatchedTitles.value.length) {
+    step.value = 'review'
+    return
+  }
+  step.value = 'match'
+  const todo = unmatchedTitles.value.filter(([key]) => !matches.value.has(key))
+  if (!todo.length) return
+  matching.value = true
+  stopMatching.value = false
+  matchError.value = ''
+  matchedCount.value = unmatchedTitles.value.length - todo.length
+  try {
+    for (let start = 0; start < todo.length; start += MATCH_BATCH_SIZE) {
+      if (stopMatching.value) break
+      const batch = todo.slice(start, start + MATCH_BATCH_SIZE)
+      const found = await auth.apiFetch<NameMatch[]>('/api/import/match', {
+        method: 'POST',
+        body: { names: batch.map(([, name]) => name) },
+      })
+      const nextMatches = new Map(matches.value)
+      const nextChoices = new Map(choices.value)
+      batch.forEach(([key], index) => {
+        const match = found[index]
+        if (!match) return
+        nextMatches.set(key, match)
+        nextChoices.set(key, match.suggestion)
+      })
+      matches.value = nextMatches
+      choices.value = nextChoices
+      matchedCount.value += batch.length
+    }
+  } catch {
+    matchError.value = t('import.match.failed')
+  } finally {
+    matching.value = false
+  }
+}
+
+function skipMatching() {
+  stopMatching.value = true
+  choices.value = new Map()
+  step.value = 'review'
+}
+
+const matchList = computed(() =>
+  unmatchedTitles.value
+    .map(([key, name]) => ({ key, name, match: matches.value.get(key) }))
+    .filter(
+      (entry) => !onlyUnsure.value || entry.match?.confidence !== 'exact',
+    ),
+)
+const unsureCount = computed(
+  () =>
+    unmatchedTitles.value.filter(
+      ([key]) => matches.value.get(key)?.confidence !== 'exact',
+    ).length,
+)
+
+function choose(key: string, value: unknown) {
+  const next = new Map(choices.value)
+  next.set(
+    key,
+    value === 'hand' || typeof value !== 'string' ? null : Number(value),
+  )
+  choices.value = next
+}
+
+function chosen(key: string) {
+  const id = choices.value.get(key)
+  return matches.value.get(key)?.candidates.find((game) => game.id === id)
+}
+
+/** The plan's rows with the chosen IGDB games filled in. */
+const finalRows = computed(() =>
+  (plan.value?.rows ?? []).map((row) => {
+    if (row.igdbId !== null) return row
+    const game = chosen(normalizeTitle(row.name))
+    return game ? { ...row, igdbId: game.id, name: game.name } : row
+  }),
+)
+
 const linkedCount = computed(
-  () => plan.value?.rows.filter((row) => row.igdbId !== null).length ?? 0,
+  () => finalRows.value.filter((row) => row.igdbId !== null).length,
 )
 const fieldName = (id: string) =>
   plan.value?.fields.find((field) => field.id === id)?.name ?? ''
@@ -163,6 +271,7 @@ const reasons: Record<ImportProblem['reason'], { key: string }> = {
 
 async function runImport() {
   const current = plan.value
+  const rows = finalRows.value
   if (!current) return
   step.value = 'importing'
   progress.value = 0
@@ -171,18 +280,14 @@ async function runImport() {
   const fieldsChanged =
     current.newFields.length > 0 || Object.keys(current.addedOptions).length > 0
   try {
-    for (
-      let start = 0;
-      start < current.rows.length;
-      start += IMPORT_CHUNK_SIZE
-    ) {
+    for (let start = 0; start < rows.length; start += IMPORT_CHUNK_SIZE) {
       const chunk = await auth.apiFetch<typeof totals>(
         `/api/collections/${props.collectionId}/import`,
         {
           method: 'POST',
           body: {
             ...(start === 0 && fieldsChanged && { fields: current.fields }),
-            rows: current.rows.slice(start, start + IMPORT_CHUNK_SIZE),
+            rows: rows.slice(start, start + IMPORT_CHUNK_SIZE),
           },
         },
       )
@@ -190,7 +295,7 @@ async function runImport() {
       totals.updated += chunk.updated
       totals.linked += chunk.linked
       totals.handAdded += chunk.handAdded
-      progress.value = Math.min(start + IMPORT_CHUNK_SIZE, current.rows.length)
+      progress.value = Math.min(start + IMPORT_CHUNK_SIZE, rows.length)
     }
     result.value = totals
     step.value = 'done'
@@ -326,7 +431,103 @@ async function runImport() {
         <FormMessage v-if="!hasName">{{ $t('import.needsName') }}</FormMessage>
       </div>
 
-      <!-- 3. Review -->
+      <!-- 3. Match games without an IGDB id -->
+      <div v-else-if="step === 'match'" class="flex flex-col gap-3">
+        <template v-if="matching">
+          <p>
+            {{
+              $t('import.match.progress', {
+                done: matchedCount,
+                total: unmatchedTitles.length,
+              })
+            }}
+          </p>
+          <div
+            class="h-2 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            :aria-valuenow="matchedCount"
+            aria-valuemin="0"
+            :aria-valuemax="unmatchedTitles.length"
+          >
+            <div
+              class="h-full bg-primary transition-all"
+              :style="{
+                width: `${(matchedCount / Math.max(unmatchedTitles.length, 1)) * 100}%`,
+              }"
+            />
+          </div>
+        </template>
+        <template v-else>
+          <FormMessage v-if="matchError">{{ matchError }}</FormMessage>
+          <p class="text-sm text-muted-foreground">
+            {{ $t('import.match.hint', { count: unmatchedTitles.length }) }}
+          </p>
+          <Label class="flex items-center gap-2 font-normal">
+            <Checkbox v-model="onlyUnsure" />
+            {{ $t('import.match.onlyUnsure', { count: unsureCount }) }}
+          </Label>
+          <p
+            v-if="!matchList.length"
+            class="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground"
+          >
+            {{ $t('import.match.allExact') }}
+          </p>
+          <ul
+            v-else
+            class="flex max-h-96 flex-col divide-y overflow-y-auto rounded-lg border"
+          >
+            <li
+              v-for="entry in matchList"
+              :key="entry.key"
+              class="flex flex-wrap items-center gap-3 p-3"
+            >
+              <GameCover
+                :name="chosen(entry.key)?.name ?? entry.name"
+                :cover-id="chosen(entry.key)?.coverId ?? null"
+                size="thumb"
+                class="w-8 shrink-0"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-medium">{{ entry.name }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{
+                    entry.match?.confidence === 'exact'
+                      ? $t('import.match.exact')
+                      : entry.match?.confidence === 'close'
+                        ? $t('import.match.close')
+                        : $t('import.match.none')
+                  }}
+                </p>
+              </div>
+              <Select
+                :model-value="String(choices.get(entry.key) ?? 'hand')"
+                @update:model-value="choose(entry.key, $event)"
+              >
+                <SelectTrigger
+                  class="w-64"
+                  :aria-label="$t('import.match.choice', { name: entry.name })"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="game in entry.match?.candidates ?? []"
+                    :key="game.id"
+                    :value="String(game.id)"
+                  >
+                    {{ game.name }}{{ game.year ? ` (${game.year})` : '' }}
+                  </SelectItem>
+                  <SelectItem value="hand">{{
+                    $t('import.match.byHand')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </li>
+          </ul>
+        </template>
+      </div>
+
+      <!-- 4. Review -->
       <div v-else-if="step === 'review' && plan" class="flex flex-col gap-4">
         <p class="font-medium">
           {{
@@ -451,12 +652,23 @@ async function runImport() {
           <Button variant="outline" @click="step = 'file'">
             {{ $t('import.back') }}
           </Button>
-          <Button :disabled="!hasName" @click="step = 'review'">
+          <Button :disabled="!hasName" @click="goToMatching">
+            {{ $t('import.next') }}
+          </Button>
+        </template>
+        <template v-else-if="step === 'match'">
+          <Button variant="outline" @click="skipMatching">
+            {{ matching ? $t('import.match.stop') : $t('import.match.skip') }}
+          </Button>
+          <Button :disabled="matching" @click="step = 'review'">
             {{ $t('import.next') }}
           </Button>
         </template>
         <template v-else-if="step === 'review' && plan">
-          <Button variant="outline" @click="step = 'map'">
+          <Button
+            variant="outline"
+            @click="step = unmatchedTitles.length ? 'match' : 'map'"
+          >
             {{ $t('import.back') }}
           </Button>
           <Button :disabled="!plan.rows.length" @click="runImport">

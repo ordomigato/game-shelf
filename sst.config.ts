@@ -83,7 +83,8 @@ export default $config({
       server: {
         runtime: 'nodejs24.x',
         architecture: 'arm64',
-        memory: '512 MB',
+        // More memory also means more CPU, which speeds up cold starts.
+        memory: '1024 MB',
       },
       transform: {
         server: (args) => {

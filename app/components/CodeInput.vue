@@ -14,6 +14,7 @@ const emit = defineEmits<{ complete: [code: string] }>()
     inputmode="numeric"
     autocomplete="one-time-code"
     :aria-label="$t('fields.codeLabel')"
+    class="justify-center"
     @complete="emit('complete', $event)"
   >
     <InputOTPGroup>

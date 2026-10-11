@@ -1,11 +1,38 @@
 <script setup lang="ts">
+import { Download } from '@lucide/vue'
+import { FetchError } from 'ofetch'
+
 const { t } = useI18n()
 useHead(() => ({
   title: t('app.title', { page: t('account.settings.pageTitle') }),
 }))
 
 const auth = useAuth()
+const collections = useCollections()
 const error = ref('')
+
+const exporting = ref(false)
+const exportError = ref('')
+
+/** Downloads every collection as CSV files in one zip. */
+async function exportEverything() {
+  exportError.value = ''
+  exporting.value = true
+  try {
+    const date = new Date().toISOString().slice(0, 10)
+    saveFile(
+      await collections.exportEverything(),
+      `gameshelf-${auth.me.value?.username ?? 'export'}-${date}.zip`,
+    )
+  } catch (e) {
+    exportError.value =
+      e instanceof FetchError && e.statusCode === 429
+        ? t('account.settings.exportTooSoon')
+        : t('account.settings.exportFailed')
+  } finally {
+    exporting.value = false
+  }
+}
 const deleting = ref(false)
 
 async function deleteAccount() {
@@ -37,6 +64,34 @@ async function deleteAccount() {
       </CardHeader>
       <CardContent>
         <ThemeSwitcher show-labels />
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2 class="text-lg font-semibold">
+            {{ $t('account.settings.exportTitle') }}
+          </h2>
+        </CardTitle>
+        <CardDescription>{{
+          $t('account.settings.exportDescription')
+        }}</CardDescription>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-4">
+        <FormMessage v-if="exportError">{{ exportError }}</FormMessage>
+        <Button
+          variant="outline"
+          class="self-start"
+          :disabled="exporting"
+          @click="exportEverything"
+        >
+          <Download />
+          {{
+            exporting
+              ? $t('account.settings.exporting')
+              : $t('account.settings.exportButton')
+          }}
+        </Button>
       </CardContent>
     </Card>
     <Card class="border-destructive/40">

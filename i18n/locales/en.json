@@ -301,7 +301,8 @@
     "editFields": "Edit fields",
     "addByHand": "Add by hand",
     "charts": "Charts",
-    "exportCsv": "Export CSV"
+    "exportCsv": "Export CSV",
+    "importCsv": "Import CSV"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -633,5 +634,55 @@
       "igdbId": "IGDB ID",
       "added": "Added"
     }
+  },
+  "import": {
+    "title": "Import from a CSV file",
+    "description": "Bring games in from a spreadsheet. Nothing is saved until the last step.",
+    "choose": "Choose a CSV file",
+    "chooseHint": "Exported from GameShelf or any spreadsheet (Excel, Numbers, Google Sheets). Up to 5 MB.",
+    "tooBig": "That file is over 5 MB. Split it into smaller files and import them one at a time.",
+    "empty": "That file has no rows to import. The first row should name the columns.",
+    "unreadable": "Couldn't read that file. Make sure it's a CSV.",
+    "mapHint": "{file}: {count} rows. Choose where each column goes.",
+    "sharedBlueprint": "This collection's fields come from the blueprint \"{name}\", used by {count} collection. New fields and choices are added to it. | This collection's fields come from the blueprint \"{name}\", used by {count} collections. New fields and choices are added to it, for all of them.",
+    "tooMany": "Only the first {max} rows will be imported.",
+    "untitled": "(no heading)",
+    "newField": "New field",
+    "columnTarget": "Where {column} goes",
+    "newFieldType": "Type for the new field from {column}",
+    "multipleChoice": "Multiple choice",
+    "targets": {
+      "name": "Game name",
+      "igdbId": "IGDB ID",
+      "new": "New field",
+      "skip": "Don't import"
+    },
+    "needsName": "Choose which column holds the game's name.",
+    "summary": "{count} game will be imported. | {count} games will be imported.",
+    "linked": "{count} linked to IGDB by their ID | {count} linked to IGDB by their ID | {count} linked to IGDB by their ID",
+    "byHand": "{count} added by hand (no IGDB ID) | {count} added by hand (no IGDB ID) | {count} added by hand (no IGDB ID)",
+    "newFields": "New fields: {fields}",
+    "newChoices": "New choices for {field}: {choices}",
+    "updateNote": "Games already in your library get the file's values. Empty cells never erase anything.",
+    "problemsTitle": "{count} cell won't be imported | {count} cells won't be imported",
+    "row": "Row",
+    "column": "Column",
+    "value": "Value",
+    "why": "Why",
+    "problems": {
+      "noName": "No game name",
+      "badIgdbId": "Not an IGDB ID, so the game is added by hand",
+      "doesNotFit": "Doesn't fit the field"
+    },
+    "progress": "Imported {done} of {total} games…",
+    "failed": "The import stopped after {done} games. Those are saved: import the file again to finish, and they'll be updated rather than added twice.",
+    "doneTitle": "Import finished",
+    "added": "No games added | {count} game added | {count} games added",
+    "updated": "{count} game was already here and got updated | {count} game was already here and got updated | {count} games were already here and got updated",
+    "back": "Back",
+    "next": "Review",
+    "start": "Import {count} game | Import {count} games",
+    "close": "Done",
+    "cancel": "Cancel"
   }
 }

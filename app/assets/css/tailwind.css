@@ -95,6 +95,32 @@
   --sidebar-accent-foreground: oklch(0.234 0.046 257);
   --sidebar-border: oklch(0.896 0.016 248);
   --sidebar-ring: oklch(0.772 0.105 242.1);
+  --sidebar-width: 15rem;
+
+  /* Raised buttons: a soft vertical gradient, a light top edge and a glow
+     under the primary. Tune the look here, not in the components. */
+  --btn-radius: 0.625rem;
+  --btn-radius-sm: 0.5rem;
+  --btn-edge: rgb(255 255 255 / 0.28);
+  --btn-primary-from: color-mix(in oklch, var(--primary) 80%, white);
+  --btn-primary-to: var(--primary);
+  --btn-primary-border: color-mix(in oklch, var(--primary) 72%, black);
+  --btn-primary-glow: color-mix(in oklch, var(--primary) 55%, transparent);
+  --btn-primary-shadow:
+    inset 0 1px 0 var(--btn-edge), 0 4px 12px -6px var(--btn-primary-glow);
+  --btn-primary-shadow-hover:
+    inset 0 1px 0 var(--btn-edge), 0 8px 18px -8px var(--btn-primary-glow);
+  --btn-neutral-from: var(--card);
+  --btn-neutral-to: var(--muted);
+  --btn-neutral-edge: rgb(255 255 255 / 0.55);
+  --btn-neutral-shadow:
+    inset 0 1px 0 var(--btn-neutral-edge),
+    0 1px 2px oklch(0.242 0.079 254.7 / 0.1);
+  --btn-tonal-from: color-mix(in oklch, var(--secondary) 70%, white);
+  --btn-tonal-to: var(--secondary);
+  --btn-danger-from: color-mix(in oklch, var(--destructive) 6%, var(--card));
+  --btn-danger-to: color-mix(in oklch, var(--destructive) 14%, var(--card));
+  --btn-danger-border: color-mix(in oklch, var(--destructive) 30%, transparent);
 }
 
 .dark {
@@ -135,6 +161,14 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 248);
   --sidebar-border: oklch(0.95 0.01 248 / 12%);
   --sidebar-ring: oklch(0.772 0.105 242.1);
+
+  /* Glows smudge on dark backgrounds, so dark mode keeps them faint. */
+  --btn-edge: rgb(255 255 255 / 0.22);
+  --btn-primary-glow: color-mix(in oklch, var(--primary) 18%, transparent);
+  --btn-neutral-edge: rgb(255 255 255 / 0.06);
+  --btn-neutral-shadow:
+    inset 0 1px 0 var(--btn-neutral-edge), 0 1px 2px rgb(0 0 0 / 0.25);
+  --btn-tonal-from: color-mix(in oklch, var(--secondary) 85%, white);
 }
 
 @layer base {

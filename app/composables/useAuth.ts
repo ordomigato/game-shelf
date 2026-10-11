@@ -51,6 +51,7 @@ export function useAuth() {
     me.value = null
     status.value = 'signedOut'
     hint.value = null
+    clearNuxtState('my-collections')
   }
 
   async function accessToken(): Promise<string | null> {

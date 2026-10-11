@@ -10,7 +10,10 @@ export default $config({
       providers: {
         aws: {
           region: 'us-east-1',
-          profile: process.env.AWS_PROFILE ?? 'gameshelf',
+          // GitHub Actions signs in with its own short-lived credentials.
+          profile: process.env.GITHUB_ACTIONS
+            ? undefined
+            : (process.env.AWS_PROFILE ?? 'gameshelf'),
         },
       },
     }

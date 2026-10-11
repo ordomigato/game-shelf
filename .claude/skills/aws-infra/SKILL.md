@@ -65,7 +65,7 @@ or `--fallback` to set a default for every stage.
 Before adding a resource, check `project-context`'s cost rules. Specifically
 here:
 
-- Lambda: arm64 (cheaper per GB-second), 512 MB, log retention 1 week, and
+- Lambda: arm64 (cheaper per GB-second), 1024 MB (faster cold starts, #36), log retention 1 week, and
   production reserved concurrency of 5. Don't raise them without a reason.
   A brand-new AWS account can have a concurrency quota of 10, and AWS
   refuses a reservation that leaves fewer than its minimum unreserved. If a
@@ -91,3 +91,16 @@ here:
 | `npx sst deploy`           | Ask. Changes real resources and can cost money.                |
 | `npx sst remove`           | Ask, every time. Deletes resources.                            |
 | `npx sst secret set`       | Ask. The user supplies the value, never paste it into chat.    |
+
+## Production deploys
+
+Production deploys from GitHub Actions (`.github/workflows/deploy.yml`)
+when the user pushes a version tag (`v3.1.0`) on a commit on `main`, or
+publishes a release with one. Merging to `main` doesn't deploy. The job
+migrates the database, runs `sst deploy`, then smoke-tests the site.
+Migrations run before the new code, so they must stay additive.
+
+GitHub signs in to AWS as the IAM role `game-shelf-github-deploy`, through
+GitHub's OIDC provider. The user created both by hand in the IAM console,
+outside `sst.config.ts`. The role only trusts jobs in this repo's GitHub
+`production` environment, which only `v*.*.*` tags can use.

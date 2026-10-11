@@ -74,6 +74,9 @@ export default defineNuxtConfig({
     // Lets server code find the current request (useEvent), so database and
     // IGDB time can be added to the request's log line.
     experimental: { asyncContext: true },
+    // Bundles dependencies into a few chunks instead of ~1,700 files in
+    // node_modules: loading them was most of the ~6 s Lambda cold start.
+    noExternals: true,
     typescript: {
       tsConfig: {
         include: ['../sst-env.d.ts'],

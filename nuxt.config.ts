@@ -76,7 +76,9 @@ export default defineNuxtConfig({
     experimental: { asyncContext: true },
     // Bundles dependencies into a few chunks instead of ~1,700 files in
     // node_modules: loading them was most of the ~6 s Lambda cold start.
-    noExternals: true,
+    // Production builds only: the dev server's own packages have optional
+    // dependencies that can't be bundled.
+    noExternals: process.env.NODE_ENV === 'production',
     typescript: {
       tsConfig: {
         include: ['../sst-env.d.ts'],

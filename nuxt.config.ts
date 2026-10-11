@@ -83,6 +83,13 @@ export default defineNuxtConfig({
       },
     },
   },
+  typescript: {
+    tsConfig: {
+      // Typecheck fails on a component the template uses but nobody
+      // imported, which Vue otherwise only warns about in the browser.
+      vueCompilerOptions: { checkUnknownComponents: true },
+    },
+  },
   eslint: {
     config: {
       typescript: { strict: true },

@@ -2,6 +2,7 @@
 import {
   ArrowLeft,
   BookmarkPlus,
+  ChartColumn,
   Columns3,
   Download,
   Ellipsis,
@@ -13,6 +14,7 @@ import {
   Table2,
   Trash2,
   Unlink,
+  Upload,
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { collectionCsv, FIXED_COLUMNS } from '#shared/utils/csv'

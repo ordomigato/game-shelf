@@ -114,6 +114,15 @@ test('owners drag a game into place', async ({ page }) => {
   const to = (await target.boundingBox())!
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
   await page.mouse.down()
+  // The picked-up row is one solid colour, pinned name cell included, so
+  // the copy that follows the cursor doesn't show a solid name only.
+  const picked = rows.nth(0)
+  await expect(picked).toHaveClass(/drag-chosen/)
+  const backgrounds = await picked.evaluate((row) => [
+    getComputedStyle(row).backgroundColor,
+    getComputedStyle(row.querySelector('.pinned-cell')!).backgroundColor,
+  ])
+  expect(backgrounds[0]).toBe(backgrounds[1])
   await page.mouse.move(from.x + from.width / 2, to.y + to.height / 2, {
     steps: 12,
   })

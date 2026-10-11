@@ -226,3 +226,13 @@ tr:has([aria-expanded='true']) > .pinned-cell {
 .drag-gap {
   opacity: 0;
 }
+
+/* The row being picked up. The browser snapshots it as the copy that
+   follows the cursor, so it needs one solid background: otherwise the
+   pinned name cell (solid) and the other cells (see-through) differ. No
+   fade either, or the snapshot catches it halfway. */
+tr.drag-chosen,
+tr.drag-chosen > .pinned-cell {
+  background: var(--card);
+  transition: none;
+}

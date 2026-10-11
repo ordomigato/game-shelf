@@ -192,6 +192,10 @@ export function useCollections() {
         body: { name },
       }),
 
+    /** Everything the user has, as CSV files in a zip. */
+    exportEverything: () =>
+      auth.apiFetch<Blob>('/api/export', { responseType: 'blob' }),
+
     /** Replaces the charts on a collection's dashboard. */
     saveDashboard: (collectionId: string, dashboard: ChartWidget[]) =>
       auth.apiFetch<ChartWidget[]>(

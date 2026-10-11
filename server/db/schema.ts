@@ -148,3 +148,13 @@ export const collectionItems = pgTable(
     index('collection_items_item_id_idx').on(table.itemId),
   ],
 )
+
+/**
+ * Counters for rate limits, one row per action and person (or address),
+ * for the current fixed window. See `server/utils/rate-limit.ts`.
+ */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull(),
+})

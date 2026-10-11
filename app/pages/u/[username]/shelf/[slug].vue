@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookmarkPlus,
   Columns3,
+  Download,
   Ellipsis,
   Heart,
   LayoutGrid,
@@ -14,6 +15,7 @@ import {
   Unlink,
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
+import { collectionCsv, FIXED_COLUMNS } from '#shared/utils/csv'
 import { toast } from 'vue-sonner'
 import type {
   Blueprint,
@@ -290,6 +292,24 @@ function setBlueprint(blueprint: Blueprint) {
   data.value = { ...data.value, blueprint }
 }
 
+/**
+ * Downloads this collection as a CSV file, built right here from the games
+ * already on the page.
+ */
+function exportCsv() {
+  if (!data.value) return
+  const [name, igdbId, added] = FIXED_COLUMNS.map((column) => t(column.key))
+  const csv = collectionCsv(data.value.blueprint.fields, data.value.items, [
+    name!,
+    igdbId!,
+    added!,
+  ])
+  saveFile(
+    new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `${data.value.slug}.csv`,
+  )
+}
+
 const changingVisibility = ref(false)
 
 /** Makes the collection private or public. Resolves whether it worked. */
@@ -481,6 +501,9 @@ async function deleteCollection() {
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="editingFields = true">
                   <Columns3 /> {{ $t('collection.editFields') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem @select="exportCsv">
+                  <Download /> {{ $t('collection.exportCsv') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="data.blueprint.shared"

@@ -183,13 +183,19 @@
       "pageTitle": "Settings",
       "appearanceTitle": "Appearance",
       "appearanceDescription": "Choose how GameShelf looks on this device.",
+      "exportTitle": "Your data",
+      "exportDescription": "Download every collection, your Wishlist included, as CSV files you can open in any spreadsheet. Your games are yours to take anywhere.",
+      "exportButton": "Export all your data",
+      "exporting": "Preparing your download…",
+      "exportFailed": "Couldn't prepare your download. Try again.",
       "deleteTitle": "Delete account",
       "deleteDescription": "This deletes your account, your collections and everything in them. It can't be undone.",
       "deleteButton": "Delete account",
       "confirmTitle": "Delete your account?",
       "confirmBody": "Your account, collections and everything in them will be deleted. This can't be undone.",
       "keep": "Keep my account",
-      "deleteFailed": "We couldn't delete your account. Try again."
+      "deleteFailed": "We couldn't delete your account. Try again.",
+      "exportTooSoon": "You've exported a few times just now. Try again in a few minutes."
     }
   },
   "common": {
@@ -294,7 +300,8 @@
     "showMore": "Show more",
     "editFields": "Edit fields",
     "addByHand": "Add by hand",
-    "charts": "Charts"
+    "charts": "Charts",
+    "exportCsv": "Export CSV"
   },
   "addToCollection": {
     "button": "Add to collection",
@@ -618,6 +625,13 @@
       "add": "Add",
       "addOne": "Add {title}",
       "addAll": "Add all {count}"
+    }
+  },
+  "export": {
+    "columns": {
+      "name": "Name",
+      "igdbId": "IGDB ID",
+      "added": "Added"
     }
   }
 }

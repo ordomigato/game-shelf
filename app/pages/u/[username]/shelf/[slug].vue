@@ -160,6 +160,7 @@ async function saveValue(
 }
 
 const addingByHand = ref(false)
+const importing = ref(false)
 const renaming = ref(false)
 const renamingItem = ref<CollectionEntry | null>(null)
 
@@ -502,6 +503,9 @@ async function deleteCollection() {
                 <DropdownMenuItem @select="editingFields = true">
                   <Columns3 /> {{ $t('collection.editFields') }}
                 </DropdownMenuItem>
+                <DropdownMenuItem @select="importing = true">
+                  <Upload /> {{ $t('collection.importCsv') }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @select="exportCsv">
                   <Download /> {{ $t('collection.exportCsv') }}
                 </DropdownMenuItem>
@@ -544,6 +548,9 @@ async function deleteCollection() {
             </Button>
             <Button variant="outline" @click="addingByHand = true">
               <PenLine /> {{ $t('collection.addByHand') }}
+            </Button>
+            <Button variant="outline" @click="importing = true">
+              <Upload /> {{ $t('collection.importCsv') }}
             </Button>
           </div>
         </template>
@@ -659,6 +666,13 @@ async function deleteCollection() {
         </div>
       </template>
 
+      <ImportDialog
+        v-if="data.isOwner"
+        v-model:open="importing"
+        :collection-id="data.id"
+        :blueprint="data.blueprint"
+        @imported="refresh()"
+      />
       <AddByHandDialog
         v-if="data.isOwner"
         v-model:open="addingByHand"

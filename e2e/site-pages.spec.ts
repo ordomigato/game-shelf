@@ -8,6 +8,8 @@ test('the footer links to About, Privacy and the contact address', async ({
   await expect(
     footer.getByText(`© ${new Date().getFullYear()} ThisPlayShelf`),
   ).toBeVisible()
+  // Tests run a local build, which isn't a release.
+  await expect(footer.getByTitle('Version')).toHaveText('dev')
   const links = footer.getByRole('navigation', { name: 'Site' })
   await expect(links.getByRole('link', { name: 'About' })).toHaveAttribute(
     'href',

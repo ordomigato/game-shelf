@@ -76,6 +76,8 @@ export default defineNuxtConfig({
       // The real domain, for canonical links and link previews. Set in
       // production with NUXT_PUBLIC_SITE_URL.
       siteUrl: '',
+      // The release tag, set by the deploy (NUXT_PUBLIC_APP_VERSION).
+      appVersion: 'dev',
       cognitoUserPoolId: '',
       cognitoClientId: '',
       // Share of visits that report Core Web Vitals (0 to 1). Set with

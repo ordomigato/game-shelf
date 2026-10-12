@@ -105,6 +105,12 @@ export default $config({
       environment: {
         NUXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.id,
         NUXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
+        // The release tag (v1.2.1) when GitHub Actions deploys a release;
+        // "dev" for everything else. Shown in the footer.
+        NUXT_PUBLIC_APP_VERSION:
+          process.env.GITHUB_REF_TYPE === 'tag'
+            ? (process.env.GITHUB_REF_NAME ?? 'dev')
+            : 'dev',
         // Canonical links and link previews name the real domain.
         ...(isProduction && {
           NUXT_PUBLIC_SITE_URL: 'https://thisplayshelf.com',

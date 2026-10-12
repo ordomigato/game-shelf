@@ -44,7 +44,8 @@
     "label": "Site",
     "about": "About",
     "privacy": "Privacy",
-    "contact": "Contact"
+    "contact": "Contact",
+    "version": "Version"
   },
   "about": {
     "title": "About",

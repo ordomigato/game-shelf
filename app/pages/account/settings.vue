@@ -22,7 +22,7 @@ async function exportEverything() {
     const date = new Date().toISOString().slice(0, 10)
     saveFile(
       await collections.exportEverything(),
-      `gameshelf-${auth.me.value?.username ?? 'export'}-${date}.zip`,
+      `thisplayshelf-${auth.me.value?.username ?? 'export'}-${date}.zip`,
     )
   } catch (e) {
     exportError.value =

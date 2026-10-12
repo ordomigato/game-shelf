@@ -10,7 +10,7 @@ description: >
 
 # Observability: hits, latency and how pages feel
 
-GameShelf follows the common baseline for web services: **rate, errors and
+ThisPlayShelf follows the common baseline for web services: **rate, errors and
 duration** per route on the server (read as percentiles, p50/p95/p99, not
 averages), and **Core Web Vitals** from real visits in the browser. All of it
 is JSON log lines, so it costs nothing beyond CloudWatch Logs' free tier.

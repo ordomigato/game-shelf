@@ -28,7 +28,7 @@ let loading: Promise<void> | undefined
 
 /**
  * Sign-in state and actions. Amplify talks to Cognito from the browser and
- * keeps the tokens. `me` is the GameShelf user from `/api/me`. Everything
+ * keeps the tokens. `me` is the ThisPlayShelf user from `/api/me`. Everything
  * here runs in the browser only. During server rendering `status` stays
  * `loading`.
  */
@@ -74,7 +74,7 @@ export function useAuth() {
     } as NitroFetchOptions<NitroFetchRequest>) as Promise<T>
   }
 
-  /** Re-reads the session and the GameShelf user. */
+  /** Re-reads the session and the ThisPlayShelf user. */
   async function refresh() {
     try {
       if (!(await accessToken())) {

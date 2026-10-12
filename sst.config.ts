@@ -82,6 +82,10 @@ export default $config({
       environment: {
         NUXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.id,
         NUXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
+        // Canonical links and link previews name the real domain.
+        ...(isProduction && {
+          NUXT_PUBLIC_SITE_URL: 'https://thisplayshelf.com',
+        }),
       },
       server: {
         runtime: 'nodejs24.x',

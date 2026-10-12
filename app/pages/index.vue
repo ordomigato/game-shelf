@@ -103,14 +103,27 @@ const showTooShort = computed(
     input.value.trim().length > 0 &&
     input.value.trim().length < MIN_SEARCH_LENGTH,
 )
-// Rendered on the server, so a link to GameShelf says what it is.
-useSeoMeta({
-  description: () => t('preview.site'),
-  ogSiteName: 'GameShelf',
-  ogType: 'website',
-  ogTitle: 'GameShelf',
-  ogDescription: () => t('preview.site'),
-  twitterCard: 'summary',
+// Rendered on the server. Tells search engines the site name and how to
+// search it, so results can show a search box for the site.
+const site = useSiteUrl()
+useHead({
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: () =>
+        JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'ThisPlayShelf',
+          url: `${site.value}/`,
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: `${site.value}/?q={search_term_string}`,
+            'query-input': 'required name=search_term_string',
+          },
+        }),
+    },
+  ],
 })
 
 const resultsLabel = computed(() => {

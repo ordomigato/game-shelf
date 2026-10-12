@@ -50,7 +50,7 @@ Always pass `--stage` explicitly. Without it, SST falls back to the local
 creates a third copy.
 
 Each project gets its own AWS account under the user's AWS Organization.
-GameShelf lives in the `gameshelf` account (787391403512). The management
+ThisPlayShelf lives in the `gameshelf` account (787391403512, named before the rename). The management
 account (`jeremy-personal`) holds billing and the organization only, so
 don't deploy anything there. SST signs in with the `gameshelf` profile in
 `~/.aws/config` (an IAM Identity Center login). Set `AWS_PROFILE` to aim one

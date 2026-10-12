@@ -1,4 +1,4 @@
-# GameShelf
+# ThisPlayShelf
 
 Build your own game collections, with the columns you care about, and share them.
 IGDB search fills in the details.

@@ -102,5 +102,5 @@ so render a placeholder rather than a broken image.
 
 IGDB only pre-fills. When a user adds a game, the item copies `name`,
 `coverId` and `igdbId` into its own row, and from then on the user owns
-that data and can edit it. GameShelf doesn't mirror IGDB's catalog. Pages
+that data and can edit it. ThisPlayShelf doesn't mirror IGDB's catalog. Pages
 render from the database, so don't call IGDB per item on page load.

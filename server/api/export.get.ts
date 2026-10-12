@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const date = new Date().toISOString().slice(0, 10)
   setResponseHeaders(event, {
     'Content-Type': 'application/zip',
-    'Content-Disposition': `attachment; filename="gameshelf-${user.username ?? 'export'}-${date}.zip"`,
+    'Content-Disposition': `attachment; filename="thisplayshelf-${user.username ?? 'export'}-${date}.zip"`,
     'Cache-Control': 'no-store',
   })
   return zip

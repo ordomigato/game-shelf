@@ -10,8 +10,12 @@ export default defineNitroPlugin((nitroApp) => {
     try {
       const preview = await findSharePreview(event.path)
       if (!preview) return
-      const url = getRequestURL(event)
-      html.head.push(...previewTags(preview, `${url.origin}${url.pathname}`))
+      const site = siteUrl(event)
+      const path = getRequestURL(event).pathname
+      html.head.push(
+        `<link rel="canonical" href="${site}${path}">`,
+        ...previewTags(preview, `${site}${path}`, site),
+      )
     } catch (error) {
       // A missing preview is fine. The page itself still works.
       log('warn', 'preview.failed', {

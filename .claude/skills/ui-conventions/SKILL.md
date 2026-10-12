@@ -28,7 +28,7 @@ element's.
 
 ## The look lives in the theme
 
-GameShelf must not look like stock shadcn. Restyle through the theme in
+ThisPlayShelf must not look like stock shadcn. Restyle through the theme in
 `app/assets/css/tailwind.css` (colours, `--radius`, fonts, the `--masthead`
 and `--shelf` tokens), never by editing a component. The palette comes from
 GameShelf v1: steel blue `#3D6F94` (primary), navy `#001F44` (masthead,

@@ -46,24 +46,28 @@ const escape = (value: string) =>
     .replace(/>/g, '&gt;')
 
 /** The Open Graph and Twitter tags for a preview, ready for the page head. */
-export function previewTags(preview: SharePreview, url: string): string[] {
+export function previewTags(
+  preview: SharePreview,
+  url: string,
+  site: string,
+): string[] {
   const title = translate(preview.title)
   const description = translate(preview.description).slice(0, 300)
   const tags: [string, string, string][] = [
     ['name', 'description', description],
-    ['property', 'og:site_name', 'GameShelf'],
+    ['property', 'og:site_name', 'ThisPlayShelf'],
     ['property', 'og:type', 'website'],
     ['property', 'og:url', url],
     ['property', 'og:title', title],
     ['property', 'og:description', description],
-    ['name', 'twitter:card', 'summary'],
+    ['name', 'twitter:card', preview.image ? 'summary' : 'summary_large_image'],
     ['name', 'twitter:title', title],
     ['name', 'twitter:description', description],
   ]
-  if (preview.image) {
-    tags.push(['property', 'og:image', preview.image])
-    tags.push(['name', 'twitter:image', preview.image])
-  }
+  // A collection's first cover when it has one, otherwise the site image.
+  const image = preview.image ?? `${site}/og.png`
+  tags.push(['property', 'og:image', image])
+  tags.push(['name', 'twitter:image', image])
   return tags.map(
     ([attribute, name, content]) =>
       `<meta ${attribute}="${name}" content="${escape(content)}">`,

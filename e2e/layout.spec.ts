@@ -85,9 +85,15 @@ test.describe('signed in', () => {
     await expect(
       sidebar.getByRole('list', { name: 'Collections' }).getByRole('listitem'),
     ).toHaveText([/NES Games\s*3/, /Atari\s*3/])
+    // Blueprints and Settings live in the account menu, not the sidebar.
+    await expect(sidebar.getByRole('link', { name: 'Blueprints' })).toHaveCount(
+      0,
+    )
+    await page.getByRole('button', { name: 'Account menu' }).click()
     await expect(
-      sidebar.getByRole('link', { name: 'Blueprints' }),
-    ).toHaveAttribute('aria-current', 'page')
+      page.getByRole('menuitem', { name: 'Blueprints' }),
+    ).toHaveAttribute('href', '/blueprints')
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('banner').getByRole('searchbox')).toBeVisible()
   })
 

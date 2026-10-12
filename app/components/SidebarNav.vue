@@ -11,7 +11,11 @@ const SHOWN_COLLECTIONS = 8
  * pinned (in their order), then the rest, most recently changed first.
  * Shown in the sidebar on wide screens and in the drawer on phones.
  */
-const props = defineProps<{ shelfPath: string }>()
+const props = defineProps<{
+  shelfPath: string
+  /** The smaller logo, matching the phone top bar (in the drawer). */
+  smallLogo?: boolean
+}>()
 
 const route = useRoute()
 // Ids stay unique when the sidebar and the drawer are both on the page.
@@ -109,7 +113,7 @@ const itemClass =
 <template>
   <div ref="root" class="flex flex-col gap-0.5">
     <NuxtLink to="/" class="mb-3 self-start rounded-md px-2 py-1">
-      <BrandLogo />
+      <BrandLogo :small="smallLogo" />
     </NuxtLink>
 
     <nav :aria-label="$t('sidebar.mainLabel')" class="flex flex-col gap-0.5">

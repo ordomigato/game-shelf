@@ -43,7 +43,7 @@ watch(
           <SheetDescription class="sr-only">{{
             $t('sidebar.drawerDescription')
           }}</SheetDescription>
-          <SidebarNav :shelf-path="props.shelfPath" />
+          <SidebarNav :shelf-path="props.shelfPath" small-logo />
         </SheetContent>
       </Sheet>
       <!-- Centred in the bar on phones. Wider screens show the search box

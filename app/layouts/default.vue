@@ -19,11 +19,8 @@ useSearchShortcut()
     }"
   >
     <AppSidebar v-if="app" :shelf-path="shelfPath!" class="hidden md:flex" />
-    <div
-      class="flex min-h-dvh min-w-0 flex-col"
-      :class="{ 'pb-16 md:pb-0': app }"
-    >
-      <AppTopBar v-if="app" />
+    <div class="flex min-h-dvh min-w-0 flex-col">
+      <AppTopBar v-if="app" :shelf-path="shelfPath!" />
       <SiteHeader v-else />
       <main
         class="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6"
@@ -33,6 +30,5 @@ useSearchShortcut()
       </main>
       <SiteFooter />
     </div>
-    <MobileTabBar v-if="app" :shelf-path="shelfPath!" class="md:hidden" />
   </div>
 </template>

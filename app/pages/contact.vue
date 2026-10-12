@@ -27,7 +27,7 @@ async function copy() {
   <article class="mx-auto flex max-w-2xl flex-col gap-8">
     <header class="flex flex-col gap-3">
       <h1 class="text-3xl font-bold">{{ $t('contact.title') }}</h1>
-      <p class="text-lg leading-relaxed text-muted-foreground">
+      <p class="leading-relaxed text-muted-foreground">
         {{ $t('contact.intro') }}
       </p>
     </header>

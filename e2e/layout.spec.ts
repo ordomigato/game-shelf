@@ -135,25 +135,31 @@ test.describe('signed in', () => {
       },
     ])
     const html = await (await page.request.get('/')).text()
-    expect(html).toContain('id="sidebar-collection-list"')
+    expect(html).toContain('aria-label="Show or hide collections"')
     expect(html).not.toContain('href="/signup"')
   })
 
-  test('phones get a tab bar instead of the sidebar', async ({ page }) => {
+  test('phones get a drawer with the same navigation', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 })
-    await signedInWith(page, [wishlist])
+    await signedInWith(page, [
+      wishlist,
+      summary('NES Games', '2026-05-01T00:00:00.000Z'),
+    ])
     await page.goto('/blueprints')
     await expect(page.getByRole('complementary')).toBeHidden()
-    const tabs = page.getByRole('navigation', { name: 'Main' })
-    await expect(tabs.getByRole('link')).toHaveText([
-      'Search',
-      'Explore',
-      'Shelf',
-      'Wishlist',
-    ])
-    await expect(tabs.getByRole('link', { name: 'Wishlist' })).toHaveAttribute(
-      'href',
-      '/u/retro_fan/shelf/wishlist',
-    )
+
+    await page.getByRole('button', { name: 'Menu', exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'Menu' })
+    await expect(
+      drawer.getByRole('navigation', { name: 'Main' }).getByRole('link'),
+    ).toHaveText(['Search', 'Explore', 'My shelf'])
+    await expect(
+      drawer.getByRole('list', { name: 'Pinned' }).getByRole('link'),
+    ).toHaveText(['Wishlist'])
+
+    // Following a link closes it.
+    await drawer.getByRole('link', { name: 'NES Games' }).click()
+    await expect(page).toHaveURL(/\/u\/retro_fan\/shelf\/nes-games$/)
+    await expect(drawer).toBeHidden()
   })
 })

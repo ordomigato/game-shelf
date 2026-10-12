@@ -33,6 +33,7 @@ export default defineEventHandler(async (event): Promise<CollectionSummary> => {
   const { title, description, starter, blueprintId, copy } =
     await readValidatedBody(event, startSchema.parse)
   const user = await findOrCreateUser(sub)
+  await assertCollectionRoom(user.id, userLimits(user))
   const created = await createCollection(user.id, {
     title,
     description,

@@ -51,6 +51,7 @@ async function deleteAccount() {
 
 <template>
   <div class="flex flex-col gap-6">
+    <PlanCard />
     <Card>
       <CardHeader>
         <CardTitle>

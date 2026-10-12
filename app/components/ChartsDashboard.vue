@@ -3,7 +3,7 @@ import { ChartColumn, Plus, Sparkles } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { ChartSize, ChartWidget } from '#shared/types/charts'
 import type { FieldDefinition } from '#shared/types/collection'
-import { MAX_CHARTS, suggestCharts, type ChartItem } from '#shared/utils/charts'
+import { suggestCharts, type ChartItem } from '#shared/utils/charts'
 
 /**
  * A collection's charts, in a grid of three columns (one on phones).
@@ -19,6 +19,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ save: [dashboard: ChartWidget[]] }>()
 
+const { limits } = usePlan()
 const editing = ref(false)
 const editingWidget = ref<ChartWidget | undefined>()
 
@@ -72,7 +73,7 @@ function remove(widget: ChartWidget) {
 const suggestions = computed(() =>
   suggestCharts(props.fields, widgets.value).slice(
     0,
-    Math.max(MAX_CHARTS - widgets.value.length, 0),
+    Math.max(limits.value.chartsPerCollection - widgets.value.length, 0),
   ),
 )
 const suggesting = ref(false)
@@ -95,7 +96,16 @@ const span: Record<ChartSize, string> = {
 
 <template>
   <div class="flex flex-col gap-4">
-    <div v-if="editable && widgets.length" class="flex justify-end gap-2">
+    <div
+      v-if="editable && widgets.length"
+      class="flex flex-wrap items-center justify-end gap-2"
+    >
+      <span class="mr-auto text-sm text-muted-foreground">{{
+        $t('limits.chartsUsed', {
+          used: widgets.length,
+          limit: limits.chartsPerCollection,
+        })
+      }}</span>
       <Button
         v-if="suggestions.length"
         variant="outline"
@@ -103,7 +113,10 @@ const span: Record<ChartSize, string> = {
       >
         <Sparkles /> {{ $t('charts.suggestions.button') }}
       </Button>
-      <Button :disabled="widgets.length >= MAX_CHARTS" @click="startAdding">
+      <Button
+        :disabled="widgets.length >= limits.chartsPerCollection"
+        @click="startAdding"
+      >
         <Plus /> {{ $t('charts.add') }}
       </Button>
     </div>

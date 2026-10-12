@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Plus } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import type { CollectionSummary } from '#shared/types/collection'
 
 const route = useRoute()
@@ -43,13 +44,29 @@ useHead(() => ({
 
 const creating = ref(false)
 
+// The plan's collection limit (the Wishlist doesn't count), shown next to
+// New collection so reaching it never comes as a surprise.
+const { limits } = usePlan()
+const ownCollections = computed(
+  () =>
+    (data.value ?? []).filter((collection) => collection.kind !== 'wishlist')
+      .length,
+)
+const atLimit = computed(() => ownCollections.value >= limits.value.collections)
+
 // The sidebar's New collection button links here with `?new=1`.
 const router = useRouter()
 watch(
-  [isMine, () => route.query.new],
-  ([mine, wantsNew]) => {
-    if (!mine || wantsNew !== '1') return
-    creating.value = true
+  [isMine, () => route.query.new, data],
+  ([mine, wantsNew, loaded]) => {
+    if (!mine || wantsNew !== '1' || !loaded) return
+    if (atLimit.value) {
+      toast.info(
+        t('limits.reached.collections', { limit: limits.value.collections }),
+      )
+    } else {
+      creating.value = true
+    }
     void router.replace({ query: { ...route.query, new: undefined } })
   },
   { immediate: true },
@@ -92,10 +109,18 @@ async function onCreated(collection: CollectionSummary) {
             "
             is-public
           />
-          <Button v-if="isMine" @click="creating = true">
-            <Plus />
-            {{ $t('shelf.newCollection') }}
-          </Button>
+          <template v-if="isMine">
+            <span class="text-sm text-muted-foreground">{{
+              $t('limits.collectionsUsed', {
+                used: ownCollections,
+                limit: limits.collections,
+              })
+            }}</span>
+            <Button :disabled="atLimit" @click="creating = true">
+              <Plus />
+              {{ $t('shelf.newCollection') }}
+            </Button>
+          </template>
         </div>
       </div>
 

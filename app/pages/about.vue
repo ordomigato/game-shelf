@@ -38,7 +38,13 @@ useSeoMeta({
     </ProseSection>
 
     <ProseSection :title="$t('about.freeTitle')">
-      <p>{{ $t('about.free') }}</p>
+      <i18n-t scope="global" keypath="about.free" tag="p">
+        <template #pricing>
+          <NuxtLink to="/pricing" :class="linkClass">{{
+            $t('about.pricingLink')
+          }}</NuxtLink>
+        </template>
+      </i18n-t>
     </ProseSection>
 
     <ProseSection :title="$t('about.dataTitle')">

@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
   )
   const { toCollectionIds } = await readValidatedBody(event, bodySchema.parse)
   const user = await findOrCreateUser(sub)
+  await assertRoomToAdd(user.id, itemId, toCollectionIds, userLimits(user))
   await moveItemToCollections(user.id, id, itemId, toCollectionIds)
   setResponseStatus(event, 204)
   return null

@@ -50,5 +50,6 @@ export function toMe(user: UserRow): Me {
     username: user.username,
     displayName: user.displayName,
     createdAt: user.createdAt.toISOString(),
+    plan: effectivePlan(user),
   }
 }

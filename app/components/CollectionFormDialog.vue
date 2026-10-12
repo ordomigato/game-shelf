@@ -107,9 +107,10 @@ async function save() {
     emit('saved', saved)
   } catch (e) {
     error.value =
-      e instanceof FetchError && e.statusCode === 409
+      limitMessage(e, t) ??
+      (e instanceof FetchError && e.statusCode === 409
         ? t('collections.nameTaken')
-        : t('common.genericError')
+        : t('common.genericError'))
   } finally {
     saving.value = false
   }

@@ -15,6 +15,7 @@ export default defineEventHandler(async (event): Promise<Blueprint> => {
     fieldsBodySchema.parse,
   )
   const user = await findOrCreateUser(sub)
+  assertFieldCount(fields.length, userLimits(user))
   return updateBlueprintFields(
     user.id,
     id,

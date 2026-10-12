@@ -1,0 +1,149 @@
+import { and, count, eq, inArray, ne } from 'drizzle-orm'
+import { createError } from 'h3'
+import { limitsFor, type Plan, type PlanLimits } from '../../shared/utils/plans'
+import { collectionItems, collections, libraryItems } from '../db/schema'
+
+/** The plan a user has right now: a paid plan that ended counts as free. */
+export function effectivePlan(user: {
+  plan: Plan
+  planUntil: Date | null
+}): Plan {
+  if (user.plan === 'free') return 'free'
+  return user.planUntil && user.planUntil < new Date() ? 'free' : user.plan
+}
+
+export function userLimits(user: Parameters<typeof effectivePlan>[0]) {
+  return limitsFor(effectivePlan(user))
+}
+
+/**
+ * Refuses a change that would go past a plan limit. The browser shows
+ * `data.key` with `data.params` (see app/utils/limit-message.ts).
+ */
+
+export function limitReached(limit: keyof PlanLimits, value: number): never {
+  throw createError({
+    statusCode: 403,
+    statusMessage: 'Plan limit reached',
+    data: { key: LIMIT_REACHED[limit].key, params: { limit: value } },
+  })
+}
+
+/** Room for one more collection (the Wishlist doesn't count). */
+export async function assertCollectionRoom(
+  ownerId: string,
+  limits: PlanLimits,
+): Promise<void> {
+  const [row] = await useDb()
+    .select({ n: count() })
+    .from(collections)
+    .where(
+      and(eq(collections.ownerId, ownerId), ne(collections.kind, 'wishlist')),
+    )
+  if ((row?.n ?? 0) >= limits.collections) {
+    limitReached('collections', limits.collections)
+  }
+}
+
+/**
+ * Room for `adding` more games in each of these collections. Games already
+ * in a collection don't need room, so pass only the ones being added.
+ */
+export async function assertCollectionsRoom(
+  collectionIds: string[],
+  adding: number,
+  limits: PlanLimits,
+): Promise<void> {
+  if (!collectionIds.length || adding <= 0) return
+  const rows = await useDb()
+    .select({ id: collectionItems.collectionId, n: count() })
+    .from(collectionItems)
+    .where(inArray(collectionItems.collectionId, collectionIds))
+    .groupBy(collectionItems.collectionId)
+  if (rows.some((row) => row.n + adding > limits.gamesPerCollection)) {
+    limitReached('gamesPerCollection', limits.gamesPerCollection)
+  }
+  if (adding > limits.gamesPerCollection) {
+    limitReached('gamesPerCollection', limits.gamesPerCollection)
+  }
+}
+
+/** Room for `adding` new games in the user's library (each game once). */
+export async function assertLibraryRoom(
+  ownerId: string,
+  adding: number,
+  limits: PlanLimits,
+): Promise<void> {
+  if (adding <= 0) return
+  const [row] = await useDb()
+    .select({ n: count() })
+    .from(libraryItems)
+    .where(eq(libraryItems.ownerId, ownerId))
+  if ((row?.n ?? 0) + adding > limits.games) {
+    limitReached('games', limits.games)
+  }
+}
+
+export function assertFieldCount(fields: number, limits: PlanLimits): void {
+  if (fields > limits.fieldsPerCollection) {
+    limitReached('fieldsPerCollection', limits.fieldsPerCollection)
+  }
+}
+
+export function assertChartCount(charts: number, limits: PlanLimits): void {
+  if (charts > limits.chartsPerCollection) {
+    limitReached('chartsPerCollection', limits.chartsPerCollection)
+  }
+}
+
+/** The user's counts, for Settings. */
+export async function usage(ownerId: string) {
+  const db = useDb()
+  const [[owned], [games]] = await Promise.all([
+    db
+      .select({ n: count() })
+      .from(collections)
+      .where(
+        and(eq(collections.ownerId, ownerId), ne(collections.kind, 'wishlist')),
+      ),
+    db
+      .select({ n: count() })
+      .from(libraryItems)
+      .where(eq(libraryItems.ownerId, ownerId)),
+  ])
+  return { collections: owned?.n ?? 0, games: games?.n ?? 0 }
+}
+
+/**
+ * Room to put a game into these collections: in each collection it isn't
+ * already in, and in the library when it's a new game (no `itemId` yet).
+ */
+export async function assertRoomToAdd(
+  ownerId: string,
+  itemId: string | null,
+  collectionIds: string[],
+  limits: PlanLimits,
+): Promise<void> {
+  if (!itemId) await assertLibraryRoom(ownerId, 1, limits)
+  const already = itemId ? await collectionIdsForItem(itemId) : []
+  await assertCollectionsRoom(
+    collectionIds.filter((id) => !already.includes(id)),
+    1,
+    limits,
+  )
+}
+
+/** The user's item for an IGDB game, if they have one. */
+export async function itemIdForIgdb(
+  ownerId: string,
+  igdbId: number | null,
+): Promise<string | null> {
+  if (igdbId === null) return null
+  const [row] = await useDb()
+    .select({ id: libraryItems.id })
+    .from(libraryItems)
+    .where(
+      and(eq(libraryItems.ownerId, ownerId), eq(libraryItems.igdbId, igdbId)),
+    )
+  return row?.id ?? null
+}

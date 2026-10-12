@@ -25,6 +25,9 @@ const linkClass = 'underline-offset-4 hover:text-foreground hover:underline'
         <NuxtLink to="/about" :class="linkClass">{{
           $t('footer.about')
         }}</NuxtLink>
+        <NuxtLink to="/pricing" :class="linkClass">{{
+          $t('footer.pricing')
+        }}</NuxtLink>
         <NuxtLink to="/privacy" :class="linkClass">{{
           $t('footer.privacy')
         }}</NuxtLink>

@@ -26,8 +26,8 @@ export default defineEventHandler(async (event): Promise<ImportResult> => {
   // About 15,000 games in ten minutes: plenty for real files.
   await rateLimit(event, `import:${user.id}`, { limit: 60, windowSeconds: 600 })
   const { fields, rows } = await readValidatedBody(event, bodySchema.parse)
-  return importIntoCollection(user.id, id, {
-    fields: fields as Parameters<typeof importIntoCollection>[2]['fields'],
-    rows: rows as Parameters<typeof importIntoCollection>[2]['rows'],
+  return importIntoCollection(user.id, id, userLimits(user), {
+    fields: fields as Parameters<typeof importIntoCollection>[3]['fields'],
+    rows: rows as Parameters<typeof importIntoCollection>[3]['rows'],
   })
 })

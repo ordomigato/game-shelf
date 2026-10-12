@@ -40,8 +40,8 @@ async function save() {
     )
     emit('added', item)
     open.value = false
-  } catch {
-    error.value = t('byHand.failed')
+  } catch (e) {
+    error.value = limitMessage(e, t) ?? t('byHand.failed')
   } finally {
     saving.value = false
   }

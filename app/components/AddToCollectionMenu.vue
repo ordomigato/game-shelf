@@ -98,9 +98,9 @@ async function toggle(collection: CollectionSummary, checked: boolean) {
     } else {
       await collections.removeItem(id, itemId.value!)
     }
-  } catch {
+  } catch (error) {
     setSelected(before)
-    toast.error(t('addToCollection.saveFailed'))
+    toast.error(limitMessage(error, t) ?? t('addToCollection.saveFailed'))
   } finally {
     const done = new Set(saving.value)
     done.delete(id)

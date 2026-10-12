@@ -40,5 +40,6 @@ export default defineEventHandler(async (event): Promise<ChartWidget[]> => {
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const { dashboard } = await readValidatedBody(event, bodySchema.parse)
   const user = await findOrCreateUser(sub)
+  assertChartCount(dashboard.length, userLimits(user))
   return updateDashboard(user.id, id, dashboard)
 })

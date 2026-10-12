@@ -64,6 +64,13 @@
       "when": 1791751651102,
       "tag": "0008_sidebar_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791839254920,
+      "tag": "0009_user_plans",
+      "breakpoints": true
     }
   ]
 }

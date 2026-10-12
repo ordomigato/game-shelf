@@ -27,6 +27,11 @@ export default $config({
     // branch.
     const databaseUrl = new sst.Secret('DatabaseUrl')
 
+    // The sign-up and reset-password code email (Cognito sends both from
+    // one template). HTML is free with Cognito's own sender.
+    const { readFileSync } = await import('node:fs')
+    const codeEmail = readFileSync('infra/emails/code.html', 'utf8')
+
     const userPool = new sst.aws.CognitoUserPool('Users', {
       usernames: ['email'],
       transform: {
@@ -40,6 +45,11 @@ export default $config({
             temporaryPasswordValidityDays: 7,
           }
           args.deletionProtection = isProduction ? 'ACTIVE' : 'INACTIVE'
+          args.verificationMessageTemplate = {
+            defaultEmailOption: 'CONFIRM_WITH_CODE',
+            emailSubject: 'Your ThisPlayShelf code',
+            emailMessage: codeEmail,
+          }
         },
       },
     })

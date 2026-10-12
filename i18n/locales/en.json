@@ -40,7 +40,58 @@
     "dark": "Dark"
   },
   "footer": {
-    "igdbCredit": "Game data from {igdb}."
+    "copyright": "© {year} ThisPlayShelf",
+    "label": "Site",
+    "about": "About",
+    "privacy": "Privacy",
+    "contact": "Contact"
+  },
+  "about": {
+    "title": "About",
+    "intro": "ThisPlayShelf is a place to keep track of the games you collect, with the columns you care about, and to share your collection if you like.",
+    "whoTitle": "The developer",
+    "who": "ThisPlayShelf is built and run by one developer. He made it because he wanted a better way to keep track of his own games. It's a hobby project he works on in his spare time, so there's no company behind it, just him and the occasional help from friends. You can see more of his work at {site}.",
+    "freeTitle": "It's free",
+    "free": "No ads, no paid plans, and your data is never sold. The site runs on a small budget, which works as long as it stays small. If anything changes, you'll hear about it here first.",
+    "dataTitle": "Your data is yours",
+    "data": "You can export everything as spreadsheet files whenever you like, and delete your account at any time. The {privacy} page explains what's stored.",
+    "privacyLink": "privacy",
+    "gamesTitle": "Where the game info comes from",
+    "games": "Game names, covers and details come from {igdb}. Anything you add to your shelf is your own copy, so change it however you like.",
+    "contactTitle": "Get in touch",
+    "contact": "Found a bug, have an idea, or just want to say hi? Send an email to {email}."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "intro": "The short version: ThisPlayShelf keeps what it needs to run your shelf, sells nothing, and lets you take everything with you or delete it.",
+    "accountTitle": "Your account",
+    "account": "Your email address and password are handled by Amazon Cognito, Amazon's sign-in service. Your password never reaches ThisPlayShelf's servers: signing in proves you know it without sending it.",
+    "storedTitle": "What's stored",
+    "stored": "Your username and display name, your collections and everything you put in them, and when things were created. These live in a Postgres database run by Neon on Amazon's servers in the United States. Your email address isn't kept there.",
+    "visibleTitle": "Who can see what",
+    "visible": "Private collections are visible only to you. Public collections, your username and your display name can be seen by anyone.",
+    "cookiesTitle": "Cookies and browser storage",
+    "cookies": "A cookie remembers your username so pages draw correctly while they load. Others remember your colour theme and whether the sidebar's collections are folded. Your sign-in is kept in your browser's storage. There are no tracking or advertising cookies.",
+    "speedTitle": "Measuring speed",
+    "speed": "About a quarter of visits report how quickly pages load: anonymous timings, with no account or address attached. The server records which kinds of page were requested and how long they took, never what you typed.",
+    "othersTitle": "Other services",
+    "others": "Cover images load straight from IGDB, so IGDB sees your browser's address when you view them, as any website would.",
+    "controlTitle": "Take it with you, or delete it",
+    "control": "In {settings} you can export everything as spreadsheet files, or delete your account. Deleting removes your account and everything you've added. The database host keeps a few hours of history for recovery, after which it's gone for good.",
+    "settingsLink": "Settings",
+    "questionsTitle": "Questions",
+    "questions": "Email {email}.",
+    "updated": "Last updated October 12, 2026."
+  },
+  "contact": {
+    "title": "Contact",
+    "intro": "Found a bug, have an idea, or just want to say hi? Email is the best way to get in touch.",
+    "emailLabel": "Email",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy the address. Select it and copy it instead.",
+    "send": "Send an email",
+    "reply": "ThisPlayShelf is run by one person in his spare time, so replies can take a few days."
   },
   "error": {
     "notFoundTitle": "Page not found",

@@ -98,6 +98,14 @@ async function onCreated(collection: CollectionSummary) {
             @{{ profile.username }} ·
             {{ $t('shelf.memberSince', { date: memberSince }) }}
           </p>
+          <p v-if="isMine && data" class="text-sm text-muted-foreground">
+            {{
+              $t('limits.collectionsUsed', {
+                used: ownCollections,
+                limit: limits.collections,
+              })
+            }}
+          </p>
         </div>
         <div class="flex items-center gap-2">
           <ShareButton
@@ -109,18 +117,10 @@ async function onCreated(collection: CollectionSummary) {
             "
             is-public
           />
-          <template v-if="isMine">
-            <span class="text-sm text-muted-foreground">{{
-              $t('limits.collectionsUsed', {
-                used: ownCollections,
-                limit: limits.collections,
-              })
-            }}</span>
-            <Button :disabled="atLimit" @click="creating = true">
-              <Plus />
-              {{ $t('shelf.newCollection') }}
-            </Button>
-          </template>
+          <Button v-if="isMine" :disabled="atLimit" @click="creating = true">
+            <Plus />
+            {{ $t('shelf.newCollection') }}
+          </Button>
         </div>
       </div>
 

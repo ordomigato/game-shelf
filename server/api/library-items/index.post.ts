@@ -21,6 +21,12 @@ export default defineEventHandler(
       bodySchema.parse,
     )
     const user = await findOrCreateUser(sub)
+    await assertRoomToAdd(
+      user.id,
+      await itemIdForIgdb(user.id, game.igdbId),
+      collectionIds,
+      userLimits(user),
+    )
     const item = await findOrCreateItem(user.id, game)
     await addItemToCollections(user.id, item.id, collectionIds)
     return {

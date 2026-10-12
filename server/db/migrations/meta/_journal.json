@@ -64,6 +64,27 @@
       "when": 1791751651102,
       "tag": "0008_sidebar_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791839254920,
+      "tag": "0009_user_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791840050978,
+      "tag": "0010_plan_pro_and_max",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791842614333,
+      "tag": "0011_custom_limits",
+      "breakpoints": true
     }
   ]
 }

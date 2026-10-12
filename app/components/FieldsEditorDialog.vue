@@ -99,8 +99,8 @@ async function save() {
     )
     emit('saved', blueprint)
     open.value = false
-  } catch {
-    error.value = t('fieldEditor.saveFailed')
+  } catch (e) {
+    error.value = limitMessage(e, t) ?? t('fieldEditor.saveFailed')
   } finally {
     saving.value = false
   }

@@ -88,8 +88,8 @@ export function useTrackedGames(
         [collection.id],
       )
       items.value = new Map(items.value).set(game.id, added.item.id)
-    } catch {
-      toast.error(t('addToCollection.saveFailed'))
+    } catch (error) {
+      toast.error(limitMessage(error, t) ?? t('addToCollection.saveFailed'))
     } finally {
       const done = new Set(saving.value)
       done.delete(game.id)

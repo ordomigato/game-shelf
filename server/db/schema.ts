@@ -14,6 +14,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { CustomLimits } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
 
@@ -38,6 +39,18 @@ export const users = pgTable(
     /** Chosen after the first sign-in. Null until then. */
     username: text('username').unique(),
     displayName: text('display_name'),
+    /** What the account may store (shared/utils/plans.ts). */
+    plan: text('plan')
+      .$type<'free' | 'pro' | 'max'>()
+      .notNull()
+      .default('free'),
+    /** When a paid plan ends; null for free, or a plan that doesn't end. */
+    planUntil: timestamp('plan_until', { withTimezone: true }),
+    /**
+     * Limits set by hand for this account (Max, or extra room for someone),
+     * on top of the plan's. Null for most people.
+     */
+    customLimits: jsonb('custom_limits').$type<CustomLimits>(),
     ...timestamps,
   },
   (table) => [
@@ -45,6 +58,7 @@ export const users = pgTable(
       'users_username_format',
       sql`${table.username} ~ '^[a-z0-9_]{3,20}$'`,
     ),
+    check('users_plan', sql`${table.plan} in ('free', 'pro', 'max')`),
   ],
 )
 

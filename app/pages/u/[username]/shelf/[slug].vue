@@ -33,6 +33,7 @@ import type {
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
 const { t } = useI18n()
+const { limits } = usePlan()
 const collections = useCollections()
 const titleOf = useCollectionTitle()
 
@@ -110,9 +111,9 @@ async function saveDashboard(dashboard: ChartWidget[]) {
   data.value = { ...data.value, dashboard }
   try {
     await collections.saveDashboard(data.value.id, dashboard)
-  } catch {
+  } catch (error) {
     if (data.value) data.value = { ...data.value, dashboard: before }
-    toast.error(t('charts.saveFailed'))
+    toast.error(limitMessage(error, t) ?? t('charts.saveFailed'))
   }
 }
 
@@ -215,9 +216,9 @@ async function moveToCollection(itemId: string, collectionId: string) {
         onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
       },
     })
-  } catch {
+  } catch (error) {
     setItems(before)
-    toast.error(t('table.moveToFailed'))
+    toast.error(limitMessage(error, t) ?? t('table.moveToFailed'))
   }
 }
 
@@ -429,7 +430,13 @@ async function deleteCollection() {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span>{{ $t('shelf.gameCount', data.itemCount) }}</span>
+            <span v-if="data.isOwner">{{
+              $t('limits.gamesUsed', {
+                used: data.itemCount,
+                limit: limits.gamesPerCollection,
+              })
+            }}</span>
+            <span v-else>{{ $t('shelf.gameCount', data.itemCount) }}</span>
             <VisibilityMenu
               v-if="data.isOwner"
               :visibility="data.visibility"

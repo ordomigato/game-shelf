@@ -245,6 +245,7 @@ export function planImport(
   targets: ColumnTarget[],
   existing: FieldDefinition[],
   newId: () => string = () => crypto.randomUUID(),
+  maxFields: number = MAX_FIELDS,
 ): ImportPlan {
   const fields = existing.map((field) => ({
     ...field,
@@ -258,7 +259,7 @@ export function planImport(
     if (target.kind === 'field') {
       const field = fields.find((candidate) => candidate.id === target.fieldId)
       if (field) columnField.set(index, field)
-    } else if (target.kind === 'new' && fields.length < MAX_FIELDS) {
+    } else if (target.kind === 'new' && fields.length < maxFields) {
       const guess = guessType(rows.map((row) => row[index] ?? ''))
       const choiceList =
         target.type === 'select' || target.type === 'multiselect'

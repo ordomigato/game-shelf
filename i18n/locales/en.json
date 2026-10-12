@@ -39,26 +39,29 @@
   },
   "footer": {
     "copyright": "© {year} ThisPlayShelf",
+    "igdbCredit": "Game data from {igdb}.",
     "label": "Site",
     "about": "About",
     "privacy": "Privacy",
     "contact": "Contact",
-    "version": "Version"
+    "version": "Version",
+    "pricing": "Pricing"
   },
   "about": {
     "title": "About",
     "intro": "ThisPlayShelf is a place to keep track of the games you collect, with the columns you care about, and to share your collection if you like.",
     "whoTitle": "The developer",
-    "who": "ThisPlayShelf is built and run by one developer. He made it because he wanted a better way to keep track of his own games. It's a hobby project he works on in his spare time, so there's no company behind it, just him and the occasional help from friends. You can see more of his work at {site}.",
+    "who": "ThisPlayShelf is built, run and maintained by one developer who simply wanted a nicer way to keep track of his own games. It's a hobby project he works on in his spare time, so there's no company behind it, just him and the occasional help from friends. You can see more of his work at {site}.",
     "freeTitle": "It's free",
-    "free": "No ads, no paid plans, and your data is never sold. The site runs on a small budget, which works as long as it stays small. If anything changes, you'll hear about it here first.",
+    "free": "No ads, and your data is never sold. The free plan is meant to be enough for most collections, but an affordable Pro plan is coming for super users; the {pricing} page has the details.",
     "dataTitle": "Your data is yours",
     "data": "You can export everything as spreadsheet files whenever you like, and delete your account at any time. The {privacy} page explains what's stored.",
     "privacyLink": "privacy",
     "gamesTitle": "Where the game info comes from",
     "games": "Game names, covers and details come from {igdb}. Anything you add to your shelf is your own copy, so change it however you like.",
     "contactTitle": "Get in touch",
-    "contact": "Found a bug, have an idea, or just want to say hi? Send an email to {email}."
+    "contact": "Found a bug, have an idea, or just want to say hi? Send an email to {email}.",
+    "pricingLink": "pricing"
   },
   "privacy": {
     "title": "Privacy",
@@ -91,6 +94,59 @@
     "copyFailed": "Couldn't copy the address. Select it and copy it instead.",
     "send": "Send an email",
     "reply": "ThisPlayShelf is run by one person in his spare time, so replies can take a few days."
+  },
+  "pricing": {
+    "title": "Pricing",
+    "intro": "ThisPlayShelf is free, and the free plan is meant to be enough for most collections. A small paid plan for people who want to go further is on its way, and the very biggest collections can get in touch.",
+    "freeName": "Free",
+    "freePrice": "$0",
+    "freeCta": "Create an account",
+    "yourPlan": "Your plan",
+    "proName": "Pro",
+    "proPrice": "TBD",
+    "perYear": "per year",
+    "comingSoon": "Coming soon",
+    "maxName": "Max",
+    "maxPrice": "Let's talk",
+    "maxBlurb": "For the very biggest shelves, consider custom limits, set to fit your collection needs.",
+    "maxCta": "Get in touch",
+    "collections": "{count} collections, plus the Wishlist",
+    "games": "{count} games in total",
+    "gamesPerCollection": "{count} games per collection",
+    "fields": "{count} fields per collection",
+    "charts": "{count} charts per collection",
+    "text": "{count} characters per note or text field",
+    "importRows": "CSV imports of up to {count} rows at a time",
+    "whyTitle": "Why a paid plan?",
+    "why": "Although this is a hobby project, hosting anything isn't fully free and there are some costs involved. The database, sign-ins, domain and servers all cost a little something. The goal is to keep the free plan as generous as possible and provide as much value as we can without charging you anything. Hopefully it's all you'll ever need. But for any super user, the option is there to enhance your experience. Plus we may even add some time saving features in the future =).",
+    "whyPro": "If you get real value out of the site and/or wish to support its development and continuation, the pro plan might be the best way to show your support.",
+    "limitsTitle": "What happens at a limit",
+    "limits": "You'll see your usage as you go: on your shelf, in each collection and in Settings. At a limit, adding stops with a message saying which one. Nothing you've already added is ever deleted, whatever plan you're on."
+  },
+  "limits": {
+    "collectionsUsed": "{used} of {limit} collections",
+    "gamesUsed": "{used} of {limit} games",
+    "fieldsUsed": "{used} of {limit} fields",
+    "chartsUsed": "{used} of {limit} charts",
+    "usedOf": "{used} of {limit}",
+    "collections": "Collections",
+    "games": "Games",
+    "planFree": "Free plan",
+    "planPro": "Pro plan",
+    "planMax": "Max plan",
+    "planDescription": "What your shelf can hold. The Wishlist doesn't count as a collection.",
+    "perCollection": "Each collection: up to {games} games, {fields} fields and {charts} charts.",
+    "perValue": "Text fields up to {text} characters; CSV imports up to {rows} rows at a time.",
+    "seePlans": "See plans and pricing",
+    "reached": {
+      "collections": "You've reached {limit} collections, the most your plan allows. The Wishlist doesn't count.",
+      "fieldsPerCollection": "A collection can have up to {limit} fields on your plan.",
+      "gamesPerCollection": "A collection can hold up to {limit} games on your plan.",
+      "games": "Your shelf can hold up to {limit} games on your plan.",
+      "textLength": "Text fields can hold up to {limit} characters on your plan.",
+      "chartsPerCollection": "A collection can have up to {limit} charts on your plan.",
+      "importRows": "Imports can take up to {limit} rows at a time on your plan."
+    }
   },
   "error": {
     "notFoundTitle": "Page not found",
@@ -232,6 +288,7 @@
     "tabs": {
       "profile": "Profile",
       "security": "Security",
+      "usage": "Usage",
       "settings": "Settings"
     },
     "profile": {

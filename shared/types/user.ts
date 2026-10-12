@@ -1,3 +1,5 @@
+import type { Plan, PlanLimits } from '../utils/plans'
+
 /** The signed-in user, as returned by `/api/me`. */
 export interface Me {
   id: string
@@ -5,6 +7,19 @@ export interface Me {
   username: string | null
   displayName: string | null
   createdAt: string
+  /** The plan in effect now (a paid plan that ended counts as free). */
+  plan: Plan
+  /** The limits in effect: the plan's, with any custom limits on top. */
+  limits: PlanLimits
+}
+
+/** How much of their plan a user has used, for Settings. */
+export interface PlanUsage {
+  plan: Plan
+  /** Collections, not counting the Wishlist. */
+  collections: number
+  /** Games across all collections, each counted once. */
+  games: number
 }
 
 /** What anyone can see about a user, on their shelf. */

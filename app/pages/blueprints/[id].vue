@@ -120,8 +120,8 @@ async function saveFields() {
     attempted.value = false
     await refresh()
     toast.success(t('blueprintsPage.saved'))
-  } catch {
-    toast.error(t('fieldEditor.saveFailed'))
+  } catch (error) {
+    toast.error(limitMessage(error, t) ?? t('fieldEditor.saveFailed'))
   } finally {
     saving.value = false
   }

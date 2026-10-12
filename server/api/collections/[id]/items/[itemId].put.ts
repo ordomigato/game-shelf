@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
   )
   const user = await findOrCreateUser(sub)
   await getOwnedItem(user.id, itemId)
+  await assertRoomToAdd(user.id, itemId, [id], userLimits(user))
   await addItemToCollections(user.id, itemId, [id])
   setResponseStatus(event, 204)
   return null

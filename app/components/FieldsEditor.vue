@@ -2,7 +2,7 @@
 import { GripVertical, Plus, Trash2, X } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { FieldType, RatingScale } from '#shared/types/collection'
-import { MAX_FIELDS, RATING_SCALES } from '#shared/utils/field-changes'
+import { RATING_SCALES } from '#shared/utils/field-changes'
 import type { FieldDrafts } from '~/composables/useFieldDrafts'
 
 /**
@@ -12,6 +12,7 @@ import type { FieldDrafts } from '~/composables/useFieldDrafts'
  * dialog and the blueprint page share it.
  */
 const props = defineProps<{ editor: FieldDrafts }>()
+const { limits } = usePlan()
 
 const { t, locale } = useI18n()
 
@@ -267,14 +268,21 @@ const currencyNames = computed(() => {
       </li>
     </VueDraggable>
 
-    <Button
-      type="button"
-      variant="outline"
-      class="self-start"
-      :disabled="editor.drafts.value.length >= MAX_FIELDS"
-      @click="add"
-    >
-      <Plus /> {{ $t('fieldEditor.add') }}
-    </Button>
+    <div class="flex flex-wrap items-center gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        :disabled="editor.drafts.value.length >= limits.fieldsPerCollection"
+        @click="add"
+      >
+        <Plus /> {{ $t('fieldEditor.add') }}
+      </Button>
+      <span class="text-sm text-muted-foreground">{{
+        $t('limits.fieldsUsed', {
+          used: editor.drafts.value.length,
+          limit: limits.fieldsPerCollection,
+        })
+      }}</span>
+    </div>
   </div>
 </template>

@@ -10,6 +10,7 @@ import {
   collections,
   libraryItems,
 } from '../db/schema'
+import type { PlanLimits } from '../../shared/utils/plans'
 import type { IgdbGame } from './igdb-queries'
 
 export interface ImportResult {
@@ -81,6 +82,7 @@ function validValues(fields: FieldDefinition[], values: ItemData) {
 export async function importIntoCollection(
   ownerId: string,
   collectionId: string,
+  limits: PlanLimits,
   input: { fields?: FieldDefinition[]; rows: ImportRow[] },
 ): Promise<ImportResult> {
   const collection = await getOwnedCollection(ownerId, collectionId)
@@ -96,6 +98,7 @@ export async function importIntoCollection(
   if (input.fields) {
     const next = cleanFields(input.fields)
     checkOnlyAdds(fields, next)
+    assertFieldCount(next.length, limits)
     const problem = fieldsProblem(next)
     if (problem)
       throw createError({ statusCode: 400, statusMessage: problem.key })
@@ -171,6 +174,29 @@ export async function importIntoCollection(
       })
     }
   }
+
+  // Within the plan: new games in the library, and games new to this
+  // collection (ones already in it only get their values updated).
+  await assertLibraryRoom(ownerId, toInsert.length, limits)
+  const alreadyIn = existing.length
+    ? await db
+        .select({ itemId: collectionItems.itemId })
+        .from(collectionItems)
+        .where(
+          and(
+            eq(collectionItems.collectionId, collection.id),
+            inArray(
+              collectionItems.itemId,
+              existing.map((item) => item.id),
+            ),
+          ),
+        )
+    : []
+  const inCollection = new Set(alreadyIn.map((row) => row.itemId))
+  const newToCollection = order.filter(
+    (entry) => typeof entry !== 'string' || !inCollection.has(entry),
+  ).length
+  await assertCollectionsRoom([collection.id], newToCollection, limits)
 
   const inserted = toInsert.length
     ? await db

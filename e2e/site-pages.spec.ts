@@ -76,3 +76,11 @@ test('Contact shows the address to copy or email', async ({
     'support@thisplayshelf.com',
   )
 })
+
+test('the footer credits IGDB, as their terms ask', async ({ page }) => {
+  await page.goto('/about')
+  const credit = page
+    .getByRole('contentinfo')
+    .getByRole('link', { name: 'IGDB' })
+  await expect(credit).toHaveAttribute('href', 'https://www.igdb.com')
+})

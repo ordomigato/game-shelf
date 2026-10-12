@@ -10,7 +10,6 @@ import {
 import {
   autoMap,
   IMPORT_CHUNK_SIZE,
-  MAX_IMPORT_ROWS,
   planImport,
   type ColumnTarget,
   type ImportProblem,
@@ -32,6 +31,7 @@ const open = defineModel<boolean>('open', { default: false })
 const { t } = useI18n()
 const auth = useAuth()
 const sidebar = useMyCollections()
+const { limits } = usePlan()
 
 type Step = 'file' | 'map' | 'match' | 'review' | 'importing' | 'done'
 const step = ref<Step>('file')
@@ -77,8 +77,8 @@ async function readFile(event: Event) {
     }
     fileName.value = file.name
     headers.value = header.map((cell) => cell.replace(/^\uFEFF/, '').trim())
-    tooMany.value = body.length > MAX_IMPORT_ROWS
-    rows.value = body.slice(0, MAX_IMPORT_ROWS)
+    tooMany.value = body.length > limits.value.importRows
+    rows.value = body.slice(0, limits.value.importRows)
     targets.value = autoMap(headers.value, rows.value, props.blueprint.fields)
     step.value = 'map'
   } catch {
@@ -153,6 +153,8 @@ const plan = computed(() =>
         rows.value,
         targets.value,
         props.blueprint.fields,
+        undefined,
+        limits.value.fieldsPerCollection,
       )
     : null,
 )
@@ -301,9 +303,10 @@ async function runImport() {
     result.value = totals
     step.value = 'done'
     emit('imported')
-  } catch {
+  } catch (error) {
     // Chunks already sent are kept. Importing the file again updates them.
-    importError.value = t('import.failed', { done: progress.value })
+    importError.value =
+      limitMessage(error, t) ?? t('import.failed', { done: progress.value })
     result.value = totals
     step.value = 'done'
     emit('imported')
@@ -360,7 +363,7 @@ async function runImport() {
           }}
         </p>
         <p v-if="tooMany" class="text-sm text-muted-foreground">
-          {{ $t('import.tooMany', { max: MAX_IMPORT_ROWS }) }}
+          {{ $t('import.tooMany', { max: limits.importRows }) }}
         </p>
         <ul class="flex flex-col divide-y rounded-lg border">
           <li

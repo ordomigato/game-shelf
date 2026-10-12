@@ -1,5 +1,27 @@
 <script setup lang="ts">
 const colorMode = useColorMode()
+const { t } = useI18n()
+const route = useRoute()
+const site = useSiteUrl()
+
+// Defaults for every page. Pages with something better to say (a game, a
+// shared collection) set their own description, title and image.
+useHead({
+  link: [{ rel: 'canonical', href: () => `${site.value}${route.path}` }],
+})
+useSeoMeta({
+  description: () => t('preview.site'),
+  ogSiteName: 'ThisPlayShelf',
+  ogType: 'website',
+  ogUrl: () => `${site.value}${route.path}`,
+  ogTitle: 'ThisPlayShelf',
+  ogDescription: () => t('preview.site'),
+  ogImage: () => `${site.value}/og.png`,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageAlt: () => t('preview.imageAlt'),
+  twitterCard: 'summary_large_image',
+})
 </script>
 
 <template>

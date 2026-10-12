@@ -10,11 +10,8 @@ const { t } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('explore.title') }) }))
 useSeoMeta({
   description: () => t('explore.description'),
-  ogSiteName: 'GameShelf',
-  ogType: 'website',
   ogTitle: () => t('app.title', { page: t('explore.title') }),
   ogDescription: () => t('explore.description'),
-  twitterCard: 'summary',
 })
 
 // Nuxt's $fetch, which also works while rendering on the server (a plain

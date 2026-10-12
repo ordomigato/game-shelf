@@ -71,7 +71,7 @@ test('exports everything from account settings', async ({ page }) => {
 
   const file = await download
   expect(file.suggestedFilename()).toMatch(
-    /^gameshelf-retro_fan-\d{4}-\d{2}-\d{2}\.zip$/,
+    /^thisplayshelf-retro_fan-\d{4}-\d{2}-\d{2}\.zip$/,
   )
   expect(await readFile((await file.path())!)).toEqual(zip)
 })

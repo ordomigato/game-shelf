@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Visitors get a website: a header with search. Once signed in (with a
- * username), GameShelf becomes an app with a sidebar of their collections,
+ * username), ThisPlayShelf becomes an app with a sidebar of their collections,
  * on every page, theirs or not.
  *
  * The page itself stays in the same place in both, so it isn't rebuilt

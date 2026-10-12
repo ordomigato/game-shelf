@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "{page} · GameShelf"
+    "title": "{page} · ThisPlayShelf"
   },
   "header": {
     "signIn": "Sign in",
@@ -150,7 +150,7 @@
     "forgotPassword": "Forgot password?",
     "submit": "Sign in",
     "submitting": "Signing in…",
-    "newHere": "New to GameShelf?",
+    "newHere": "New to ThisPlayShelf?",
     "createAccount": "Create an account",
     "verified": "Your email is verified. Sign in to continue.",
     "passwordChanged": "Your password is changed. Sign in with the new one."
@@ -187,7 +187,7 @@
     "profile": {
       "pageTitle": "Profile",
       "title": "Profile",
-      "description": "How you appear to others on GameShelf.",
+      "description": "How you appear to others on ThisPlayShelf.",
       "usernameHint": "Changing it changes your shelf's address. Old links stop working.",
       "save": "Save profile",
       "saving": "Saving…",
@@ -205,7 +205,7 @@
     "settings": {
       "pageTitle": "Settings",
       "appearanceTitle": "Appearance",
-      "appearanceDescription": "Choose how GameShelf looks on this device.",
+      "appearanceDescription": "Choose how ThisPlayShelf looks on this device.",
       "exportTitle": "Your data",
       "exportDescription": "Download every collection, your Wishlist included, as CSV files you can open in any spreadsheet. Your games are yours to take anywhere.",
       "exportButton": "Export all your data",
@@ -551,14 +551,15 @@
   "preview": {
     "collectionTitle": "{collection} · {owner}'s shelf",
     "text": "{text}",
-    "gameCount": "An empty collection on GameShelf | 1 game on GameShelf | {count} games on GameShelf",
+    "gameCount": "An empty collection on ThisPlayShelf | 1 game on ThisPlayShelf | {count} games on ThisPlayShelf",
     "shelfTitle": "{owner}'s shelf",
-    "collectionCount": "No public collections on GameShelf yet | 1 public collection on GameShelf | {count} public collections on GameShelf",
-    "site": "Search games, track your collection and share your shelf."
+    "collectionCount": "No public collections on ThisPlayShelf yet | 1 public collection on ThisPlayShelf | {count} public collections on ThisPlayShelf",
+    "site": "Search games, track your collection and share your shelf.",
+    "imageAlt": "The ThisPlayShelf logo, an S-shaped glass shelf, with the words “Your collection, on display.”"
   },
   "explore": {
     "title": "Explore",
-    "description": "Public collections from everyone on GameShelf, most recently active first.",
+    "description": "Public collections from everyone on ThisPlayShelf, most recently active first.",
     "by": "by {owner}",
     "empty": "No public collections yet. Make one of yours public to be the first.",
     "loadFailed": "Couldn't load collections. Try again.",
@@ -664,7 +665,7 @@
     "title": "Import from a CSV file",
     "description": "Bring games in from a spreadsheet. Nothing is saved until the last step.",
     "choose": "Choose a CSV file",
-    "chooseHint": "Exported from GameShelf or any spreadsheet (Excel, Numbers, Google Sheets). Up to 5 MB.",
+    "chooseHint": "Exported from ThisPlayShelf or any spreadsheet (Excel, Numbers, Google Sheets). Up to 5 MB.",
     "tooBig": "That file is over 5 MB. Split it into smaller files and import them one at a time.",
     "empty": "That file has no rows to import. The first row should name the columns.",
     "unreadable": "Couldn't read that file. Make sure it's a CSV.",

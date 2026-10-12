@@ -4,7 +4,7 @@
       class="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6"
     >
       <div class="flex items-center gap-4">
-        <p>GameShelf</p>
+        <p>ThisPlayShelf</p>
         <ThemeSwitcher />
       </div>
       <i18n-t scope="global" keypath="footer.igdbCredit" tag="p">

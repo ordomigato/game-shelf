@@ -2,7 +2,7 @@ import { expect, test } from './fixtures'
 
 test('home page loads', async ({ page }) => {
   await page.goto('/')
-  await expect(page).toHaveTitle('GameShelf')
+  await expect(page).toHaveTitle('ThisPlayShelf')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Find any game',
   )

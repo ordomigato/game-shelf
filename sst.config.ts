@@ -72,6 +72,19 @@ export default $config({
     })
 
     new sst.aws.Nuxt('Site', {
+      // DNS lives at Namecheap, so SST doesn't create records (dns: false).
+      // The certificate was validated there by hand. www is served by the
+      // same distribution and the app redirects it (server/middleware):
+      // SST's `redirects` would add a second distribution, outside the
+      // flat-rate plan.
+      domain: isProduction
+        ? {
+            name: 'thisplayshelf.com',
+            aliases: ['www.thisplayshelf.com'],
+            dns: false,
+            cert: 'arn:aws:acm:us-east-1:787391403512:certificate/fafff0b1-9eef-45a4-bc73-16fca71c90ff',
+          }
+        : undefined,
       link: [
         twitchClientId,
         twitchClientSecret,
@@ -82,6 +95,10 @@ export default $config({
       environment: {
         NUXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.id,
         NUXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
+        // Canonical links and link previews name the real domain.
+        ...(isProduction && {
+          NUXT_PUBLIC_SITE_URL: 'https://thisplayshelf.com',
+        }),
       },
       server: {
         runtime: 'nodejs24.x',

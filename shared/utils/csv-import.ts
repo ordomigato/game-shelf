@@ -59,7 +59,7 @@ const normalize = (text: string) =>
 
 const NAME_HEADERS = ['name', 'title', 'game', 'game name', 'game title']
 const IGDB_HEADERS = ['igdb id', 'igdb', 'igdbid']
-/** GameShelf sets the date a game joins a collection itself. */
+/** ThisPlayShelf sets the date a game joins a collection itself. */
 const SKIPPED_HEADERS = ['added', 'date added', 'added at']
 
 const YES = new Set(['yes', 'y', 'true', '1', 'x', '✓', '✔'])
@@ -204,7 +204,7 @@ export function guessType(values: string[]): {
 /**
  * Where each column goes, guessed from its header: the game's name, its
  * IGDB id, a field with the same name, or a new field with a guessed type.
- * A date-added column is skipped: GameShelf sets that itself.
+ * A date-added column is skipped: ThisPlayShelf sets that itself.
  */
 export function autoMap(
   headers: string[],

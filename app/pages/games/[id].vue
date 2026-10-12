@@ -20,21 +20,22 @@ if (error.value) {
 }
 
 useHead(() => ({
-  title: game.value ? t('app.title', { page: game.value.name }) : 'GameShelf',
+  title: game.value
+    ? t('app.title', { page: game.value.name })
+    : 'ThisPlayShelf',
 }))
 
 // Rendered on the server, so link previews show the game.
 useSeoMeta({
   description: () => game.value?.summary?.slice(0, 300) ?? t('preview.site'),
-  ogSiteName: 'GameShelf',
-  ogType: 'website',
-  ogTitle: () => game.value?.name ?? 'GameShelf',
+  ogTitle: () => game.value?.name ?? 'ThisPlayShelf',
   ogDescription: () => game.value?.summary?.slice(0, 300) ?? t('preview.site'),
   ogImage: () =>
     game.value?.coverId
       ? igdbImageUrl(game.value.coverId, 'cover_big')
       : undefined,
-  twitterCard: 'summary',
+  // A portrait cover fits the small card better than the wide one.
+  twitterCard: () => (game.value?.coverId ? 'summary' : 'summary_large_image'),
 })
 
 // Show whether the game is already in a collection. Browser only, once the

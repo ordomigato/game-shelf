@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* GameShelf type. @nuxt/fonts self-hosts these at build time. */
+/* ThisPlayShelf type. @nuxt/fonts self-hosts these at build time. */
 @theme {
   --animate-caret-blink: caret-blink 1.25s ease-out infinite;
   --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
@@ -97,6 +97,15 @@
   --sidebar-ring: oklch(0.772 0.105 242.1);
   --sidebar-width: 15rem;
 
+  /* The logo mark: glass shelves over the S's two walls (app/assets/brand,
+     V11). One set of colours per theme. */
+  --logo-wall: #1e4363;
+  --logo-wall-opacity: 0.85;
+  --logo-glass-from: #cfe6f8;
+  --logo-glass-via: #79bcef;
+  --logo-glass-to: #3c6e93;
+  --logo-edge: #ffffff;
+
   /* Raised buttons: a soft vertical gradient, a light top edge and a glow
      under the primary. Tune the look here, not in the components. */
   --btn-radius: 0.625rem;
@@ -161,6 +170,11 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 248);
   --sidebar-border: oklch(0.95 0.01 248 / 12%);
   --sidebar-ring: oklch(0.772 0.105 242.1);
+
+  --logo-wall: #9cc7ea;
+  --logo-wall-opacity: 0.55;
+  --logo-glass-from: #eaf5ff;
+  --logo-edge: #ddefff;
 
   /* Glows smudge on dark backgrounds, so dark mode keeps them faint. */
   --btn-edge: rgb(255 255 255 / 0.22);

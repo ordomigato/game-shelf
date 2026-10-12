@@ -1,6 +1,8 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import tailwindcss from '@tailwindcss/vite'
 
+const noindex = { 'X-Robots-Tag': 'noindex' }
+
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
@@ -40,27 +42,40 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'en' },
-      title: 'GameShelf',
+      title: 'ThisPlayShelf',
+      // The SVG favicon follows the browser's light or dark mode. The .ico
+      // is for browsers without SVG favicons; the PNG is the phone icon.
+      link: [
+        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+        { rel: 'icon', href: '/favicon.ico', sizes: '48x48' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
+      meta: [{ name: 'theme-color', content: '#041429' }],
     },
   },
   // Pages that depend on who is signed in render in the browser only. The
   // server can't know the user, so rendering them there would only produce
   // a page the browser then has to replace.
+  // Pages only for signing in or for your own account are kept out of
+  // search results (noindex).
   routeRules: {
-    '/account': { ssr: false },
-    '/account/**': { ssr: false },
-    '/welcome': { ssr: false },
-    '/blueprints': { ssr: false },
-    '/blueprints/**': { ssr: false },
-    '/login': { ssr: false },
-    '/signup': { ssr: false },
-    '/verify': { ssr: false },
-    '/forgot-password': { ssr: false },
+    '/account': { ssr: false, headers: noindex },
+    '/account/**': { ssr: false, headers: noindex },
+    '/welcome': { ssr: false, headers: noindex },
+    '/blueprints': { ssr: false, headers: noindex },
+    '/blueprints/**': { ssr: false, headers: noindex },
+    '/login': { ssr: false, headers: noindex },
+    '/signup': { ssr: false, headers: noindex },
+    '/verify': { ssr: false, headers: noindex },
+    '/forgot-password': { ssr: false, headers: noindex },
     // Rendered in the browser until public shelves get server rendering.
     '/u/**': { ssr: false },
   },
   runtimeConfig: {
     public: {
+      // The real domain, for canonical links and link previews. Set in
+      // production with NUXT_PUBLIC_SITE_URL.
+      siteUrl: '',
       cognitoUserPoolId: '',
       cognitoClientId: '',
       // Share of visits that report Core Web Vitals (0 to 1). Set with

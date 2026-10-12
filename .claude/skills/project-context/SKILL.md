@@ -10,7 +10,7 @@ description: >
 
 # Where this project keeps its own context
 
-GameShelf lets people build their own game collections and share them.
+ThisPlayShelf lets people build their own game collections and share them.
 Each collection has columns the user defines (a collector tracks price and
 quantity, a player tracks console and progress), and IGDB search only
 pre-fills new items. Users own their data. Public collections can be

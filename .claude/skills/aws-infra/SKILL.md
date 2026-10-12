@@ -50,7 +50,7 @@ Always pass `--stage` explicitly. Without it, SST falls back to the local
 creates a third copy.
 
 Each project gets its own AWS account under the user's AWS Organization.
-GameShelf lives in the `gameshelf` account (787391403512). The management
+ThisPlayShelf lives in the `gameshelf` account (787391403512, named before the rename). The management
 account (`jeremy-personal`) holds billing and the organization only, so
 don't deploy anything there. SST signs in with the `gameshelf` profile in
 `~/.aws/config` (an IAM Identity Center login). Set `AWS_PROFILE` to aim one
@@ -104,3 +104,17 @@ GitHub signs in to AWS as the IAM role `game-shelf-github-deploy`, through
 GitHub's OIDC provider. The user created both by hand in the IAM console,
 outside `sst.config.ts`. The role only trusts jobs in this repo's GitHub
 `production` environment, which only `v*.*.*` tags can use.
+
+## Domain
+
+Production answers on `thisplayshelf.com`. `www` is an alias on the same
+distribution, and `server/middleware/www-redirect.ts` redirects it to the
+bare domain. Don't switch to SST's `redirects`: it creates a second
+CloudFront distribution, outside the flat-rate plan.
+DNS is at Namecheap, not Route 53, so SST creates no DNS records
+(`dns: false`). The ACM certificate (us-east-1) was validated by hand with
+CNAME records at Namecheap, and its ARN is in `sst.config.ts`. At Namecheap,
+an ALIAS on `@` and a CNAME on `www` point at the production CloudFront
+distribution. If the distribution is ever replaced, update those two
+records. Production builds set `NUXT_PUBLIC_SITE_URL`, which canonical links
+and link previews use.

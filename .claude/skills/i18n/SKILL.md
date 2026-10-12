@@ -9,7 +9,7 @@ description: >
 
 # Translatable text
 
-GameShelf uses `@nuxtjs/i18n` (vue-i18n). English is the only language for
+ThisPlayShelf uses `@nuxtjs/i18n` (vue-i18n). English is the only language for
 now, but no user-facing text is hard-coded, so adding one later is a matter
 of translating a file.
 
@@ -51,7 +51,7 @@ of translating a file.
 
 ## Not translated
 
-The brand name "GameShelf" and "IGDB", user content (usernames, game names,
+The brand name "ThisPlayShelf" and "IGDB", user content (usernames, game names,
 summaries from IGDB), and code-level identifiers.
 
 ## Adding a language

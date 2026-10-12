@@ -44,7 +44,7 @@ function onGripKey(event: KeyboardEvent) {
     >
       <Heart
         v-if="collection.kind === 'wishlist'"
-        class="size-3.5 shrink-0 fill-current text-primary"
+        class="size-2.5 shrink-0 fill-current text-primary"
         :class="markClass"
         aria-hidden="true"
       />

@@ -9,14 +9,14 @@ const linkClass = 'underline-offset-4 hover:text-foreground hover:underline'
 </script>
 
 <template>
-  <footer class="border-t border-border py-6 text-sm text-muted-foreground">
+  <footer class="border-t border-border py-5 text-xs text-muted-foreground">
     <div
       class="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left"
     >
       <p>
         {{ $t('footer.copyright', { year }) }}
         <span
-          class="ml-2 font-mono text-xs opacity-70"
+          class="ml-2 font-mono text-[0.625rem] opacity-70"
           :title="$t('footer.version')"
           >{{ version }}</span
         >

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleCheck, CirclePlus, Heart, Plus } from '@lucide/vue'
+import { CircleCheck, CirclePlus, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { CollectionSummary } from '#shared/types/collection'
 
@@ -147,11 +147,6 @@ async function onCreated(collection: CollectionSummary) {
           @update:model-value="toggle(collection, $event === true)"
           @select.prevent
         >
-          <Heart
-            v-if="collection.kind === 'wishlist'"
-            class="text-primary"
-            aria-hidden="true"
-          />
           <span class="truncate">{{ titleOf(collection) }}</span>
         </DropdownMenuCheckboxItem>
       </template>

@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
-import {
-  ChevronDown,
-  Compass,
-  LayoutTemplate,
-  Library,
-  Plus,
-  Search,
-  Settings,
-} from '@lucide/vue'
+import { ChevronDown, Compass, Library, Plus, Search } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /** How many unpinned collections the sidebar lists before "View all". */
@@ -99,20 +91,6 @@ const sections = computed(() => [
     labelKey: 'header.myShelf',
     icon: Library,
     current: route.path === props.shelfPath,
-  },
-])
-const footer = computed(() => [
-  {
-    to: '/blueprints',
-    labelKey: 'header.blueprints',
-    icon: LayoutTemplate,
-    current: route.path.startsWith('/blueprints'),
-  },
-  {
-    to: '/account/settings',
-    labelKey: 'header.settings',
-    icon: Settings,
-    current: route.path.startsWith('/account'),
   },
 ])
 
@@ -248,21 +226,5 @@ const itemClass =
         </NuxtLink>
       </li>
     </ul>
-
-    <nav
-      :aria-label="$t('sidebar.moreLabel')"
-      class="mt-auto flex flex-col gap-0.5 border-t border-sidebar-border pt-2.5"
-    >
-      <NuxtLink
-        v-for="item in footer"
-        :key="item.to"
-        :to="item.to"
-        :class="itemClass"
-        :aria-current="item.current ? 'page' : undefined"
-      >
-        <component :is="item.icon" class="size-4" aria-hidden="true" />
-        {{ $t(item.labelKey) }}
-      </NuxtLink>
-    </nav>
   </aside>
 </template>

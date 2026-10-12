@@ -67,7 +67,7 @@ test('a search result opens the game page', async ({ page }) => {
 test('the game page says its data comes from IGDB', async ({ page }) => {
   await openFromSearch(page, { body: linkToThePast })
 
-  await expect(page.getByText('From IGDB')).toBeVisible()
+  await expect(page.getByText('From IGDB', { exact: true })).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'View this game on IGDB' }),
   ).toHaveAttribute('href', linkToThePast.igdbUrl)

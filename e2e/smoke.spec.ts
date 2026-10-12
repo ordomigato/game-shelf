@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { signInAs } from './support/session'
 
 test('home page loads', async ({ page }) => {
   await page.goto('/')
@@ -9,12 +10,12 @@ test('home page loads', async ({ page }) => {
 })
 
 test('theme switcher changes and remembers the theme', async ({ page }) => {
-  await page.goto('/')
+  await signInAs(page, { username: 'retro_fan' })
+  await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
+  await page.goto('/account/settings')
   const html = page.locator('html')
 
-  const theme = page.getByRole('contentinfo').getByRole('group', {
-    name: 'Theme',
-  })
+  const theme = page.getByRole('main').getByRole('group', { name: 'Theme' })
   await theme.getByRole('button', { name: 'Dark' }).click()
   await expect(html).toHaveClass(/\bdark\b/)
 

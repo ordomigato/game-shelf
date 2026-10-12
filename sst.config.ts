@@ -27,6 +27,11 @@ export default $config({
     // branch.
     const databaseUrl = new sst.Secret('DatabaseUrl')
 
+    // The sign-up and reset-password code email (Cognito sends both from
+    // one template). HTML is free with Cognito's own sender.
+    const { readFileSync } = await import('node:fs')
+    const codeEmail = readFileSync('infra/emails/code.html', 'utf8')
+
     const userPool = new sst.aws.CognitoUserPool('Users', {
       usernames: ['email'],
       transform: {
@@ -40,6 +45,11 @@ export default $config({
             temporaryPasswordValidityDays: 7,
           }
           args.deletionProtection = isProduction ? 'ACTIVE' : 'INACTIVE'
+          args.verificationMessageTemplate = {
+            defaultEmailOption: 'CONFIRM_WITH_CODE',
+            emailSubject: 'Your ThisPlayShelf code',
+            emailMessage: codeEmail,
+          }
         },
       },
     })
@@ -95,6 +105,12 @@ export default $config({
       environment: {
         NUXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.id,
         NUXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
+        // The release tag (v1.2.1) when GitHub Actions deploys a release;
+        // "dev" for everything else. Shown in the footer.
+        NUXT_PUBLIC_APP_VERSION:
+          process.env.GITHUB_REF_TYPE === 'tag'
+            ? (process.env.GITHUB_REF_NAME ?? 'dev')
+            : 'dev',
         // Canonical links and link previews name the real domain.
         ...(isProduction && {
           NUXT_PUBLIC_SITE_URL: 'https://thisplayshelf.com',

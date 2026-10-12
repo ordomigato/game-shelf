@@ -72,12 +72,22 @@ here:
   deploy fails on that, ask the user to request a quota increase rather
   than removing the cap.
 - No `provisioned` concurrency, no VPC, no NAT, no RDS.
-- Production's CloudFront distribution is on the **flat-rate Free plan**
-  ($0, 100 GB and 1M requests a month, WAF and DDoS protection included,
-  no overage charges). That plan is what caps bandwidth costs if the site
-  is attacked or scraped. Pay-as-you-go CloudFront has no ceiling. Check
-  the plan is still attached after any change that replaces the
-  distribution, and do the same for every new project's production site.
+- **The ceiling is about a dollar a month:** the user would rather the site
+  go offline than pay more. CloudFront is **pay-as-you-go**. The flat-rate
+  Free plan isn't available, because SST's Nuxt setup uses custom cache
+  policies and an edge key-value store (Pro, $15/month). Costs stay near
+  zero through the always-free allowances (CloudFront 1 TB and 10M
+  requests, Lambda 1M requests a month), the concurrency cap and the
+  kill switch below.
+- **Kill switch** (production): five CloudWatch alarms on CloudFront
+  requests (50k/hour, 300k/day), CloudFront bytes (20 GB/day) and server
+  invocations (20k/hour, 30k/day) publish to the `TrafficAlarms` topic.
+  `infra/kill-switch.ts` then sets the server's reserved concurrency to 0
+  and disables the distribution, and the topic emails the budget address.
+  **To bring the site back, re-run the latest deploy** (Actions → Deploy →
+  re-run, or publish a new release): it restores both. Raise a threshold in
+  `sst.config.ts` if real traffic grows toward it, and keep the daily ones
+  inside the free allowance.
 - Say what a new resource costs at this scale in the PR.
 
 ## Commands
@@ -110,7 +120,7 @@ outside `sst.config.ts`. The role only trusts jobs in this repo's GitHub
 Production answers on `thisplayshelf.com`. `www` is an alias on the same
 distribution, and `server/middleware/www-redirect.ts` redirects it to the
 bare domain. Don't switch to SST's `redirects`: it creates a second
-CloudFront distribution, outside the flat-rate plan.
+CloudFront distribution, which the kill switch doesn't watch.
 DNS is at Namecheap, not Route 53, so SST creates no DNS records
 (`dns: false`). The ACM certificate (us-east-1) was validated by hand with
 CNAME records at Namecheap, and its ARN is in `sst.config.ts`. At Namecheap,

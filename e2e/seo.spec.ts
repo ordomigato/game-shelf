@@ -53,3 +53,14 @@ test('the share image and icons are there', async ({ request }) => {
     expect((await request.get(path)).status(), path).toBe(200)
   }
 })
+
+test('www goes to the bare domain, keeping the path', async ({ request }) => {
+  const response = await request.get('/explore?page=2', {
+    headers: { 'x-forwarded-host': 'www.thisplayshelf.com' },
+    maxRedirects: 0,
+  })
+  expect(response.status()).toBe(301)
+  expect(response.headers().location).toBe(
+    'https://thisplayshelf.com/explore?page=2',
+  )
+})

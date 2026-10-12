@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://d2ajc85c3zkcbv.cloudfront.net
+      url: https://thisplayshelf.com
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,7 +56,7 @@ jobs:
 
       - name: Smoke test
         run: |
-          base=https://d2ajc85c3zkcbv.cloudfront.net
+          base=https://thisplayshelf.com
           for path in / /explore '/api/games/search?q=zelda'; do
             status=$(curl -s -o /dev/null -w '%{http_code}' --retry 3 --retry-all-errors "$base$path")
             echo "$status $path"

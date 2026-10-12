@@ -107,9 +107,15 @@ filter event = "web.vital"
 
 Good targets at p75: LCP under 2500 ms, INP under 200 ms, CLS under 0.1.
 
+## Alerts
+
+Production emails the owner (see `aws-infra`): 5+ server errors in 15
+minutes, and a daily health check (database, accounts, traffic, home
+page) with a Monday summary. Traffic floods trip the kill switch instead.
+
 ## Not yet
 
-- **Dashboard and alarms** in SST: a CloudWatch dashboard (3 are free) and a
-  few alarms (10 are free), for when there's production traffic.
+- **Dashboard** in SST: a CloudWatch dashboard (3 are free), for when
+  there's production traffic.
 - **Tracing** with OpenTelemetry and X-Ray, if a slow request can't be
   explained from these logs.

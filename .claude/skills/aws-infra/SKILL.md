@@ -88,6 +88,14 @@ here:
   re-run, or publish a new release): it restores both. Raise a threshold in
   `sst.config.ts` if real traffic grows toward it, and keep the daily ones
   inside the free allowance.
+- **Alerts** (production, email only, nothing switches off): the `Alerts`
+  topic emails the budget address. `ServerErrorsAlarm` fires on 5+ server
+  errors in 15 minutes (a log metric filter on the server's log group).
+  `HealthCheck` runs `infra/health-check.ts` daily at 14:00 UTC and emails
+  when the database is down or over 400 MB, there are more than 15
+  accounts or 5 sign-ups in a day, traffic passes 3,000 requests a day,
+  or the home page doesn't answer. On Mondays it sends the numbers either
+  way. Limits are in `infra/health.ts`; raise them as the audience grows.
 - Say what a new resource costs at this scale in the PR.
 
 ## Commands

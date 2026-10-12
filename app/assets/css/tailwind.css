@@ -97,6 +97,13 @@
   --sidebar-ring: oklch(0.772 0.105 242.1);
   --sidebar-width: 15rem;
 
+  /* The navigation drawer on phones: slides in from the left edge. */
+  --drawer-duration-in: 300ms;
+  --drawer-duration-out: 200ms;
+  --drawer-ease-in: cubic-bezier(0.22, 1, 0.36, 1);
+  --drawer-ease-out: cubic-bezier(0.4, 0, 1, 1);
+  --drawer-backdrop-duration: 200ms;
+
   /* The logo mark: glass shelves over the S's two walls (app/assets/brand,
      V11). One set of colours per theme. */
   --logo-wall: #1e4363;
@@ -249,4 +256,36 @@ tr.drag-chosen,
 tr.drag-chosen > .pinned-cell {
   background: var(--card);
   transition: none;
+}
+
+/* The navigation drawer slides all the way in from the left edge, with no
+   fade. Timing comes from the --drawer-* variables above. Unlayered, so it
+   wins over the Sheet's own animation utilities. */
+.nav-drawer[data-state='open'] {
+  animation: nav-drawer-in var(--drawer-duration-in) var(--drawer-ease-in) both;
+}
+.nav-drawer[data-state='closed'] {
+  animation: nav-drawer-out var(--drawer-duration-out) var(--drawer-ease-out)
+    both;
+}
+@keyframes nav-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes nav-drawer-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-drawer[data-state] {
+    animation-duration: 1ms;
+  }
 }

@@ -9,6 +9,8 @@ defineProps<{
   compact?: boolean
   /** Only the mark on phones. */
   compactOnPhone?: boolean
+  /** Smaller, for tight bars like the phone header. */
+  small?: boolean
 }>()
 
 // Each logo on the page needs its own gradient id.
@@ -23,7 +25,12 @@ const shelves = [
 
 <template>
   <span class="inline-flex items-center gap-2 font-heading">
-    <svg viewBox="-6 -6 154 176" class="h-7 w-auto shrink-0" aria-hidden="true">
+    <svg
+      viewBox="-6 -6 154 176"
+      class="w-auto shrink-0"
+      :class="small ? 'h-5' : 'h-7'"
+      aria-hidden="true"
+    >
       <defs>
         <linearGradient :id="glass" x1="0" y1="0" x2="1" y2="1">
           <stop
@@ -59,8 +66,11 @@ const shelves = [
       />
     </svg>
     <span
-      class="text-xl leading-none whitespace-nowrap"
-      :class="{ 'sr-only': compact, 'max-sm:sr-only': compactOnPhone }"
+      class="leading-none whitespace-nowrap"
+      :class="[
+        small ? 'text-base' : 'text-xl',
+        { 'sr-only': compact, 'max-sm:sr-only': compactOnPhone },
+      ]"
     >
       <span
         class="mr-[0.14em] align-[0.62em] text-[0.55em] font-normal tracking-wide opacity-60"

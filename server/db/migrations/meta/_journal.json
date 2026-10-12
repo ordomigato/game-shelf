@@ -71,6 +71,13 @@
       "when": 1791839254920,
       "tag": "0009_user_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791840050978,
+      "tag": "0010_plan_pro_and_max",
+      "breakpoints": true
     }
   ]
 }

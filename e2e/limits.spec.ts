@@ -130,11 +130,20 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
     free.getByText('10 collections, plus the Wishlist'),
   ).toBeVisible()
   await expect(free.getByText('3,000 games in total')).toBeVisible()
-  const plus = page.getByRole('region', { name: 'Plus' })
+  const pro = page.getByRole('region', { name: 'Pro' })
   await expect(
-    plus.getByText('100 collections, plus the Wishlist'),
+    pro.getByText('100 collections, plus the Wishlist'),
   ).toBeVisible()
-  await expect(plus.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
+  await expect(pro.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
+  const max = page.getByRole('region', { name: 'Max' })
+  await expect(max.getByText("Let's talk")).toBeVisible()
+  await expect(
+    max.getByText('500 collections, plus the Wishlist'),
+  ).toBeVisible()
+  await expect(max.getByRole('link', { name: 'Get in touch' })).toHaveAttribute(
+    'href',
+    '/contact',
+  )
   await expect(
     page.getByRole('heading', { name: 'Why a paid plan?' }),
   ).toBeVisible()

@@ -38,7 +38,13 @@ const meters = computed(() =>
     <CardHeader>
       <CardTitle>
         <h2 class="text-lg font-semibold">
-          {{ plan === 'plus' ? $t('limits.planPlus') : $t('limits.planFree') }}
+          {{
+            plan === 'max'
+              ? $t('limits.planMax')
+              : plan === 'pro'
+                ? $t('limits.planPro')
+                : $t('limits.planFree')
+          }}
         </h2>
       </CardTitle>
       <CardDescription>{{ $t('limits.planDescription') }}</CardDescription>

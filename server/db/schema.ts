@@ -39,7 +39,10 @@ export const users = pgTable(
     username: text('username').unique(),
     displayName: text('display_name'),
     /** What the account may store (shared/utils/plans.ts). */
-    plan: text('plan').$type<'free' | 'plus'>().notNull().default('free'),
+    plan: text('plan')
+      .$type<'free' | 'pro' | 'max'>()
+      .notNull()
+      .default('free'),
     /** When a paid plan ends; null for free, or a plan that doesn't end. */
     planUntil: timestamp('plan_until', { withTimezone: true }),
     ...timestamps,
@@ -49,7 +52,7 @@ export const users = pgTable(
       'users_username_format',
       sql`${table.username} ~ '^[a-z0-9_]{3,20}$'`,
     ),
-    check('users_plan', sql`${table.plan} in ('free', 'plus')`),
+    check('users_plan', sql`${table.plan} in ('free', 'pro', 'max')`),
   ],
 )
 

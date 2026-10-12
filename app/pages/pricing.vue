@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Check } from '@lucide/vue'
-import { PLAN_LIMITS, PLUS_PRICE_PER_YEAR } from '#shared/utils/plans'
+import { PLAN_LIMITS, PRO_PRICE_PER_YEAR } from '#shared/utils/plans'
 
 /**
- * The free plan and the planned paid one, with every limit listed from the
- * same numbers the server enforces. Rendered on the server.
+ * Free, the planned Pro, and Max by arrangement, with every limit listed
+ * from the same numbers the server enforces. Rendered on the server.
  */
 const { t, locale } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('pricing.title') }) }))
@@ -20,7 +20,7 @@ const number = (value: number) =>
   new Intl.NumberFormat(locale.value).format(value)
 
 const rows = computed(() =>
-  (['free', 'plus'] as const).map((name) => {
+  (['free', 'pro', 'max'] as const).map((name) => {
     const limits = PLAN_LIMITS[name]
     return {
       name,
@@ -39,19 +39,20 @@ const rows = computed(() =>
   }),
 )
 const free = computed(() => rows.value[0]!)
-const plus = computed(() => rows.value[1]!)
+const pro = computed(() => rows.value[1]!)
+const max = computed(() => rows.value[2]!)
 </script>
 
 <template>
-  <article class="mx-auto flex max-w-3xl flex-col gap-10">
-    <header class="flex flex-col gap-3">
+  <article class="mx-auto flex max-w-5xl flex-col gap-10">
+    <header class="flex max-w-3xl flex-col gap-3">
       <h1 class="text-3xl font-bold">{{ $t('pricing.title') }}</h1>
       <p class="text-lg leading-relaxed text-muted-foreground">
         {{ $t('pricing.intro') }}
       </p>
     </header>
 
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div class="grid gap-4 md:grid-cols-3">
       <section
         class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
         aria-labelledby="plan-free"
@@ -83,24 +84,27 @@ const plus = computed(() => rows.value[1]!)
 
       <section
         class="flex flex-col gap-4 rounded-xl border border-dashed border-border bg-card/60 p-6"
-        aria-labelledby="plan-plus"
+        aria-labelledby="plan-pro"
       >
         <div class="flex items-center justify-between gap-2">
-          <h2 id="plan-plus" class="text-xl font-semibold">
-            {{ $t('pricing.plusName') }}
+          <h2 id="plan-pro" class="text-xl font-semibold">
+            {{ $t('pricing.proName') }}
           </h2>
-          <Badge variant="outline">{{ $t('pricing.comingSoon') }}</Badge>
+          <Badge v-if="signedIn && plan === 'pro'" variant="secondary">{{
+            $t('pricing.yourPlan')
+          }}</Badge>
+          <Badge v-else variant="outline">{{ $t('pricing.comingSoon') }}</Badge>
         </div>
         <p class="flex items-baseline gap-1">
           <span class="text-3xl font-bold">{{
-            $t('pricing.plusPrice', { price: PLUS_PRICE_PER_YEAR })
+            $t('pricing.proPrice', { price: PRO_PRICE_PER_YEAR })
           }}</span>
           <span class="text-sm text-muted-foreground">{{
             $t('pricing.perYear')
           }}</span>
         </p>
         <ul class="flex flex-col gap-2 text-sm">
-          <li v-for="item in plus.items" :key="item" class="flex gap-2">
+          <li v-for="item in pro.items" :key="item" class="flex gap-2">
             <Check
               class="mt-0.5 size-4 shrink-0 text-primary"
               aria-hidden="true"
@@ -110,14 +114,46 @@ const plus = computed(() => rows.value[1]!)
         </ul>
         <Button class="mt-auto" disabled>{{ $t('pricing.comingSoon') }}</Button>
       </section>
+
+      <section
+        class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
+        aria-labelledby="plan-max"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <h2 id="plan-max" class="text-xl font-semibold">
+            {{ $t('pricing.maxName') }}
+          </h2>
+          <Badge v-if="signedIn && plan === 'max'" variant="secondary">{{
+            $t('pricing.yourPlan')
+          }}</Badge>
+        </div>
+        <p>
+          <span class="text-3xl font-bold">{{ $t('pricing.maxPrice') }}</span>
+        </p>
+        <p class="text-sm text-muted-foreground">
+          {{ $t('pricing.maxBlurb') }}
+        </p>
+        <ul class="flex flex-col gap-2 text-sm">
+          <li v-for="item in max.items" :key="item" class="flex gap-2">
+            <Check
+              class="mt-0.5 size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            {{ item }}
+          </li>
+        </ul>
+        <Button as-child variant="outline" class="mt-auto">
+          <NuxtLink to="/contact">{{ $t('pricing.maxCta') }}</NuxtLink>
+        </Button>
+      </section>
     </div>
 
-    <ProseSection :title="$t('pricing.whyTitle')">
+    <ProseSection :title="$t('pricing.whyTitle')" class="max-w-3xl">
       <p>{{ $t('pricing.why') }}</p>
-      <p>{{ $t('pricing.whyPlus') }}</p>
+      <p>{{ $t('pricing.whyPro') }}</p>
     </ProseSection>
 
-    <ProseSection :title="$t('pricing.limitsTitle')">
+    <ProseSection :title="$t('pricing.limitsTitle')" class="max-w-3xl">
       <p>{{ $t('pricing.limits') }}</p>
     </ProseSection>
   </article>

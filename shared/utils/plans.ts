@@ -1,6 +1,7 @@
 /**
- * What each plan allows. Free is what everyone has today; Plus is planned
- * (see /pricing) and not on sale yet. The server enforces these
+ * What each plan allows. Free is what everyone has today. Pro is planned
+ * (see /pricing) and not on sale yet. Max is for the biggest collections,
+ * arranged by email and set by hand. The server enforces these
  * (server/utils/limits.ts) and the app shows them where they apply, so a
  * limit never comes out of nowhere.
  *
@@ -8,7 +9,7 @@
  * most) while one account, or one script, can't fill the free database
  * for everyone.
  */
-export type Plan = 'free' | 'plus'
+export type Plan = 'free' | 'pro' | 'max'
 
 export interface PlanLimits {
   /** Collections, not counting the Wishlist. */
@@ -35,8 +36,8 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     importRows: 1000,
   },
   // Planned. The text limit needs the per-plan check wired through value
-  // validation (shared/utils/field-values.ts) when Plus goes on sale.
-  plus: {
+  // validation (shared/utils/field-values.ts) when Pro goes on sale.
+  pro: {
     collections: 100,
     fieldsPerCollection: 30,
     gamesPerCollection: 10_000,
@@ -45,10 +46,20 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     chartsPerCollection: 20,
     importRows: 5000,
   },
+  // By arrangement. Fields and charts stay at the app's own maximums.
+  max: {
+    collections: 500,
+    fieldsPerCollection: 30,
+    gamesPerCollection: 50_000,
+    games: 100_000,
+    textLength: 2000,
+    chartsPerCollection: 24,
+    importRows: 5000,
+  },
 }
 
-/** Plus is planned: about this much a year, not on sale yet. */
-export const PLUS_PRICE_PER_YEAR = 5
+/** Pro is planned: about this much a year, not on sale yet. */
+export const PRO_PRICE_PER_YEAR = 5
 
 export function limitsFor(plan: Plan): PlanLimits {
   return PLAN_LIMITS[plan]

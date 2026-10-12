@@ -425,14 +425,7 @@ async function deleteCollection() {
     <template v-else-if="data">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex flex-col gap-2">
-          <h1 class="flex items-center gap-2 text-3xl font-bold">
-            <Heart
-              v-if="data.kind === 'wishlist'"
-              class="size-6 text-primary"
-              aria-hidden="true"
-            />
-            {{ titleOf(data) }}
-          </h1>
+          <h1 class="text-3xl font-bold">{{ titleOf(data) }}</h1>
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >

@@ -230,6 +230,67 @@ export default $config({
         })
       }
 
+      // Alerts: emails only, nothing switches off. The error alarm reads the
+      // server's request log; the daily check measures the database,
+      // accounts, traffic and the home page (infra/health-check.ts).
+      const alerts = new sst.aws.SnsTopic('Alerts')
+      new aws.sns.TopicSubscription('AlertsEmail', {
+        topic: alerts.arn,
+        protocol: 'email',
+        endpoint: budgetEmail.value,
+      })
+
+      const serverLogs = server.nodes.logGroup.apply((group) => group!.name)
+      new aws.cloudwatch.LogMetricFilter('ServerErrors', {
+        logGroupName: serverLogs,
+        pattern:
+          '{ ($.event = "server.error") || ($.event = "http.request" && $.status >= 500) }',
+        metricTransformation: {
+          name: 'ServerErrors',
+          namespace: 'ThisPlayShelf',
+          value: '1',
+        },
+      })
+      new aws.cloudwatch.MetricAlarm('ServerErrorsAlarm', {
+        alarmDescription:
+          'Five or more server errors in 15 minutes. Check the request log.',
+        namespace: 'ThisPlayShelf',
+        metricName: 'ServerErrors',
+        statistic: 'Sum',
+        period: 900,
+        evaluationPeriods: 1,
+        threshold: 5,
+        comparisonOperator: 'GreaterThanOrEqualToThreshold',
+        treatMissingData: 'notBreaching',
+        alarmActions: [alerts.arn],
+      })
+
+      new sst.aws.Cron('HealthCheck', {
+        // 14:00 UTC: mid-morning in North America.
+        schedule: 'cron(0 14 * * ? *)',
+        job: {
+          handler: 'infra/health-check.handler',
+          runtime: 'nodejs24.x',
+          architecture: 'arm64',
+          memory: '256 MB',
+          timeout: '30 seconds',
+          logging: { retention: '1 month' },
+          link: [databaseUrl, userPool],
+          environment: {
+            ALERT_TOPIC_ARN: alerts.arn,
+            DISTRIBUTION_ID: distribution.id,
+            SITE_URL: 'https://thisplayshelf.com/',
+          },
+          permissions: [
+            { actions: ['sns:Publish'], resources: [alerts.arn] },
+            {
+              actions: ['cloudwatch:GetMetricStatistics'],
+              resources: ['*'],
+            },
+          ],
+        },
+      })
+
       // Budgets are account-wide, so only the production stage owns one.
       new aws.budgets.Budget('MonthlyBudget', {
         budgetType: 'COST',

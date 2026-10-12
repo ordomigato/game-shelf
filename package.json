@@ -23,7 +23,6 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
-    "@aws-sdk/client-cognito-identity-provider": "^3.1149.0",
     "@lucide/vue": "^1.54.0",
     "@neondatabase/serverless": "^1.2.0",
     "@nuxt/fonts": "^0.14.0",
@@ -58,7 +57,10 @@
   },
   "devDependencies": {
     "@aws-sdk/client-cloudfront": "3.1149.0",
+    "@aws-sdk/client-cloudwatch": "3.1149.0",
+    "@aws-sdk/client-cognito-identity-provider": "3.1149.0",
     "@aws-sdk/client-lambda": "3.1149.0",
+    "@aws-sdk/client-sns": "3.1149.0",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
     "@nuxt/eslint": "^1.17.0",

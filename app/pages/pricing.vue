@@ -49,9 +49,9 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
 
 <template>
   <article class="mx-auto flex max-w-5xl flex-col gap-10">
-    <header class="flex max-w-3xl flex-col gap-3">
+    <header class="flex flex-col gap-3">
       <h1 class="text-3xl font-bold">{{ $t('pricing.title') }}</h1>
-      <p class="text-lg leading-relaxed text-muted-foreground">
+      <p class="leading-relaxed text-muted-foreground">
         {{ $t('pricing.intro') }}
       </p>
     </header>
@@ -141,12 +141,12 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
       </section>
     </div>
 
-    <ProseSection :title="$t('pricing.whyTitle')" class="max-w-3xl">
+    <ProseSection :title="$t('pricing.whyTitle')">
       <p>{{ $t('pricing.why') }}</p>
       <p>{{ $t('pricing.whyPro') }}</p>
     </ProseSection>
 
-    <ProseSection :title="$t('pricing.limitsTitle')" class="max-w-3xl">
+    <ProseSection :title="$t('pricing.limitsTitle')">
       <p>{{ $t('pricing.limits') }}</p>
     </ProseSection>
   </article>

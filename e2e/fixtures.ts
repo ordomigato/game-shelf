@@ -2,17 +2,21 @@ import { test as base, expect } from '@playwright/test'
 
 /**
  * Playwright `test` that fails any test whose page logs a Vue hydration
- * warning, i.e. the server render and the browser's first render differ.
+ * warning (the server render and the browser's first render differ) or
+ * hits the Content-Security-Policy (something blocked from loading).
  */
-export const test = base.extend<{ hydrationGuard: undefined }>({
-  hydrationGuard: [
+export const test = base.extend<{ consoleGuard: undefined }>({
+  consoleGuard: [
     async ({ page }, use) => {
-      const warnings: string[] = []
+      const problems: string[] = []
       page.on('console', (message) => {
-        if (/hydration/i.test(message.text())) warnings.push(message.text())
+        const text = message.text()
+        if (/hydration|Content Security Policy/i.test(text)) {
+          problems.push(text.split('\n')[0]!)
+        }
       })
       await use(undefined)
-      expect(warnings, 'hydration warnings').toEqual([])
+      expect(problems, 'hydration or CSP problems').toEqual([])
     },
     { auto: true },
   ],

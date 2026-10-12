@@ -37,7 +37,7 @@ watch(
         </SheetTrigger>
         <SheetContent
           side="left"
-          class="w-(--sidebar-width) overflow-y-auto bg-sidebar px-2.5 py-3.5 text-sidebar-foreground"
+          class="nav-drawer w-(--sidebar-width) overflow-y-auto bg-sidebar px-2.5 py-3.5 text-sidebar-foreground"
         >
           <SheetTitle class="sr-only">{{ $t('header.menu') }}</SheetTitle>
           <SheetDescription class="sr-only">{{
@@ -46,10 +46,6 @@ watch(
           <SidebarNav :shelf-path="props.shelfPath" />
         </SheetContent>
       </Sheet>
-      <!-- The sidebar shows the logo on wider screens. -->
-      <NuxtLink to="/" class="rounded-md md:hidden">
-        <BrandLogo compact-on-phone />
-      </NuxtLink>
       <div class="min-w-0 flex-1">
         <HeaderSearch v-if="!onHome" class="hidden sm:block" />
       </div>

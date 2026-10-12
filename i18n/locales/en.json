@@ -107,7 +107,7 @@
     "comingSoon": "Coming soon",
     "maxName": "Max",
     "maxPrice": "Let's talk",
-    "maxBlurb": "For the very biggest shelves. Custom limits, set to fit your collection.",
+    "maxBlurb": "For the very biggest shelves, consider custom limits, set to fit your collection needs.",
     "maxCta": "Get in touch",
     "collections": "{count} collections, plus the Wishlist",
     "games": "{count} games in total",
@@ -287,6 +287,7 @@
     "tabs": {
       "profile": "Profile",
       "security": "Security",
+      "usage": "Usage",
       "settings": "Settings"
     },
     "profile": {

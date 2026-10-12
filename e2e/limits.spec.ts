@@ -103,13 +103,20 @@ test('a refusal from the server says which limit', async ({ page }) => {
   ).toBeVisible()
 })
 
-test('Settings shows the plan and what is used', async ({ page }) => {
+test('the Usage tab shows the plan and what is used', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/me/usage', (route) =>
     route.fulfill({ json: { plan: 'free', collections: 3, games: 214 } }),
   )
-  await page.goto('/account/settings')
+  await page.goto('/account/usage')
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Account sections' })
+      .getByRole('link', {
+        name: 'Usage',
+      }),
+  ).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { name: 'Free plan' })).toBeVisible()
   await expect(
     page.getByRole('progressbar', { name: 'Collections' }),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Menu, Search } from '@lucide/vue'
+import { Menu } from '@lucide/vue'
 
 /**
  * The signed-in layout's top bar: search and the account menu. On phones
@@ -23,7 +23,7 @@ watch(
   <header
     class="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md"
   >
-    <div class="flex h-14 items-center gap-2 px-4 sm:px-6">
+    <div class="relative flex h-14 items-center gap-2 px-4 sm:px-6">
       <Sheet v-model:open="drawerOpen">
         <SheetTrigger as-child>
           <Button
@@ -46,20 +46,17 @@ watch(
           <SidebarNav :shelf-path="props.shelfPath" />
         </SheetContent>
       </Sheet>
+      <!-- Centred in the bar on phones. Wider screens show the search box
+           here, and the sidebar shows the logo. -->
+      <NuxtLink
+        to="/"
+        class="absolute left-1/2 -translate-x-1/2 rounded-md sm:hidden"
+      >
+        <BrandLogo small />
+      </NuxtLink>
       <div class="min-w-0 flex-1">
         <HeaderSearch v-if="!onHome" class="hidden sm:block" />
       </div>
-      <Button
-        v-if="!onHome"
-        as-child
-        variant="ghost"
-        size="icon"
-        class="sm:hidden"
-      >
-        <NuxtLink to="/" :aria-label="$t('header.searchLabel')">
-          <Search class="size-5" aria-hidden="true" />
-        </NuxtLink>
-      </Button>
       <UserMenu />
     </div>
   </header>

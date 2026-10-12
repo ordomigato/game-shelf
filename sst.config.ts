@@ -71,7 +71,7 @@ export default $config({
       },
     })
 
-    new sst.aws.Nuxt('Site', {
+    const site = new sst.aws.Nuxt('Site', {
       // DNS lives at Namecheap, so SST doesn't create records (dns: false).
       // The certificate was validated there by hand. www is served by the
       // same distribution and the app redirects it (server/middleware):
@@ -118,6 +118,117 @@ export default $config({
 
     if (isProduction) {
       const budgetEmail = new sst.Secret('BudgetAlertEmail')
+
+      // Kill switch: rather go offline than pay. Traffic alarms trip a small
+      // function that stops the server (no capacity left) and disables the
+      // CloudFront distribution. Normal traffic is around 10 requests an
+      // hour; the daily limits keep a month inside the free allowance and
+      // the hourly ones catch a flood within minutes. Re-running the latest
+      // deploy brings the site back.
+      const distribution = site.nodes.cdn!.nodes.distribution
+      const server = site.nodes.server!
+      const killSwitch = new sst.aws.Function('KillSwitch', {
+        handler: 'infra/kill-switch.handler',
+        runtime: 'nodejs24.x',
+        architecture: 'arm64',
+        memory: '128 MB',
+        timeout: '30 seconds',
+        environment: {
+          DISTRIBUTION_ID: distribution.id,
+          SERVER_FUNCTION: server.name,
+        },
+        permissions: [
+          {
+            actions: [
+              'cloudfront:GetDistributionConfig',
+              'cloudfront:UpdateDistribution',
+            ],
+            resources: [distribution.arn],
+          },
+          {
+            actions: ['lambda:PutFunctionConcurrency'],
+            resources: [server.arn],
+          },
+        ],
+        logging: { retention: '1 month' },
+      })
+      const trafficAlarms = new sst.aws.SnsTopic('TrafficAlarms')
+      // Wired by hand rather than with trafficAlarms.subscribe(), so a
+      // preview (sst diff) shows the subscription before it's deployed.
+      new aws.lambda.Permission('KillSwitchInvoke', {
+        action: 'lambda:InvokeFunction',
+        function: killSwitch.name,
+        principal: 'sns.amazonaws.com',
+        sourceArn: trafficAlarms.arn,
+      })
+      new aws.sns.TopicSubscription('KillSwitchTrigger', {
+        topic: trafficAlarms.arn,
+        protocol: 'lambda',
+        endpoint: killSwitch.arn,
+      })
+      // Also email, so the outage isn't a mystery. The address has to
+      // confirm the subscription once (AWS sends a link).
+      new aws.sns.TopicSubscription('TrafficAlarmEmail', {
+        topic: trafficAlarms.arn,
+        protocol: 'email',
+        endpoint: budgetEmail.value,
+      })
+
+      const limits = [
+        {
+          name: 'RequestsHour',
+          namespace: 'AWS/CloudFront',
+          metric: 'Requests',
+          period: 3600,
+          threshold: 50_000,
+        },
+        {
+          name: 'RequestsDay',
+          namespace: 'AWS/CloudFront',
+          metric: 'Requests',
+          period: 86_400,
+          threshold: 300_000,
+        },
+        {
+          name: 'DownloadDay',
+          namespace: 'AWS/CloudFront',
+          metric: 'BytesDownloaded',
+          period: 86_400,
+          threshold: 20e9,
+        },
+        {
+          name: 'ServerHour',
+          namespace: 'AWS/Lambda',
+          metric: 'Invocations',
+          period: 3600,
+          threshold: 20_000,
+        },
+        {
+          name: 'ServerDay',
+          namespace: 'AWS/Lambda',
+          metric: 'Invocations',
+          period: 86_400,
+          threshold: 30_000,
+        },
+      ]
+      for (const limit of limits) {
+        new aws.cloudwatch.MetricAlarm(`TrafficAlarm${limit.name}`, {
+          alarmDescription: `Kill switch: ${limit.metric} over ${limit.threshold} in ${limit.period / 3600} h`,
+          namespace: limit.namespace,
+          metricName: limit.metric,
+          dimensions:
+            limit.namespace === 'AWS/CloudFront'
+              ? { DistributionId: distribution.id, Region: 'Global' }
+              : { FunctionName: server.name },
+          statistic: 'Sum',
+          period: limit.period,
+          evaluationPeriods: 1,
+          threshold: limit.threshold,
+          comparisonOperator: 'GreaterThanThreshold',
+          treatMissingData: 'notBreaching',
+          alarmActions: [trafficAlarms.arn],
+        })
+      }
 
       // Budgets are account-wide, so only the production stage owns one.
       new aws.budgets.Budget('MonthlyBudget', {

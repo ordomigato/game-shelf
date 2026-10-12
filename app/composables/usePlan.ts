@@ -4,6 +4,7 @@ import { limitsFor } from '#shared/utils/plans'
 export function usePlan() {
   const auth = useAuth()
   const plan = computed(() => auth.me.value?.plan ?? 'free')
-  const limits = computed(() => limitsFor(plan.value))
+  // The server sends the account's actual limits, custom ones included.
+  const limits = computed(() => auth.me.value?.limits ?? limitsFor(plan.value))
   return { plan, limits }
 }

@@ -20,7 +20,7 @@ const number = (value: number) =>
   new Intl.NumberFormat(locale.value).format(value)
 
 const rows = computed(() =>
-  (['free', 'pro', 'max'] as const).map((name) => {
+  (['free', 'pro'] as const).map((name) => {
     const limits = PLAN_LIMITS[name]
     return {
       name,
@@ -40,7 +40,11 @@ const rows = computed(() =>
 )
 const free = computed(() => rows.value[0]!)
 const pro = computed(() => rows.value[1]!)
-const max = computed(() => rows.value[2]!)
+// While Pro's price is still to be decided, don't add "per year" to it.
+const proPrice = computed(() =>
+  t('pricing.proPrice', { price: PRO_PRICE_PER_YEAR }),
+)
+const proPriceDecided = computed(() => /\d/.test(proPrice.value))
 </script>
 
 <template>
@@ -96,10 +100,8 @@ const max = computed(() => rows.value[2]!)
           <Badge v-else variant="outline">{{ $t('pricing.comingSoon') }}</Badge>
         </div>
         <p class="flex items-baseline gap-1">
-          <span class="text-3xl font-bold">{{
-            $t('pricing.proPrice', { price: PRO_PRICE_PER_YEAR })
-          }}</span>
-          <span class="text-sm text-muted-foreground">{{
+          <span class="text-3xl font-bold">{{ proPrice }}</span>
+          <span v-if="proPriceDecided" class="text-sm text-muted-foreground">{{
             $t('pricing.perYear')
           }}</span>
         </p>
@@ -133,15 +135,6 @@ const max = computed(() => rows.value[2]!)
         <p class="text-sm text-muted-foreground">
           {{ $t('pricing.maxBlurb') }}
         </p>
-        <ul class="flex flex-col gap-2 text-sm">
-          <li v-for="item in max.items" :key="item" class="flex gap-2">
-            <Check
-              class="mt-0.5 size-4 shrink-0 text-primary"
-              aria-hidden="true"
-            />
-            {{ item }}
-          </li>
-        </ul>
         <Button as-child variant="outline" class="mt-auto">
           <NuxtLink to="/contact">{{ $t('pricing.maxCta') }}</NuxtLink>
         </Button>

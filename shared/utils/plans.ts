@@ -1,9 +1,13 @@
+import { MAX_CHARTS } from './charts'
+import { MAX_IMPORT_ROWS } from './csv-import'
+import { MAX_FIELDS } from './field-changes'
+
 /**
  * What each plan allows. Free is what everyone has today. Pro is planned
- * (see /pricing) and not on sale yet. Max is for the biggest collections,
- * arranged by email and set by hand. The server enforces these
- * (server/utils/limits.ts) and the app shows them where they apply, so a
- * limit never comes out of nowhere.
+ * (see /pricing) and not on sale yet. Max is custom: limits agreed by
+ * email and stored on the account (`users.custom_limits`). The server
+ * enforces these (server/utils/limits.ts) and the app shows them where
+ * they apply, so a limit never comes out of nowhere.
  *
  * Sized so a free shelf stays generous (about 2 MB of database at the
  * most) while one account, or one script, can't fill the free database
@@ -25,7 +29,10 @@ export interface PlanLimits {
   importRows: number
 }
 
-export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
+/** Limits set by hand for one account, on top of its plan's. */
+export type CustomLimits = Partial<PlanLimits>
+
+export const PLAN_LIMITS: Record<'free' | 'pro', PlanLimits> = {
   free: {
     collections: 10,
     fieldsPerCollection: 15,
@@ -46,23 +53,39 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     chartsPerCollection: 20,
     importRows: 5000,
   },
-  // By arrangement. Fields and charts stay at the app's own maximums.
-  max: {
-    collections: 500,
-    fieldsPerCollection: 30,
-    gamesPerCollection: 50_000,
-    games: 100_000,
-    textLength: 2000,
-    chartsPerCollection: 24,
-    importRows: 5000,
-  },
 }
 
-/** Pro is planned: about this much a year, not on sale yet. */
+/** Pro is planned and not on sale yet. */
 export const PRO_PRICE_PER_YEAR = 5
 
-export function limitsFor(plan: Plan): PlanLimits {
-  return PLAN_LIMITS[plan]
+/** What the app itself supports, whatever an account's limits say. */
+const APP_MAXIMUMS: Partial<PlanLimits> = {
+  fieldsPerCollection: MAX_FIELDS,
+  chartsPerCollection: MAX_CHARTS,
+  importRows: MAX_IMPORT_ROWS,
+}
+
+/**
+ * An account's limits: its plan's (Max starts from Pro's), overridden by
+ * any custom limits set on the account, never past what the app supports.
+ */
+export function limitsFor(
+  plan: Plan,
+  custom?: CustomLimits | null,
+): PlanLimits {
+  const merged: PlanLimits = {
+    ...PLAN_LIMITS[plan === 'free' ? 'free' : 'pro'],
+    ...Object.fromEntries(
+      Object.entries(custom ?? {}).filter(
+        ([, value]) => typeof value === 'number' && value >= 0,
+      ),
+    ),
+  }
+  for (const [key, max] of Object.entries(APP_MAXIMUMS)) {
+    const name = key as keyof PlanLimits
+    merged[name] = Math.min(merged[name], max!)
+  }
+  return merged
 }
 
 /** The message the browser shows when the server refuses a change. */

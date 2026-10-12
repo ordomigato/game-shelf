@@ -1,6 +1,11 @@
 import { and, count, eq, inArray, ne } from 'drizzle-orm'
 import { createError } from 'h3'
-import { limitsFor, type Plan, type PlanLimits } from '../../shared/utils/plans'
+import {
+  type CustomLimits,
+  limitsFor,
+  type Plan,
+  type PlanLimits,
+} from '../../shared/utils/plans'
 import { collectionItems, collections, libraryItems } from '../db/schema'
 
 /** The plan a user has right now: a paid plan that ended counts as free. */
@@ -12,8 +17,13 @@ export function effectivePlan(user: {
   return user.planUntil && user.planUntil < new Date() ? 'free' : user.plan
 }
 
-export function userLimits(user: Parameters<typeof effectivePlan>[0]) {
-  return limitsFor(effectivePlan(user))
+/** The account's limits: its plan's, with any custom limits on top. */
+export function userLimits(
+  user: Parameters<typeof effectivePlan>[0] & {
+    customLimits: CustomLimits | null
+  },
+): PlanLimits {
+  return limitsFor(effectivePlan(user), user.customLimits)
 }
 
 /**

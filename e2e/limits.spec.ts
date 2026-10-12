@@ -137,9 +137,7 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
   await expect(pro.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
   const max = page.getByRole('region', { name: 'Max' })
   await expect(max.getByText("Let's talk")).toBeVisible()
-  await expect(
-    max.getByText('500 collections, plus the Wishlist'),
-  ).toBeVisible()
+  await expect(max.getByRole('listitem')).toHaveCount(0)
   await expect(max.getByRole('link', { name: 'Get in touch' })).toHaveAttribute(
     'href',
     '/contact',

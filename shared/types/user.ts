@@ -1,4 +1,4 @@
-import type { Plan } from '../utils/plans'
+import type { Plan, PlanLimits } from '../utils/plans'
 
 /** The signed-in user, as returned by `/api/me`. */
 export interface Me {
@@ -9,6 +9,8 @@ export interface Me {
   createdAt: string
   /** The plan in effect now (a paid plan that ended counts as free). */
   plan: Plan
+  /** The limits in effect: the plan's, with any custom limits on top. */
+  limits: PlanLimits
 }
 
 /** How much of their plan a user has used, for Settings. */

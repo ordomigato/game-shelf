@@ -156,6 +156,10 @@ describe('socialLogin', () => {
     })
   })
 
+  it('knows Twitch', () => {
+    expect(socialLogin('twitch_99')).toEqual({ provider: 'Twitch', id: '99' })
+  })
+
   it('rejects a provider that is not set up', () => {
     expect(() => socialLogin('myspace_1')).toThrow('Unknown sign-in provider')
     expect(() => socialLogin('nounderscore')).toThrow()

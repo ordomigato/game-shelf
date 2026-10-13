@@ -1,5 +1,5 @@
 /** Social logins set up in Cognito (names as Cognito knows them). */
-export type SocialProvider = 'Google'
+export type SocialProvider = 'Google' | 'Twitch'
 
 /**
  * A social sign-in on its way through Cognito's pages: where to go after,

@@ -6,6 +6,7 @@ import {
   resendSignUpCode,
   resetPassword,
   signIn,
+  signInWithRedirect,
   signOut,
   signUp,
   updatePassword,
@@ -136,6 +137,31 @@ export function useAuth() {
       if (nextStep.signInStep === 'CONFIRM_SIGN_UP') return 'needsConfirmation'
       await refresh()
       return 'signedIn'
+    },
+
+    /**
+     * Goes to the provider's sign-in through Cognito's pages. The browser
+     * comes back to `/auth/callback`, which then goes on to `redirect`.
+     */
+    async signInWithSocial(
+      provider: SocialProvider,
+      redirect: string,
+      retried = false,
+    ) {
+      savePendingSocialSignIn({ provider, redirect, retried })
+      await signInWithRedirect({ provider })
+    },
+
+    /**
+     * The social login this session came from (the ID token's
+     * `identities` claim), or null for email and password.
+     */
+    async signedInWith(): Promise<SocialProvider | null> {
+      const session = await fetchAuthSession()
+      const identities = session.tokens?.idToken?.payload.identities
+      if (!Array.isArray(identities)) return null
+      const first = identities[0] as { providerName?: string } | undefined
+      return (first?.providerName as SocialProvider | undefined) ?? null
     },
 
     async signOut() {

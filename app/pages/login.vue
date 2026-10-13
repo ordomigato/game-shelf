@@ -46,6 +46,7 @@ async function submit() {
 
 <template>
   <AuthCard :title="$t('signIn.title')" :description="$t('signIn.description')">
+    <SocialSignIn :redirect="safeRedirect(route.query.redirect)" class="mb-4" />
     <form class="flex flex-col gap-4" @submit.prevent="submit">
       <FormMessage v-if="notice" tone="success">{{ notice }}</FormMessage>
       <FormMessage v-if="error">{{ error }}</FormMessage>

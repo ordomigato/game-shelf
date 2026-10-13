@@ -1,4 +1,6 @@
 import { Amplify } from 'aws-amplify'
+// Finishes a social sign-in when Cognito sends the browser back.
+import 'aws-amplify/auth/enable-oauth-listener'
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig().public
@@ -7,7 +9,19 @@ export default defineNuxtPlugin(() => {
       Cognito: {
         userPoolId: config.cognitoUserPoolId,
         userPoolClientId: config.cognitoClientId,
-        loginWith: { email: true },
+        loginWith: {
+          email: true,
+          // Social logins go through Cognito's pages and come back here.
+          ...(config.cognitoDomain && {
+            oauth: {
+              domain: config.cognitoDomain,
+              scopes: ['openid', 'email', 'profile'],
+              redirectSignIn: [`${window.location.origin}/auth/callback`],
+              redirectSignOut: [`${window.location.origin}/`],
+              responseType: 'code' as const,
+            },
+          }),
+        },
       },
     },
   })

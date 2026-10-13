@@ -23,6 +23,9 @@ export default $config({
 
     const twitchClientId = new sst.Secret('TwitchClientId')
     const twitchClientSecret = new sst.Secret('TwitchClientSecret')
+    // "Continue with Google": an OAuth client in Google Cloud Console.
+    const googleClientId = new sst.Secret('GoogleClientId')
+    const googleClientSecret = new sst.Secret('GoogleClientSecret')
     // Neon Postgres connection string. Each stage points at its own Neon
     // branch.
     const databaseUrl = new sst.Secret('DatabaseUrl')
@@ -32,8 +35,49 @@ export default $config({
     const { readFileSync } = await import('node:fs')
     const codeEmail = readFileSync('infra/emails/code.html', 'utf8')
 
+    // Social logins go through Cognito's sign-in pages at this address.
+    // Production uses its own name (certificate validated at Namecheap, and
+    // a CNAME there pointing auth. at Cognito); other stages use a free
+    // Cognito address.
+    const authDomain = isProduction
+      ? 'auth.thisplayshelf.com'
+      : `thisplayshelf-${$app.stage}.auth.us-east-1.amazoncognito.com`
+    // Where social sign-ins come back to and sign-outs end up.
+    const siteOrigins = isProduction
+      ? ['https://thisplayshelf.com']
+      : ['http://localhost:3000']
+
     const userPool = new sst.aws.CognitoUserPool('Users', {
       usernames: ['email'],
+      domain: isProduction
+        ? {
+            name: authDomain,
+            dns: false,
+            // ACM certificate for auth.thisplayshelf.com (us-east-1),
+            // validated by a CNAME at Namecheap.
+            cert: 'arn:aws:acm:us-east-1:787391403512:certificate/ccd51c7b-e7d3-49c0-9de0-0db0b5454811',
+          }
+        : { prefix: `thisplayshelf-${$app.stage}` },
+      triggers: {
+        // One account per email, however someone signs in.
+        preSignUp: {
+          handler: 'infra/link-accounts.handler',
+          permissions: [
+            {
+              actions: [
+                'cognito-idp:ListUsers',
+                'cognito-idp:AdminCreateUser',
+                'cognito-idp:AdminSetUserPassword',
+                'cognito-idp:AdminLinkProviderForUser',
+              ],
+              // The pool's own ARN would be a circular reference here.
+              resources: [
+                $interpolate`arn:aws:cognito-idp:us-east-1:${aws.getCallerIdentityOutput().accountId}:userpool/*`,
+              ],
+            },
+          ],
+        },
+      },
       transform: {
         userPool: (args) => {
           args.passwordPolicy = {
@@ -54,19 +98,39 @@ export default $config({
       },
     })
 
-    // The site signs in with its own forms over SRP, so the hosted-UI OAuth
-    // flows SST enables by default are switched off.
+    const google = userPool.addIdentityProvider('Google', {
+      type: 'google',
+      details: {
+        client_id: googleClientId.value,
+        client_secret: googleClientSecret.value,
+        authorize_scopes: 'openid email profile',
+      },
+      // Only the email: account linking needs it (and whether Google has
+      // verified it). Names and pictures aren't kept.
+      attributes: {
+        email: 'email',
+        email_verified: 'email_verified',
+      },
+    })
+
+    // Email and password sign in with the site's own forms over SRP. Social
+    // logins use the OAuth code flow through Cognito's sign-in pages; the
+    // implicit flow stays off.
     const userPoolClient = userPool.addClient('WebClient', {
+      providers: ['COGNITO', google.providerName],
       transform: {
         client: (args) => {
           args.explicitAuthFlows = [
             'ALLOW_USER_SRP_AUTH',
             'ALLOW_REFRESH_TOKEN_AUTH',
           ]
-          args.allowedOauthFlows = []
-          args.allowedOauthFlowsUserPoolClient = false
-          args.allowedOauthScopes = []
-          args.callbackUrls = []
+          args.allowedOauthFlows = ['code']
+          args.allowedOauthFlowsUserPoolClient = true
+          args.allowedOauthScopes = ['openid', 'email', 'profile']
+          args.callbackUrls = siteOrigins.map(
+            (origin) => `${origin}/auth/callback`,
+          )
+          args.logoutUrls = siteOrigins.map((origin) => `${origin}/`)
           args.preventUserExistenceErrors = 'ENABLED'
           args.enableTokenRevocation = true
           args.accessTokenValidity = 60
@@ -105,6 +169,7 @@ export default $config({
       environment: {
         NUXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.id,
         NUXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
+        NUXT_PUBLIC_COGNITO_DOMAIN: authDomain,
         // The release tag (v1.2.1) when GitHub Actions deploys a release;
         // "dev" for everything else. Shown in the footer.
         NUXT_PUBLIC_APP_VERSION:

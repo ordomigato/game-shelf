@@ -66,6 +66,7 @@ export default defineNuxtConfig({
     '/blueprints/**': { ssr: false, headers: noindex },
     '/owned': { ssr: false, headers: noindex },
     '/login': { ssr: false, headers: noindex },
+    '/auth/**': { ssr: false, headers: noindex },
     '/signup': { ssr: false, headers: noindex },
     '/verify': { ssr: false, headers: noindex },
     '/forgot-password': { ssr: false, headers: noindex },
@@ -81,6 +82,8 @@ export default defineNuxtConfig({
       appVersion: 'dev',
       cognitoUserPoolId: '',
       cognitoClientId: '',
+      // Cognito's sign-in pages, for social logins (no https://).
+      cognitoDomain: '',
       // Share of visits that report Core Web Vitals (0 to 1). Set with
       // NUXT_PUBLIC_VITALS_SAMPLE_RATE.
       vitalsSampleRate: 0.25,

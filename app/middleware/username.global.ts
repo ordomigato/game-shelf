@@ -5,7 +5,14 @@
  * doesn't change while Vue is hydrating.
  */
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (import.meta.server || to.path === '/welcome') return
+  // The social sign-in callback sends on to /welcome itself.
+  if (
+    import.meta.server ||
+    to.path === '/welcome' ||
+    to.path === '/auth/callback'
+  ) {
+    return
+  }
   const auth = useAuth()
   const welcome = { path: '/welcome', query: { redirect: to.fullPath } }
   const needsUsername = () =>

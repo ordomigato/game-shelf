@@ -4,12 +4,27 @@ import type { GameSearchResponse, GameSummary } from '#shared/types/game'
 export const MIN_SEARCH_LENGTH = 2
 const DEBOUNCE_MS = 300
 
+/** Search filters, as IGDB ids and years. Null means not filtered. */
+export interface SearchFilterState {
+  platform: number | null
+  genre: number | null
+  from: number | null
+  until: number | null
+}
+
+/** A positive whole number from the URL, or null. */
+function queryNumber(value: unknown): number | null {
+  const number = typeof value === 'string' ? Number(value) : Number.NaN
+  return Number.isInteger(number) && number > 0 ? number : null
+}
+
 /**
  * Search-as-you-type over `/api/games/search`. `input` is bound to the text
  * field. The search runs 300 ms after typing stops (or at once through
  * `searchNow`), and only for 2+ characters. A newer search cancels an older
- * one still in flight. The search term is kept in the URL as `?q=`, so a
- * shared link or a reload shows the same results, rendered on the server.
+ * one still in flight. The search term is kept in the URL as `?q=`, and
+ * filters as `?platform=`, `?genre=`, `?from=` and `?until=`, so a shared link
+ * or a reload shows the same results, rendered on the server.
  */
 export function useGameSearch() {
   const route = useRoute()
@@ -35,6 +50,33 @@ export function useGameSearch() {
     void router.replace({ query: { ...route.query, q: value || undefined } })
   })
 
+  const filters = ref<SearchFilterState>({
+    platform: queryNumber(route.query.platform),
+    genre: queryNumber(route.query.genre),
+    from: queryNumber(route.query.from),
+    until: queryNumber(route.query.until),
+  })
+  /** The filters that are set, as the API and the URL take them. */
+  const filterQuery = computed(() => {
+    const query: Record<string, string> = {}
+    for (const [key, value] of Object.entries(filters.value)) {
+      if (value !== null) query[key] = String(value)
+    }
+    return query
+  })
+  const activeFilters = computed(() => Object.keys(filterQuery.value).length)
+
+  watch(filterQuery, (value) => {
+    const {
+      platform: _p,
+      genre: _g,
+      from: _f,
+      until: _u,
+      ...rest
+    } = route.query
+    void router.replace({ query: { ...rest, ...value } })
+  })
+
   const isSearchable = computed(() => term.value.length >= MIN_SEARCH_LENGTH)
 
   const { data, status, refresh } = useAsyncData(
@@ -42,11 +84,11 @@ export function useGameSearch() {
     async (_nuxtApp, { signal }) => {
       if (!isSearchable.value) return null
       return $fetch<GameSearchResponse>('/api/games/search', {
-        query: { q: term.value },
+        query: { q: term.value, ...filterQuery.value },
         signal,
       })
     },
-    { watch: [term] },
+    { watch: [term, filterQuery] },
   )
 
   // Pages fetched by "Show more". Everything shown is derived from `data`
@@ -70,11 +112,17 @@ export function useGameSearch() {
     loadingMore.value = true
     loadMoreFailed.value = false
     const searchedTerm = term.value
+    const searchedFilters = filterQuery.value
     try {
       const response = await $fetch<GameSearchResponse>('/api/games/search', {
-        query: { q: searchedTerm, page: current.page + 1 },
+        query: { q: searchedTerm, ...searchedFilters, page: current.page + 1 },
       })
-      if (searchedTerm !== term.value) return
+      if (
+        searchedTerm !== term.value ||
+        searchedFilters !== filterQuery.value
+      ) {
+        return
+      }
       morePages.value.push(response)
     } catch (error) {
       console.error(error)
@@ -92,6 +140,8 @@ export function useGameSearch() {
   return {
     input,
     term,
+    filters,
+    activeFilters,
     searchNow,
     isSearchable,
     status,

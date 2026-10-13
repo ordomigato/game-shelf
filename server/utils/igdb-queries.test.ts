@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildFilterListQueries,
   buildGameQuery,
   buildMatchQuery,
   buildSearchQuery,
@@ -46,6 +47,40 @@ describe('buildSearchQuery', () => {
     const query = buildSearchQuery('zelda')
     expect(query).toContain('version_parent = null')
     expect(query).not.toMatch(/game_type = \([^)]*\b(1|5)\b/)
+  })
+
+  it('has no filters unless asked', () => {
+    const query = buildSearchQuery('zelda')
+    expect(query).not.toContain('platforms =')
+    expect(query).not.toContain('genres =')
+    expect(query).not.toContain('first_release_date >')
+  })
+
+  it('filters by platform, genre and release years, both years included', () => {
+    const query = buildSearchQuery('zelda', {
+      platform: 19,
+      genre: 31,
+      fromYear: 1990,
+      toYear: 1999,
+    })
+    expect(query).toContain(
+      'where version_parent = null & game_type = (0,2,3,4,8,9,10,11) & platforms = (19) & genres = (31) & first_release_date >= 631152000 & first_release_date < 946684800;',
+    )
+  })
+
+  it('takes one end of the year range on its own', () => {
+    const query = buildSearchQuery('zelda', { fromYear: 2017 })
+    expect(query).toContain('first_release_date >= 1483228800;')
+    expect(query).not.toContain('first_release_date <')
+  })
+})
+
+describe('buildFilterListQueries', () => {
+  it('lists platforms that hold games, by name', () => {
+    const { platforms, genres } = buildFilterListQueries()
+    expect(platforms).toContain('where platform_type = (1,2,4,5,6);')
+    expect(platforms).toContain('sort name asc;')
+    expect(genres).toContain('sort name asc;')
   })
 })
 

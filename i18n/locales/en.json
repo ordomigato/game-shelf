@@ -168,9 +168,23 @@
     "retry": "Try again",
     "noResultsTitle": "No games found for \"{term}\".",
     "noResultsBody": "Check the spelling, or try fewer words.",
+    "noResultsFiltered": "Try fewer filters, or check the spelling.",
     "showMore": "Show more",
     "loadingMore": "Loading…",
-    "loadMoreFailed": "Couldn't load more games. Try again."
+    "loadMoreFailed": "Couldn't load more games. Try again.",
+    "filters": {
+      "toggle": "Filters",
+      "toggleCount": "Filters ({count})",
+      "platform": "Platform",
+      "anyPlatform": "Any platform",
+      "genre": "Genre",
+      "anyGenre": "Any genre",
+      "from": "From year",
+      "to": "To year",
+      "yearPlaceholder": "Any",
+      "clear": "Clear filters",
+      "loadFailed": "The platform and genre lists couldn't be loaded. Years still work."
+    }
   },
   "game": {
     "coverAlt": "Cover of {name}",

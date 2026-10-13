@@ -16,6 +16,12 @@ export interface GameSearchResponse {
   hasMore: boolean
 }
 
+/** The platforms and genres search can be narrowed to, with IGDB's ids. */
+export interface SearchFilterOptions {
+  platforms: { id: number; name: string }[]
+  genres: { id: number; name: string }[]
+}
+
 /** A single game, as shown on its detail page. Everything comes from IGDB. */
 export interface GameDetails {
   id: number

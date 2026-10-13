@@ -18,7 +18,8 @@ export async function ownedGames(ownerId: string): Promise<OwnedGame[]> {
         json_build_object(
           'id', ${collections.id},
           'title', ${collections.title},
-          'slug', ${collections.slug}
+          'slug', ${collections.slug},
+          'color', ${collections.color}
         ) order by lower(${collections.title})
       )`,
     })

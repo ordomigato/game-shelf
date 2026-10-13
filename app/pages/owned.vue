@@ -142,6 +142,11 @@ const shown = computed(() => data.value?.slice(0, limit.value) ?? [])
                   >
                     <Badge as-child variant="secondary">
                       <NuxtLink :to="`${shelfPath}/${collection.slug}`">
+                        <span
+                          class="size-2 shrink-0 rounded-sm ring-1 ring-foreground/15 ring-inset"
+                          :style="{ background: collectionColour(collection) }"
+                          aria-hidden="true"
+                        />
                         {{ collection.title }}
                       </NuxtLink>
                     </Badge>

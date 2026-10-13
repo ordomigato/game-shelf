@@ -173,5 +173,6 @@ export interface OwnedGame {
     id: string
     title: string
     slug: string
+    color: string | null
   }[]
 }

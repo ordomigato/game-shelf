@@ -1,8 +1,13 @@
 import { expect, test } from './fixtures'
 import { signInAs } from './support/session'
 
-const zelda = { id: 'c1', title: 'Zelda Games', slug: 'zelda-games' }
-const snes = { id: 'c2', title: 'SNES', slug: 'snes' }
+const zelda = {
+  id: 'c1',
+  title: 'Zelda Games',
+  slug: 'zelda-games',
+  color: '#22c55e',
+}
+const snes = { id: 'c2', title: 'SNES', slug: 'snes', color: null }
 const owned = [
   {
     id: 'i1',

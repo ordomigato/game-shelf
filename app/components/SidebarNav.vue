@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
-import { ChevronDown, Compass, Library, Plus, Search } from '@lucide/vue'
+import {
+  ChevronDown,
+  Compass,
+  Gamepad2,
+  Library,
+  Plus,
+  Search,
+} from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /** How many unpinned collections the sidebar lists before "View all". */
@@ -103,6 +110,12 @@ const sections = computed(() => [
     labelKey: 'header.myShelf',
     icon: Library,
     current: route.path === props.shelfPath,
+  },
+  {
+    to: '/owned',
+    labelKey: 'header.owned',
+    icon: Gamepad2,
+    current: route.path === '/owned',
   },
 ])
 

@@ -50,7 +50,7 @@ function onGripKey(event: KeyboardEvent) {
       />
       <span
         v-else
-        class="size-2.5 shrink-0 rounded-sm"
+        class="size-2.5 shrink-0 rounded-sm ring-1 ring-foreground/15 ring-inset"
         :class="markClass"
         :style="dotStyle"
         aria-hidden="true"

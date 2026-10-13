@@ -7,6 +7,7 @@
     "account": "Account",
     "signOut": "Sign out",
     "myShelf": "My shelf",
+    "owned": "Owned games",
     "blueprints": "Blueprints",
     "explore": "Explore",
     "search": "Search",
@@ -394,9 +395,13 @@
       "yourBlueprints": "Your blueprints",
       "keepLinked": "Keep linked to the blueprint",
       "keepLinkedOn": "Field changes apply to every collection using this blueprint.",
-      "keepLinkedOff": "This collection gets its own copy of the fields to change as you like."
+      "keepLinkedOff": "This collection gets its own copy of the fields to change as you like.",
+      "colourCustom": "Custom colour",
+      "colourHex": "Hex"
     },
     "colours": {
+      "white": "White",
+      "black": "Black",
       "red": "Red",
       "orange": "Orange",
       "yellow": "Yellow",
@@ -845,5 +850,19 @@
       "stop": "Stop and add the rest by hand",
       "failed": "Couldn't finish looking games up. The ones found are below, and the rest will be added by hand."
     }
+  },
+  "ownedPage": {
+    "title": "Owned games",
+    "description": "Every game in your collections, apart from the Wishlist.",
+    "count": "No games | {count} game | {count} games",
+    "matchCount": "No matches out of {total} | {count} of {total} games | {count} of {total} games",
+    "search": "Search games and collections",
+    "noMatches": "No games match “{query}”.",
+    "empty": "No owned games yet",
+    "emptyHint": "Games you add to a collection other than the Wishlist show up here.",
+    "loadFailed": "Your games couldn't be loaded.",
+    "game": "Game",
+    "collections": "Collections",
+    "added": "Added"
   }
 }

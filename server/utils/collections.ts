@@ -22,7 +22,6 @@ import {
   type OptionRenames,
 } from '../../shared/utils/field-changes'
 import { copyFields, copyValues } from '../../shared/utils/blueprint-names'
-import type { CollectionColour } from '../../shared/utils/collection-colours'
 import { applyFieldValues } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import {
@@ -415,7 +414,7 @@ export async function createCollection(
   input: {
     title: string
     description: string | null
-    color?: CollectionColour | null
+    color?: string | null
   } & (
     | { starter: StarterBlueprint }
     /** `copy` gives the collection its own copy of the blueprint's fields. */
@@ -481,7 +480,7 @@ export async function updateCollection(
   changes: {
     title?: string
     description?: string | null
-    color?: CollectionColour | null
+    color?: string | null
     visibility?: 'private' | 'public'
   },
 ): Promise<CollectionSummary> {

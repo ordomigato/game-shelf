@@ -1,18 +1,6 @@
 /**
- * The colours a collection can be given (its mark in the sidebar). Stored by
- * id, so the shade can change later without touching the database. A
- * collection with no colour gets one from its name. The shades are in
- * `app/utils/collection-colour.ts`.
+ * A collection's colour (its mark in the sidebar) is stored as a hex code
+ * like `#7c3aed`, lowercase. Null means a colour from its name. The presets
+ * offered in the dialog are in `app/utils/collection-colour.ts`.
  */
-export const COLLECTION_COLOUR_IDS = [
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'teal',
-  'blue',
-  'purple',
-  'pink',
-] as const
-
-export type CollectionColour = (typeof COLLECTION_COLOUR_IDS)[number]
+export const HEX_COLOUR = /^#[0-9a-f]{6}$/

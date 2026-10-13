@@ -123,6 +123,38 @@ test('a link brings its filters along', async ({ page }) => {
   ).toBeVisible()
 })
 
+test('browses by filters alone, best-known games first', async ({ page }) => {
+  const searches: Record<string, string>[] = []
+  await page.route('**/api/games/search?**', async (route) => {
+    searches.push(
+      Object.fromEntries(new URL(route.request().url()).searchParams),
+    )
+    await route.fulfill({
+      json: {
+        games: [game(1026, 'A Link to the Past')],
+        page: 1,
+        hasMore: false,
+      },
+    })
+  })
+  await openSearch(page)
+  await page.getByRole('button', { name: 'Platform', exact: true }).click()
+  await page
+    .getByRole('option', { name: 'Super Nintendo Entertainment System' })
+    .click()
+
+  await expect(
+    page.getByRole('heading', { name: 'A Link to the Past' }),
+  ).toBeVisible()
+  await expect(
+    page.getByText('The best-known games for these filters.', {
+      exact: false,
+    }),
+  ).toBeVisible()
+  expect(searches.at(-1)).toEqual({ platform: '19' })
+  await expect(page).toHaveURL(/\/\?platform=19$/)
+})
+
 test('says so when a year is out of range', async ({ page }) => {
   await openSearch(page)
   await page.getByRole('button', { name: 'Release year', exact: true }).click()

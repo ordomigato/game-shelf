@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildBrowseQuery,
   buildFilterListQueries,
   buildGameQuery,
   buildMatchQuery,
@@ -72,6 +73,17 @@ describe('buildSearchQuery', () => {
     const query = buildSearchQuery('zelda', { fromYear: 2017 })
     expect(query).toContain('first_release_date >= 1483228800;')
     expect(query).not.toContain('first_release_date <')
+  })
+})
+
+describe('buildBrowseQuery', () => {
+  it('lists the best-known games that fit the filters, with no search', () => {
+    const query = buildBrowseQuery({ platform: 19 })
+    expect(query).not.toContain('search ')
+    expect(query).toContain('platforms = (19)')
+    expect(query).toContain('version_parent = null')
+    expect(query).toContain('sort total_rating_count desc;')
+    expect(query).toContain(`limit ${SEARCH_POOL_SIZE};`)
   })
 })
 

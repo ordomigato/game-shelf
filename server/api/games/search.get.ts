@@ -16,7 +16,11 @@ const year = z.coerce
 
 const querySchema = z
   .object({
-    q: z.string().trim().min(2).max(100),
+    /** Leave out to browse by filters alone. */
+    q: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().trim().min(2).max(100).optional(),
+    ),
     page: z.coerce.number().int().min(1).max(MAX_SEARCH_PAGE).default(1),
     platform: id,
     genre: id,
@@ -26,14 +30,27 @@ const querySchema = z
   .refine((query) => !query.from || !query.until || query.from <= query.until, {
     message: 'from is after until',
   })
+  .refine(
+    (query) =>
+      query.q || query.platform || query.genre || query.from || query.until,
+    { message: 'Send a term or at least one filter' },
+  )
 
 /**
  * The ranked results for a term and filters, cached for an hour and keyed
  * by the lowercased term and the filters, so "Zelda" and " zelda" share one
- * entry and paging through results costs no extra IGDB calls.
+ * entry and paging through results costs no extra IGDB calls. With no term
+ * it browses: the best-known games that fit the filters.
  */
 const rankedSearch = defineCachedFunction(
   async (term: string, filters: SearchFilters): Promise<GameSummary[]> => {
+    if (!term) {
+      const games = await igdbRequest<IgdbGame[]>(
+        'games',
+        buildBrowseQuery(filters),
+      )
+      return games.map(toGameSummary)
+    }
     const games = await igdbRequest<IgdbGame[]>(
       'games',
       buildSearchQuery(term, filters),
@@ -62,7 +79,10 @@ export default defineEventHandler(
       querySchema.parse,
     )
     const filters = { platform, genre, fromYear: from, toYear: until }
-    const { items, hasMore } = pageOf(await rankedSearch(q, filters), page)
+    const { items, hasMore } = pageOf(
+      await rankedSearch(q ?? '', filters),
+      page,
+    )
     setResponseHeader(
       event,
       'cache-control',

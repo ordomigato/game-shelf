@@ -11,6 +11,7 @@ const {
   activeFilters,
   searchNow,
   isSearchable,
+  isBrowsing,
   status,
   games,
   hasMore,
@@ -130,6 +131,13 @@ useHead({
 
 const resultsLabel = computed(() => {
   if (!isSearchable.value || status.value !== 'success') return ''
+  if (isBrowsing.value) {
+    return t(
+      'search.browseCount',
+      { count: games.value.length },
+      games.value.length,
+    )
+  }
   return t(
     'search.resultCount',
     { term: term.value, count: games.value.length },
@@ -209,7 +217,11 @@ const resultsLabel = computed(() => {
       class="py-12 text-center"
     >
       <p class="text-lg font-medium">
-        {{ $t('search.noResultsTitle', { term }) }}
+        {{
+          isBrowsing
+            ? $t('search.noResultsBrowse')
+            : $t('search.noResultsTitle', { term })
+        }}
       </p>
       <p class="mt-1 text-muted-foreground">
         {{
@@ -221,6 +233,9 @@ const resultsLabel = computed(() => {
     </div>
 
     <template v-else-if="games.length">
+      <p v-if="isBrowsing" class="mb-4 text-sm text-muted-foreground">
+        {{ $t('search.browsing') }}
+      </p>
       <ul
         class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
         :class="{ 'opacity-60 transition-opacity': status === 'pending' }"

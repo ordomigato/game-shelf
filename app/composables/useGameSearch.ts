@@ -77,18 +77,26 @@ export function useGameSearch() {
     void router.replace({ query: { ...rest, ...value } })
   })
 
-  const isSearchable = computed(() => term.value.length >= MIN_SEARCH_LENGTH)
+  const hasTerm = computed(() => term.value.length >= MIN_SEARCH_LENGTH)
+  /** With filters set, search works without a term: it browses. */
+  const isSearchable = computed(() => hasTerm.value || activeFilters.value > 0)
+  const isBrowsing = computed(() => isSearchable.value && !hasTerm.value)
+  /** What the API is asked: the term (when there is one) and the filters. */
+  const apiQuery = computed(() => ({
+    ...(hasTerm.value && { q: term.value }),
+    ...filterQuery.value,
+  }))
 
   const { data, status, refresh } = useAsyncData(
     'game-search',
     async (_nuxtApp, { signal }) => {
       if (!isSearchable.value) return null
       return $fetch<GameSearchResponse>('/api/games/search', {
-        query: { q: term.value, ...filterQuery.value },
+        query: apiQuery.value,
         signal,
       })
     },
-    { watch: [term, filterQuery] },
+    { watch: [apiQuery] },
   )
 
   // Pages fetched by "Show more". Everything shown is derived from `data`
@@ -111,18 +119,12 @@ export function useGameSearch() {
     if (!current?.hasMore || loadingMore.value) return
     loadingMore.value = true
     loadMoreFailed.value = false
-    const searchedTerm = term.value
-    const searchedFilters = filterQuery.value
+    const searched = apiQuery.value
     try {
       const response = await $fetch<GameSearchResponse>('/api/games/search', {
-        query: { q: searchedTerm, ...searchedFilters, page: current.page + 1 },
+        query: { ...searched, page: current.page + 1 },
       })
-      if (
-        searchedTerm !== term.value ||
-        searchedFilters !== filterQuery.value
-      ) {
-        return
-      }
+      if (searched !== apiQuery.value) return
       morePages.value.push(response)
     } catch (error) {
       console.error(error)
@@ -144,6 +146,7 @@ export function useGameSearch() {
     activeFilters,
     searchNow,
     isSearchable,
+    isBrowsing,
     status,
     games,
     hasMore,

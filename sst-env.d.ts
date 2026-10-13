@@ -22,6 +22,11 @@ declare module "sst" {
       "type": "sst.aws.Nuxt"
       "url": string
     }
+    "TwitchAuthorize": {
+      "name": string
+      "type": "sst.aws.Function"
+      "url": string
+    }
     "TwitchClientId": {
       "type": "sst.sst.Secret"
       "value": string

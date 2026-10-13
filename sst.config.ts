@@ -114,15 +114,14 @@ export default $config({
     })
 
     // Twitch (OIDC), with the same Twitch app as the IGDB API. Twitch only
-    // includes the email when the sign-in asks with its `claims` parameter,
-    // and Cognito has no setting for that, so it's built into the
-    // authorize address Cognito sends people to.
-    const twitchClaims = encodeURIComponent(
-      JSON.stringify({
-        id_token: { email: null, email_verified: null },
-        userinfo: { email: null, email_verified: null },
-      }),
-    )
+    // includes the email when the sign-in asks with its `claims` parameter.
+    // Cognito can't add it and won't take an authorize address with a query
+    // in it, so it sends people through this small redirect, which adds it
+    // (infra/twitch-authorize.ts).
+    const twitchAuthorize = new sst.aws.Function('TwitchAuthorize', {
+      handler: 'infra/twitch-authorize.handler',
+      url: true,
+    })
     const twitch = userPool.addIdentityProvider('Twitch', {
       type: 'oidc',
       details: {
@@ -131,7 +130,7 @@ export default $config({
         authorize_scopes: 'openid user:read:email',
         oidc_issuer: 'https://id.twitch.tv/oauth2',
         attributes_request_method: 'GET',
-        authorize_url: `https://id.twitch.tv/oauth2/authorize?claims=${twitchClaims}`,
+        authorize_url: twitchAuthorize.url,
         token_url: 'https://id.twitch.tv/oauth2/token',
         attributes_url: 'https://id.twitch.tv/oauth2/userinfo',
         jwks_uri: 'https://id.twitch.tv/oauth2/keys',

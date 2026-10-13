@@ -34,14 +34,16 @@ export function takePendingSocialSignIn(): PendingSocialSignIn | null {
 
 /**
  * What a failed social sign-in's `error_description` from Cognito means.
- * `linked`: the first sign-in after linking to an existing account, which
- * Cognito always fails; starting it again goes straight in.
+ * `retry`: starting again goes straight in. Either it's the first sign-in
+ * after linking to an account, which Cognito always fails, or the linking
+ * trigger ran past Cognito's 5 seconds (it finishes anyway, and can safely
+ * run again).
  */
 export function socialSignInProblem(
   description: string,
-): 'linked' | 'unverifiedEmail' | 'other' {
-  if (/already found an entry for username/i.test(description)) {
-    return 'linked'
+): 'retry' | 'unverifiedEmail' | 'other' {
+  if (/already found an entry for username|timed out/i.test(description)) {
+    return 'retry'
   }
   if (/no verified email|no email/i.test(description)) {
     return 'unverifiedEmail'

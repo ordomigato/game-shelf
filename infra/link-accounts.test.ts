@@ -119,6 +119,18 @@ describe('link accounts', () => {
     expect(sent[3]).toEqual(linkTo('new-account-id'))
   })
 
+  it('finishes an account an earlier run left half made', async () => {
+    existing = [{ Username: 'half-made', UserStatus: 'FORCE_CHANGE_PASSWORD' }]
+    await handler(signUp())
+    expect(sent.map((call) => call.name)).toEqual([
+      'ListUsers',
+      'AdminSetUserPassword',
+      'AdminLinkProviderForUser',
+    ])
+    expect(sent[1]!.input).toMatchObject({ Username: 'half-made' })
+    expect(sent[2]).toEqual(linkTo('half-made'))
+  })
+
   it('refuses an email the provider has not verified', async () => {
     await expect(handler(signUp({ verified: 'false' }))).rejects.toThrow(
       'no verified email',

@@ -20,9 +20,8 @@ onMounted(async () => {
 
   if (typeof failure === 'string') {
     const kind = socialSignInProblem(failure)
-    // Linked to an existing account just now: Cognito fails this first
-    // sign-in, and the second goes straight in.
-    if (kind === 'linked' && pending && !pending.retried) {
+    // Just linked, or the linking ran long: the second try goes straight in.
+    if (kind === 'retry' && pending && !pending.retried) {
       await auth.signInWithSocial(pending.provider, redirect, true)
       return
     }

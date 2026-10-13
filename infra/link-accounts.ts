@@ -43,9 +43,13 @@ export async function handler(
   }
 
   const userPoolId = event.userPoolId
-  const account =
-    (await accountWithEmail(userPoolId, email)) ??
-    (await createAccount(userPoolId, email))
+  const found = await accountWithEmail(userPoolId, email)
+  // An account left half made (an earlier run ran out of time before its
+  // password was set) gets finished, so "Forgot password" works for it.
+  if (found?.status === 'FORCE_CHANGE_PASSWORD') {
+    await setUnguessablePassword(userPoolId, found.username)
+  }
+  const account = found?.username ?? (await createAccount(userPoolId, email))
 
   await cognito.send(
     new AdminLinkProviderForUserCommand({
@@ -83,11 +87,11 @@ export function socialLogin(userName: string): {
   return { provider, id }
 }
 
-/** The username of the account (not a social login) with this email. */
+/** The account (not a social login) with this email, if there is one. */
 async function accountWithEmail(
   userPoolId: string,
   email: string,
-): Promise<string | null> {
+): Promise<{ username: string; status: string } | null> {
   const { Users = [] } = await cognito.send(
     new ListUsersCommand({
       UserPoolId: userPoolId,
@@ -96,7 +100,9 @@ async function accountWithEmail(
     }),
   )
   const account = Users.find((user) => user.UserStatus !== 'EXTERNAL_PROVIDER')
-  return account?.Username ?? null
+  return account?.Username
+    ? { username: account.Username, status: account.UserStatus ?? '' }
+    : null
 }
 
 /**
@@ -120,6 +126,12 @@ async function createAccount(
   )
   const username = User?.Username
   if (!username) throw new Error('The account could not be created.')
+  await setUnguessablePassword(userPoolId, username)
+  return username
+}
+
+/** Confirms an account with a password nobody knows. */
+async function setUnguessablePassword(userPoolId: string, username: string) {
   await cognito.send(
     new AdminSetUserPasswordCommand({
       UserPoolId: userPoolId,
@@ -128,7 +140,6 @@ async function createAccount(
       Permanent: true,
     }),
   )
-  return username
 }
 
 /** Random, and meets the pool's rules (upper, lower and a number). */

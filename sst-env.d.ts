@@ -10,6 +10,14 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "GoogleClientId": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
+    "GoogleClientSecret": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "Site": {
       "type": "sst.aws.Nuxt"
       "url": string

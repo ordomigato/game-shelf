@@ -199,6 +199,7 @@ async function createFromBlueprint(page: Page, copy: boolean) {
   expect(created).toEqual({
     title: 'Wii Games',
     description: null,
+    color: null,
     blueprintId: setId,
     copy,
   })

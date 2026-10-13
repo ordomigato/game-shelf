@@ -366,6 +366,9 @@
       "editTitle": "Edit collection",
       "name": "Name",
       "description": "Description (optional)",
+      "colour": "Colour",
+      "colourAuto": "Automatic",
+      "colourHelp": "Shown next to the collection in the sidebar. Automatic picks one from the name.",
       "address": "Address: {path}",
       "start": "Start with",
       "starters": {
@@ -392,6 +395,16 @@
       "keepLinked": "Keep linked to the blueprint",
       "keepLinkedOn": "Field changes apply to every collection using this blueprint.",
       "keepLinkedOff": "This collection gets its own copy of the fields to change as you like."
+    },
+    "colours": {
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "purple": "Purple",
+      "pink": "Pink"
     }
   },
   "shelf": {

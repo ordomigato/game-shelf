@@ -13,6 +13,7 @@ import type {
   LibraryItem,
 } from '#shared/types/collection'
 import type { PublicProfile } from '#shared/types/user'
+import type { CollectionColour } from '#shared/utils/collection-colours'
 import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
 
 /**
@@ -61,7 +62,11 @@ export function useCollections() {
 
     /** Starts from a copy of a starter's fields, or uses a blueprint. */
     create: (
-      input: { title: string; description: string | null } & (
+      input: {
+        title: string
+        description: string | null
+        color?: CollectionColour | null
+      } & (
         { starter: StarterBlueprint } | { blueprintId: string; copy?: boolean }
       ),
     ) =>
@@ -131,6 +136,7 @@ export function useCollections() {
       changes: {
         title?: string
         description?: string | null
+        color?: CollectionColour | null
         visibility?: CollectionVisibility
       },
     ) =>

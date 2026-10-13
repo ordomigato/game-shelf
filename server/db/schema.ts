@@ -17,6 +17,7 @@ import {
 import type { CustomLimits } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
+import type { CollectionColour } from '../../shared/utils/collection-colours'
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -95,6 +96,8 @@ export const collections = pgTable(
     /** URL name, from the title. Unique per owner. */
     slug: text('slug').notNull(),
     description: text('description'),
+    /** A preset from `COLLECTION_COLOURS`. Null means a colour from the title. */
+    color: text('color').$type<CollectionColour>(),
     visibility: visibility('visibility').notNull().default('private'),
     kind: collectionKind('kind').notNull().default('custom'),
     /** The charts on the collection's dashboard, in order. */

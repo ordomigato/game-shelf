@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Gamepad2, LayoutGrid, Table2 } from '@lucide/vue'
+import { Gamepad2, LayoutGrid, Search, Table2 } from '@lucide/vue'
 
 /**
  * Every game the user owns: in at least one collection other than the
@@ -46,7 +46,22 @@ function chooseView(value: unknown) {
 // Long lists grow by a batch at a time instead of drawing every row.
 const BATCH = 60
 const limit = ref(BATCH)
-const shown = computed(() => data.value?.slice(0, limit.value) ?? [])
+
+// Search by the game's name or a collection it's in. Every word typed has
+// to match somewhere.
+const query = ref('')
+const matching = computed(() => {
+  const words = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return data.value ?? []
+  return (data.value ?? []).filter((game) => {
+    const text = [game.name, ...game.collections.map((c) => c.title)]
+      .join(' ')
+      .toLowerCase()
+    return words.every((word) => text.includes(word))
+  })
+})
+watch(query, () => (limit.value = BATCH))
+const shown = computed(() => matching.value.slice(0, limit.value))
 </script>
 
 <template>
@@ -82,10 +97,32 @@ const shown = computed(() => data.value?.slice(0, limit.value) ?? [])
     </div>
 
     <template v-else>
-      <div class="flex items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div class="relative w-full sm:max-w-xs">
+          <Search
+            class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            v-model="query"
+            type="search"
+            :aria-label="$t('ownedPage.search')"
+            :placeholder="$t('ownedPage.search')"
+            class="pl-8"
+          />
+        </div>
         <p class="text-sm text-muted-foreground">
-          {{ $t('ownedPage.count', { count: data.length }, data.length) }}
+          {{
+            query.trim()
+              ? $t(
+                  'ownedPage.matchCount',
+                  { count: matching.length, total: data.length },
+                  matching.length,
+                )
+              : $t('ownedPage.count', { count: data.length }, data.length)
+          }}
         </p>
+        <div class="flex-1" />
         <ToggleGroup
           type="single"
           variant="outline"
@@ -105,7 +142,17 @@ const shown = computed(() => data.value?.slice(0, limit.value) ?? [])
         </ToggleGroup>
       </div>
 
-      <div v-if="view === 'table'" class="overflow-x-auto rounded-lg border">
+      <p
+        v-if="!matching.length"
+        class="rounded-lg border border-dashed py-12 text-center text-muted-foreground"
+      >
+        {{ $t('ownedPage.noMatches', { query: query.trim() }) }}
+      </p>
+
+      <div
+        v-else-if="view === 'table'"
+        class="overflow-x-auto rounded-lg border"
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -184,7 +231,7 @@ const shown = computed(() => data.value?.slice(0, limit.value) ?? [])
         </li>
       </ul>
 
-      <div v-if="data.length > limit" class="text-center">
+      <div v-if="matching.length > limit" class="text-center">
         <Button variant="outline" @click="limit += BATCH">
           {{ $t('collection.showMore') }}
         </Button>

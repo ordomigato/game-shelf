@@ -57,6 +57,18 @@ test('lists owned games with their collections, as a table or covers', async ({
   // Added by hand, so there's no game page to link to.
   await expect(page.getByRole('link', { name: 'Homebrew Cart' })).toHaveCount(0)
 
+  const search = page.getByRole('searchbox', {
+    name: 'Search games and collections',
+  })
+  await search.fill('zelda')
+  await expect(page.getByText('1 of 2 games')).toBeVisible()
+  await expect(rows).toHaveCount(2)
+  await search.fill('homebrew snes')
+  await expect(page.getByRole('cell', { name: 'Homebrew Cart' })).toBeVisible()
+  await search.fill('metroid')
+  await expect(page.getByText('No games match “metroid”.')).toBeVisible()
+  await search.fill('')
+
   await page.getByRole('button', { name: 'Covers' }).click()
   await expect(page.getByRole('table')).toBeHidden()
   await expect(

@@ -35,16 +35,89 @@ export function escapeApicalypseString(value: string): string {
 }
 
 /**
+ * Narrows a search. Ids are IGDB's (see `buildFilterListQueries`); years are
+ * of first release, both ends included.
+ */
+export interface SearchFilters {
+  platform?: number
+  genre?: number
+  fromYear?: number
+  toYear?: number
+}
+
+/** Unix seconds at the start of a year, in UTC like IGDB's dates. */
+const yearStart = (year: number) => Date.UTC(year, 0, 1) / 1000
+
+const SEARCH_FIELDS =
+  'fields name, cover.image_id, first_release_date, platforms.abbreviation, platforms.name, total_rating_count;'
+
+/**
+ * The `where` clause shared by search and browse: main games only, plus the
+ * filters. Filters are numbers checked by the caller, so they go into the
+ * query as they are.
+ */
+function whereClause(filters: SearchFilters): string {
+  const where = [
+    'version_parent = null',
+    `game_type = (${SEARCHABLE_GAME_TYPES.join(',')})`,
+  ]
+  if (filters.platform) where.push(`platforms = (${filters.platform})`)
+  if (filters.genre) where.push(`genres = (${filters.genre})`)
+  if (filters.fromYear) {
+    where.push(`first_release_date >= ${yearStart(filters.fromYear)}`)
+  }
+  if (filters.toYear) {
+    where.push(`first_release_date < ${yearStart(filters.toYear + 1)}`)
+  }
+  return `where ${where.join(' & ')};`
+}
+
+/**
  * Fetches IGDB's top `SEARCH_POOL_SIZE` text matches for a term, with the
  * rating count that `rankSearchResults` needs.
  */
-export function buildSearchQuery(term: string): string {
+export function buildSearchQuery(
+  term: string,
+  filters: SearchFilters = {},
+): string {
   return [
     `search "${escapeApicalypseString(term)}";`,
-    'fields name, cover.image_id, first_release_date, platforms.abbreviation, platforms.name, total_rating_count;',
-    `where version_parent = null & game_type = (${SEARCHABLE_GAME_TYPES.join(',')});`,
+    SEARCH_FIELDS,
+    whereClause(filters),
     `limit ${SEARCH_POOL_SIZE};`,
   ].join(' ')
+}
+
+/**
+ * Browsing with filters and no term: the `SEARCH_POOL_SIZE` best-known
+ * games that fit, by how many ratings they have. IGDB can sort here
+ * because there's no `search`.
+ */
+export function buildBrowseQuery(filters: SearchFilters): string {
+  return [
+    SEARCH_FIELDS,
+    whereClause(filters),
+    'sort total_rating_count desc;',
+    `limit ${SEARCH_POOL_SIZE};`,
+  ].join(' ')
+}
+
+/**
+ * IGDB `platform_type` ids offered as filters: consoles, arcade, operating
+ * systems (PC, Mac, phones), portable consoles and home computers. Leaves
+ * out type 3 (services like Steam) and platforms with no type.
+ */
+const FILTER_PLATFORM_TYPES = [1, 2, 4, 5, 6]
+
+/** The queries for the platform and genre lists that search filters offer. */
+export function buildFilterListQueries(): {
+  platforms: string
+  genres: string
+} {
+  return {
+    platforms: `fields name; where platform_type = (${FILTER_PLATFORM_TYPES.join(',')}); sort name asc; limit 500;`,
+    genres: 'fields name; sort name asc; limit 500;',
+  }
 }
 
 /** Candidates fetched per name when matching an import to IGDB. */

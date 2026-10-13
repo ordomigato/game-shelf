@@ -3,7 +3,7 @@ import { Resource } from 'sst'
 import { log } from './log'
 import { recordTiming } from './request-timing'
 
-type IgdbEndpoint = 'games'
+type IgdbEndpoint = 'games' | 'platforms' | 'genres'
 
 interface CachedToken {
   value: string

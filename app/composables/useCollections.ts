@@ -11,6 +11,7 @@ import type {
   BlueprintSummary,
   FieldValue,
   LibraryItem,
+  OwnedGame,
 } from '#shared/types/collection'
 import type { PublicProfile } from '#shared/types/user'
 import type { CollectionColour } from '#shared/utils/collection-colours'
@@ -79,6 +80,9 @@ export function useCollections() {
 
     /** The signed-in user's blueprints. */
     blueprints: () => auth.apiFetch<BlueprintSummary[]>('/api/blueprints'),
+
+    /** Every game in the user's collections other than the Wishlist. */
+    owned: () => auth.apiFetch<OwnedGame[]>('/api/owned'),
 
     /** Saves a collection's fields as a named set. 409 if the name is taken. */
     saveBlueprint: (collectionId: string, name: string) =>

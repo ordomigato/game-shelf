@@ -156,3 +156,23 @@ export interface ExplorePage {
   collections: ExploreCollection[]
   hasMore: boolean
 }
+
+/**
+ * A game in at least one of the user's collections other than the Wishlist,
+ * as listed on the Owned games page.
+ */
+export interface OwnedGame {
+  /** The library item's id. */
+  id: string
+  igdbId: number | null
+  name: string
+  coverId: string | null
+  /** When it was first added to one of those collections. */
+  addedAt: string
+  /** The collections it's in, by name (not the Wishlist). */
+  collections: {
+    id: string
+    title: string
+    slug: string
+  }[]
+}

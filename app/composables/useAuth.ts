@@ -149,7 +149,10 @@ export function useAuth() {
       retried = false,
     ) {
       savePendingSocialSignIn({ provider, redirect, retried })
-      await signInWithRedirect({ provider })
+      // Google is built into Amplify; Twitch is a custom (OIDC) provider.
+      await signInWithRedirect({
+        provider: provider === 'Google' ? 'Google' : { custom: provider },
+      })
     },
 
     /**

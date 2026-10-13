@@ -113,11 +113,39 @@ export default $config({
       },
     })
 
+    // Twitch (OIDC), with the same Twitch app as the IGDB API. Twitch only
+    // includes the email when the sign-in asks with its `claims` parameter.
+    // Cognito can't add it and won't take an authorize address with a query
+    // in it, so it sends people through this small redirect, which adds it
+    // (infra/twitch-authorize.ts).
+    const twitchAuthorize = new sst.aws.Function('TwitchAuthorize', {
+      handler: 'infra/twitch-authorize.handler',
+      url: true,
+    })
+    const twitch = userPool.addIdentityProvider('Twitch', {
+      type: 'oidc',
+      details: {
+        client_id: twitchClientId.value,
+        client_secret: twitchClientSecret.value,
+        authorize_scopes: 'openid user:read:email',
+        oidc_issuer: 'https://id.twitch.tv/oauth2',
+        attributes_request_method: 'GET',
+        authorize_url: twitchAuthorize.url,
+        token_url: 'https://id.twitch.tv/oauth2/token',
+        attributes_url: 'https://id.twitch.tv/oauth2/userinfo',
+        jwks_uri: 'https://id.twitch.tv/oauth2/keys',
+      },
+      attributes: {
+        email: 'email',
+        email_verified: 'email_verified',
+      },
+    })
+
     // Email and password sign in with the site's own forms over SRP. Social
     // logins use the OAuth code flow through Cognito's sign-in pages; the
     // implicit flow stays off.
     const userPoolClient = userPool.addClient('WebClient', {
-      providers: ['COGNITO', google.providerName],
+      providers: ['COGNITO', google.providerName, twitch.providerName],
       transform: {
         client: (args) => {
           args.explicitAuthFlows = [

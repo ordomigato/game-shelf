@@ -81,7 +81,7 @@ async function submit() {
       </Button>
     </form>
     <template #footer>
-      <p>
+      <p class="w-full text-center">
         {{ $t('signIn.newHere') }}
         <NuxtLink to="/signup" class="font-medium text-primary hover:underline">
           {{ $t('signIn.createAccount') }}

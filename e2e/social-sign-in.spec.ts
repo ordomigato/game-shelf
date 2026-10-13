@@ -30,10 +30,25 @@ test('Continue with Google goes to Cognito with Google picked', async ({
   expect(authorize.searchParams.get('code_challenge')).toBeTruthy()
 })
 
-test('sign-up offers Google too', async ({ page }) => {
+test('Continue with Twitch goes to Cognito with Twitch picked', async ({
+  page,
+}) => {
+  const visits = await fakeCognitoPages(page)
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Continue with Twitch' }).click()
+
+  await expect(page.getByText('Cognito')).toBeVisible()
+  const authorize = visits.find((url) => url.pathname === '/oauth2/authorize')!
+  expect(authorize.searchParams.get('identity_provider')).toBe('Twitch')
+})
+
+test('sign-up offers Google and Twitch too', async ({ page }) => {
   await page.goto('/signup')
   await expect(
     page.getByRole('button', { name: 'Continue with Google' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Continue with Twitch' }),
   ).toBeVisible()
 })
 

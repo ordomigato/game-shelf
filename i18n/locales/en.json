@@ -69,7 +69,7 @@
     "title": "Privacy",
     "intro": "The short version: ThisPlayShelf keeps what it needs to run your shelf, sells nothing, and lets you take everything with you or delete it.",
     "accountTitle": "Your account",
-    "account": "Your email address and password are handled by Amazon Cognito, Amazon's sign-in service. Your password never reaches ThisPlayShelf's servers: signing in proves you know it without sending it. If you continue with Google, Google tells Cognito your email address and whether it's verified. Nothing else from your Google account is kept, and an account with the same email is linked rather than duplicated.",
+    "account": "Your email address and password are handled by Amazon Cognito, Amazon's sign-in service. Your password never reaches ThisPlayShelf's servers: signing in proves you know it without sending it. If you continue with Google or Twitch, they tell Cognito your email address and whether it's verified. Nothing else from those accounts is kept, and an account with the same email is linked rather than duplicated.",
     "storedTitle": "What's stored",
     "stored": "Your username and display name, your collections and everything you put in them, and when things were created. These live in a Postgres database run by Neon on Amazon's servers in the United States. Your email address isn't kept there.",
     "visibleTitle": "Who can see what",
@@ -288,14 +288,15 @@
   },
   "socialSignIn": {
     "google": "Continue with Google",
+    "twitch": "Continue with Twitch",
     "or": "or",
-    "couldNotStart": "Google sign-in couldn't start. Try again in a moment.",
+    "couldNotStart": "{provider} sign-in couldn't start. Try again in a moment.",
     "pageTitle": "Signing in",
     "title": "Signing you in",
     "working": "One moment…",
     "failedTitle": "Couldn't sign you in",
     "failed": "Something went wrong signing in. Try again, or sign in with your email and password.",
-    "unverifiedEmail": "That account has no verified email address, so it can’t be used to sign in here. Sign in with your email and password instead.",
+    "unverifiedEmail": "That account has no verified email address, so it can’t be used to sign in here. Verify your email with the service, or sign in with your email and password instead.",
     "backToSignIn": "Back to sign in"
   },
   "resetPassword": {

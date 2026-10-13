@@ -9,7 +9,7 @@ import {
 import type { PreSignUpTriggerEvent } from 'aws-lambda'
 
 /** The social logins set up in `sst.config.ts`, as Cognito names them. */
-export const PROVIDERS = ['Google'] as const
+export const PROVIDERS = ['Google', 'Twitch'] as const
 
 const cognito = new CognitoIdentityProviderClient({})
 

@@ -6,6 +6,7 @@ import {
   resendSignUpCode,
   resetPassword,
   signIn,
+  signInWithRedirect,
   signOut,
   signUp,
   updatePassword,
@@ -136,6 +137,19 @@ export function useAuth() {
       if (nextStep.signInStep === 'CONFIRM_SIGN_UP') return 'needsConfirmation'
       await refresh()
       return 'signedIn'
+    },
+
+    /**
+     * Goes to the provider's sign-in through Cognito's pages. The browser
+     * comes back to `/auth/callback`, which then goes on to `redirect`.
+     */
+    async signInWithSocial(
+      provider: SocialProvider,
+      redirect: string,
+      retried = false,
+    ) {
+      savePendingSocialSignIn({ provider, redirect, retried })
+      await signInWithRedirect({ provider })
     },
 
     async signOut() {

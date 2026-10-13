@@ -53,9 +53,9 @@ export default $config({
         ? {
             name: authDomain,
             dns: false,
-            // TODO: the ACM certificate for auth.thisplayshelf.com
-            // (us-east-1), once it's validated at Namecheap.
-            cert: 'TODO',
+            // ACM certificate for auth.thisplayshelf.com (us-east-1),
+            // validated by a CNAME at Namecheap.
+            cert: 'arn:aws:acm:us-east-1:787391403512:certificate/ccd51c7b-e7d3-49c0-9de0-0db0b5454811',
           }
         : { prefix: `thisplayshelf-${$app.stage}` },
       triggers: {

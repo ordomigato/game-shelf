@@ -1,4 +1,5 @@
 import type { ChartWidget } from './charts'
+import type { CollectionColour } from '../utils/collection-colours'
 
 export type FieldType =
   | 'text'
@@ -96,6 +97,8 @@ export interface CollectionSummary {
   title: string
   slug: string
   description: string | null
+  /** A preset colour, or null for one from the title. */
+  color: CollectionColour | null
   visibility: CollectionVisibility
   kind: CollectionKind
   itemCount: number

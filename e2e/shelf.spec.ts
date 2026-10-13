@@ -9,6 +9,7 @@ const wishlist = {
   description: null,
   visibility: 'private',
   kind: 'wishlist',
+  color: null,
   itemCount: 0,
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -19,6 +20,7 @@ const zelda = {
   description: 'Every Zelda I own.',
   visibility: 'public',
   kind: 'custom',
+  color: null,
   itemCount: 1,
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -159,6 +161,7 @@ test.describe('as the owner', () => {
     await page.getByLabel('Name').fill('N64 Games')
     await expect(page.getByText('/u/retro_fan/shelf/n64-games')).toBeVisible()
     await page.getByLabel('Player').check()
+    await page.getByRole('radio', { name: 'Teal' }).click()
     await page.getByRole('button', { name: 'Create collection' }).click()
 
     await expect(page).toHaveURL(/\/u\/retro_fan\/shelf\/n64-games$/)
@@ -166,6 +169,7 @@ test.describe('as the owner', () => {
     expect(created).toEqual({
       title: 'N64 Games',
       description: null,
+      color: 'teal',
       starter: 'player',
     })
   })
@@ -184,6 +188,47 @@ test.describe('as the owner', () => {
     await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(
       'You already have a collection with that name.',
     )
+  })
+
+  test('picks a colour for a collection, or goes back to automatic', async ({
+    page,
+  }) => {
+    const sent: unknown[] = []
+    await page.route(`**/api/collections/${zelda.id}`, async (route) => {
+      const body = route.request().postDataJSON()
+      sent.push(body)
+      await route.fulfill({ json: { ...zelda, ...body } })
+    })
+    await page.goto('/u/retro_fan/shelf/zelda-games')
+
+    const edit = async () => {
+      await page.getByRole('button', { name: 'Collection actions' }).click()
+      await page.getByRole('menuitem', { name: 'Edit details' }).click()
+    }
+    await edit()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('radio', { name: 'Automatic' })).toBeChecked()
+    await dialog.getByRole('radio', { name: 'Purple' }).click()
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog).toBeHidden()
+
+    await edit()
+    await dialog.getByRole('radio', { name: 'Automatic' }).click()
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog).toBeHidden()
+
+    expect(sent).toMatchObject([{ color: 'purple' }, { color: null }])
+  })
+
+  test('the Wishlist has no colour to pick', async ({ page }) => {
+    await page.route('**/api/u/retro_fan/collections/wishlist', (route) =>
+      route.fulfill({ json: { ...zeldaDetail(true), ...wishlist, items: [] } }),
+    )
+    await page.goto('/u/retro_fan/shelf/wishlist')
+    await page.getByRole('button', { name: 'Collection actions' }).click()
+    await page.getByRole('menuitem', { name: 'Edit details' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Purple' })).toBeHidden()
   })
 
   test('can edit and delete a collection, but not the Wishlist', async ({

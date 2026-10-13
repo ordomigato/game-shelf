@@ -1,17 +1,24 @@
 <script setup lang="ts">
+import { Check } from '@lucide/vue'
 import { FetchError } from 'ofetch'
+import {
+  RadioGroupIndicator as SwatchCheck,
+  RadioGroupItem as Swatch,
+} from 'reka-ui'
 import type {
   CollectionSummary,
   BlueprintSummary,
 } from '#shared/types/collection'
+import type { CollectionColour } from '#shared/utils/collection-colours'
 import {
   STARTER_BLUEPRINTS,
   type StarterBlueprint,
 } from '#shared/utils/starter-blueprints'
 
 /**
- * Creates a collection (name, description, and a starter or one of the
- * user's blueprints) or edits an existing one's name and description.
+ * Creates a collection (name, description, colour, and a starter or one of
+ * the user's blueprints) or edits an existing one's name, description and
+ * colour.
  * Emits the saved collection.
  */
 const props = defineProps<{
@@ -47,8 +54,21 @@ const starters: {
   },
 ]
 
+const swatches: { id: CollectionColour; nameKey: string }[] = [
+  { id: 'red', nameKey: 'collections.colours.red' },
+  { id: 'orange', nameKey: 'collections.colours.orange' },
+  { id: 'yellow', nameKey: 'collections.colours.yellow' },
+  { id: 'green', nameKey: 'collections.colours.green' },
+  { id: 'teal', nameKey: 'collections.colours.teal' },
+  { id: 'blue', nameKey: 'collections.colours.blue' },
+  { id: 'purple', nameKey: 'collections.colours.purple' },
+  { id: 'pink', nameKey: 'collections.colours.pink' },
+]
+
 const title = ref('')
 const description = ref('')
+/** A preset, or 'auto' for a colour from the name. */
+const colour = ref<CollectionColour | 'auto'>('auto')
 /** A starter's id, or the id of one of the user's blueprints. */
 const start = ref<string>('collector')
 const blueprints = ref<BlueprintSummary[]>([])
@@ -61,6 +81,7 @@ watch(open, async (isOpen) => {
   if (!isOpen) return
   title.value = props.collection?.title ?? ''
   description.value = props.collection?.description ?? ''
+  colour.value = props.collection?.color ?? 'auto'
   start.value = 'collector'
   keepLinked.value = true
   error.value = ''
@@ -93,12 +114,14 @@ async function save() {
     const details = {
       ...(!isWishlist.value && { title: title.value.trim() }),
       description: description.value.trim() || null,
+      color: colour.value === 'auto' ? null : colour.value,
     }
     const saved = props.collection
       ? await collections.update(props.collection.id, details)
       : await collections.create({
           title: title.value.trim(),
           description: details.description,
+          color: details.color,
           ...(isStarter(start.value)
             ? { starter: start.value }
             : { blueprintId: start.value, copy: !keepLinked.value }),
@@ -119,7 +142,7 @@ async function save() {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="sm:max-w-lg">
+    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
       <DialogHeader>
         <DialogTitle>
           {{
@@ -161,6 +184,43 @@ async function save() {
             rows="3"
           />
         </div>
+        <!-- The Wishlist's mark is a heart, so it has no colour. -->
+        <fieldset v-if="!isWishlist" class="flex flex-col gap-2">
+          <legend class="mb-2 text-sm font-medium">
+            {{ $t('collections.form.colour') }}
+          </legend>
+          <RadioGroup
+            v-model="colour"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <Swatch
+              v-for="swatch in [
+                {
+                  id: 'auto',
+                  nameKey: 'collections.form.colourAuto',
+                  background: generatedCoverColors(title).from,
+                },
+                ...swatches.map((preset) => ({
+                  ...preset,
+                  background: presetColour(preset.id),
+                })),
+              ]"
+              :key="swatch.id"
+              :value="swatch.id"
+              class="grid size-7 place-items-center rounded-md text-white outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=checked]:ring-2 data-[state=checked]:ring-ring data-[state=checked]:ring-offset-2 data-[state=checked]:ring-offset-background"
+              :style="{ background: swatch.background }"
+              :aria-label="$t(swatch.nameKey)"
+              :title="$t(swatch.nameKey)"
+            >
+              <SwatchCheck>
+                <Check class="size-4" aria-hidden="true" />
+              </SwatchCheck>
+            </Swatch>
+          </RadioGroup>
+          <p class="text-xs text-muted-foreground">
+            {{ $t('collections.form.colourHelp') }}
+          </p>
+        </fieldset>
         <fieldset v-if="!collection" class="flex flex-col gap-2">
           <legend class="mb-2 text-sm font-medium">
             {{ $t('collections.form.start') }}

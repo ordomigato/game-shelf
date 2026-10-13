@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { CollectionSummary } from '../../../shared/types/collection'
+import { COLLECTION_COLOUR_IDS } from '../../../shared/utils/collection-colours'
 import { STARTER_BLUEPRINTS } from '../../../shared/utils/starter-blueprints'
 
 const bodySchema = z.object({
@@ -16,6 +17,7 @@ const bodySchema = z.object({
     .transform((value) => value || null)
     .nullable()
     .default(null),
+  color: z.enum(COLLECTION_COLOUR_IDS).nullable().default(null),
   /** Copies a starter's fields. Leave out when using `blueprintId`. */
   starter: z.enum(STARTER_BLUEPRINTS).optional(),
   /** One of the user's blueprints, used as is. */
@@ -30,13 +32,14 @@ const startSchema = bodySchema.refine(
 
 export default defineEventHandler(async (event): Promise<CollectionSummary> => {
   const { sub } = await requireAuth(event)
-  const { title, description, starter, blueprintId, copy } =
+  const { title, description, color, starter, blueprintId, copy } =
     await readValidatedBody(event, startSchema.parse)
   const user = await findOrCreateUser(sub)
   await assertCollectionRoom(user.id, userLimits(user))
   const created = await createCollection(user.id, {
     title,
     description,
+    color,
     ...(blueprintId ? { blueprintId, copy } : { starter: starter ?? 'blank' }),
   })
   setResponseStatus(event, 201)

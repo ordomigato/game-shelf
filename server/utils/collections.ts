@@ -22,6 +22,7 @@ import {
   type OptionRenames,
 } from '../../shared/utils/field-changes'
 import { copyFields, copyValues } from '../../shared/utils/blueprint-names'
+import type { CollectionColour } from '../../shared/utils/collection-colours'
 import { applyFieldValues } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import {
@@ -51,6 +52,7 @@ function toSummary(row: CollectionRow, itemCount: number): CollectionSummary {
     title: row.title,
     slug: row.slug,
     description: row.description,
+    color: row.color,
     visibility: row.visibility,
     kind: row.kind,
     itemCount,
@@ -413,6 +415,7 @@ export async function createCollection(
   input: {
     title: string
     description: string | null
+    color?: CollectionColour | null
   } & (
     | { starter: StarterBlueprint }
     /** `copy` gives the collection its own copy of the blueprint's fields. */
@@ -425,6 +428,7 @@ export async function createCollection(
     title: input.title,
     slug: slugify(input.title),
     description: input.description,
+    color: input.color ?? null,
   }
   try {
     if ('blueprintId' in input) {
@@ -477,6 +481,7 @@ export async function updateCollection(
   changes: {
     title?: string
     description?: string | null
+    color?: CollectionColour | null
     visibility?: 'private' | 'public'
   },
 ): Promise<CollectionSummary> {
@@ -495,6 +500,7 @@ export async function updateCollection(
           title: changes.title,
           slug: slugify(changes.title),
         }),
+        ...(changes.color !== undefined && { color: changes.color }),
         ...(changes.description !== undefined && {
           description: changes.description,
         }),

@@ -24,7 +24,7 @@ const markClass = computed(() =>
     : '',
 )
 const dotStyle = computed(() => ({
-  background: generatedCoverColors(props.collection.title).from,
+  background: collectionColour(props.collection),
 }))
 
 function onGripKey(event: KeyboardEvent) {

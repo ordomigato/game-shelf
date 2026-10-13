@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { CollectionSummary } from '../../../../shared/types/collection'
+import { COLLECTION_COLOUR_IDS } from '../../../../shared/utils/collection-colours'
 
 const paramsSchema = z.object({ id: z.uuid() })
 const bodySchema = z
@@ -18,6 +19,7 @@ const bodySchema = z
       .transform((value) => value || null)
       .nullable()
       .optional(),
+    color: z.enum(COLLECTION_COLOUR_IDS).nullable().optional(),
     visibility: z.enum(['private', 'public']).optional(),
   })
   .refine((body) => Object.values(body).some((value) => value !== undefined))

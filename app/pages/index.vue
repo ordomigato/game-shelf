@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search, SlidersHorizontal } from '@lucide/vue'
+import { Search } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { CollectionSummary, LibraryItem } from '#shared/types/collection'
 import type { GameSummary } from '#shared/types/game'
@@ -77,9 +77,6 @@ onMounted(() => {
 })
 
 const tracked = useTrackedGames(games, target)
-
-// Open at first when a link or reload brings filters along.
-const filtersOpen = ref(activeFilters.value > 0)
 
 const addingByHand = ref(false)
 function onAddedByHand(item: LibraryItem) {
@@ -181,29 +178,7 @@ const resultsLabel = computed(() => {
       <p v-if="showTooShort" class="mt-3 text-sm text-muted-foreground">
         {{ $t('search.tooShort', { count: MIN_SEARCH_LENGTH }) }}
       </p>
-      <div class="mt-3 flex justify-center">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          :aria-expanded="filtersOpen"
-          aria-controls="search-filters"
-          @click="filtersOpen = !filtersOpen"
-        >
-          <SlidersHorizontal aria-hidden="true" />
-          {{
-            activeFilters
-              ? $t('search.filters.toggleCount', { count: activeFilters })
-              : $t('search.filters.toggle')
-          }}
-        </Button>
-      </div>
-      <SearchFilters
-        v-if="filtersOpen"
-        id="search-filters"
-        v-model="filters"
-        class="mt-3"
-      />
+      <SearchFilters v-model="filters" class="mt-4" />
     </section>
 
     <p class="sr-only" aria-live="polite">{{ resultsLabel }}</p>

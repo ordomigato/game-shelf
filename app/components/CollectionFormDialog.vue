@@ -9,7 +9,6 @@ import type {
   CollectionSummary,
   BlueprintSummary,
 } from '#shared/types/collection'
-import type { CollectionColour } from '#shared/utils/collection-colours'
 import {
   STARTER_BLUEPRINTS,
   type StarterBlueprint,
@@ -54,21 +53,11 @@ const starters: {
   },
 ]
 
-const swatches: { id: CollectionColour; nameKey: string }[] = [
-  { id: 'red', nameKey: 'collections.colours.red' },
-  { id: 'orange', nameKey: 'collections.colours.orange' },
-  { id: 'yellow', nameKey: 'collections.colours.yellow' },
-  { id: 'green', nameKey: 'collections.colours.green' },
-  { id: 'teal', nameKey: 'collections.colours.teal' },
-  { id: 'blue', nameKey: 'collections.colours.blue' },
-  { id: 'purple', nameKey: 'collections.colours.purple' },
-  { id: 'pink', nameKey: 'collections.colours.pink' },
-]
-
 const title = ref('')
 const description = ref('')
-/** A preset, or 'auto' for a colour from the name. */
-const colour = ref<CollectionColour | 'auto'>('auto')
+/** 'auto' for a colour from the name, 'custom', or a preset's hex code. */
+const colour = ref<string>('auto')
+const customColour = ref('#808080')
 /** A starter's id, or the id of one of the user's blueprints. */
 const start = ref<string>('collector')
 const blueprints = ref<BlueprintSummary[]>([])
@@ -81,7 +70,11 @@ watch(open, async (isOpen) => {
   if (!isOpen) return
   title.value = props.collection?.title ?? ''
   description.value = props.collection?.description ?? ''
-  colour.value = props.collection?.color ?? 'auto'
+  const stored = props.collection?.color ?? null
+  const saved = isHexColour(stored) ? stored : null
+  const isPreset = COLOUR_PRESETS.some((preset) => preset.hex === saved)
+  colour.value = !saved ? 'auto' : isPreset ? saved : 'custom'
+  if (saved && !isPreset) customColour.value = saved
   start.value = 'collector'
   keepLinked.value = true
   error.value = ''
@@ -114,7 +107,12 @@ async function save() {
     const details = {
       ...(!isWishlist.value && { title: title.value.trim() }),
       description: description.value.trim() || null,
-      color: colour.value === 'auto' ? null : colour.value,
+      color:
+        colour.value === 'auto'
+          ? null
+          : colour.value === 'custom'
+            ? customColour.value.toLowerCase()
+            : colour.value,
     }
     const saved = props.collection
       ? await collections.update(props.collection.id, details)
@@ -196,19 +194,31 @@ async function save() {
             <Swatch
               v-for="swatch in [
                 {
-                  id: 'auto',
+                  value: 'auto',
                   nameKey: 'collections.form.colourAuto',
                   background: generatedCoverColors(title).from,
+                  ink: '#ffffff',
                 },
-                ...swatches.map((preset) => ({
-                  ...preset,
-                  background: presetColour(preset.id),
+                ...COLOUR_PRESETS.map((preset) => ({
+                  value: preset.hex,
+                  nameKey: preset.nameKey,
+                  background: preset.hex,
+                  ink: inkOn(preset.hex),
                 })),
+                {
+                  value: 'custom',
+                  nameKey: 'collections.form.colourCustom',
+                  background:
+                    colour === 'custom'
+                      ? customColour
+                      : 'conic-gradient(#ef4444, #facc15, #22c55e, #3b82f6, #a855f7, #ef4444)',
+                  ink: colour === 'custom' ? inkOn(customColour) : '#ffffff',
+                },
               ]"
-              :key="swatch.id"
-              :value="swatch.id"
-              class="grid size-7 place-items-center rounded-md text-white outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=checked]:ring-2 data-[state=checked]:ring-ring data-[state=checked]:ring-offset-2 data-[state=checked]:ring-offset-background"
-              :style="{ background: swatch.background }"
+              :key="swatch.value"
+              :value="swatch.value"
+              class="grid size-7 place-items-center rounded-md border border-border outline-none focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=checked]:ring-2 data-[state=checked]:ring-ring data-[state=checked]:ring-offset-2 data-[state=checked]:ring-offset-background"
+              :style="{ background: swatch.background, color: swatch.ink }"
               :aria-label="$t(swatch.nameKey)"
               :title="$t(swatch.nameKey)"
             >
@@ -217,6 +227,7 @@ async function save() {
               </SwatchCheck>
             </Swatch>
           </RadioGroup>
+          <ColourPicker v-if="colour === 'custom'" v-model="customColour" />
           <p class="text-xs text-muted-foreground">
             {{ $t('collections.form.colourHelp') }}
           </p>

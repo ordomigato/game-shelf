@@ -169,7 +169,7 @@ test.describe('as the owner', () => {
     expect(created).toEqual({
       title: 'N64 Games',
       description: null,
-      color: 'teal',
+      color: '#14b8a6',
       starter: 'player',
     })
   })
@@ -190,7 +190,7 @@ test.describe('as the owner', () => {
     )
   })
 
-  test('picks a colour for a collection, or goes back to automatic', async ({
+  test('picks a preset or custom colour, or goes back to automatic', async ({
     page,
   }) => {
     const sent: unknown[] = []
@@ -217,7 +217,19 @@ test.describe('as the owner', () => {
     await dialog.getByRole('button', { name: 'Save' }).click()
     await expect(dialog).toBeHidden()
 
-    expect(sent).toMatchObject([{ color: 'purple' }, { color: null }])
+    await edit()
+    await dialog.getByRole('radio', { name: 'Custom colour' }).click()
+    const hex = dialog.getByLabel('Hex')
+    await hex.fill('#123ABC')
+    await hex.press('Enter')
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog).toBeHidden()
+
+    expect(sent).toMatchObject([
+      { color: '#a855f7' },
+      { color: null },
+      { color: '#123abc' },
+    ])
   })
 
   test('the Wishlist has no colour to pick', async ({ page }) => {

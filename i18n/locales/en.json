@@ -395,9 +395,13 @@
       "yourBlueprints": "Your blueprints",
       "keepLinked": "Keep linked to the blueprint",
       "keepLinkedOn": "Field changes apply to every collection using this blueprint.",
-      "keepLinkedOff": "This collection gets its own copy of the fields to change as you like."
+      "keepLinkedOff": "This collection gets its own copy of the fields to change as you like.",
+      "colourCustom": "Custom colour",
+      "colourHex": "Hex"
     },
     "colours": {
+      "white": "White",
+      "black": "Black",
       "red": "Red",
       "orange": "Orange",
       "yellow": "Yellow",

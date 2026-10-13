@@ -22,7 +22,12 @@ function fakeJwt(claims: Record<string, unknown>): string {
  */
 export async function signInAs(
   page: Page,
-  user: { username: string | null; displayName?: string | null },
+  user: {
+    username: string | null
+    displayName?: string | null
+    /** A social login this session came from, like `Google`. */
+    via?: string
+  },
 ) {
   const sub = '00000000-0000-4000-8000-000000000001'
   const cognitoUsername = sub
@@ -40,6 +45,7 @@ export async function signInAs(
       token_use: 'id',
       aud: CLIENT_ID,
       'cognito:username': cognitoUsername,
+      ...(user.via && { identities: [{ providerName: user.via }] }),
     }),
     [`${prefix}.${cognitoUsername}.refreshToken`]: 'fake-refresh-token',
     [`${prefix}.${cognitoUsername}.clockDrift`]: '0',

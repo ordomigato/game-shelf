@@ -344,7 +344,9 @@
       "save": "Change password",
       "saving": "Saving…",
       "saved": "Password changed.",
-      "wrongCurrent": "Your current password isn't right."
+      "wrongCurrent": "Your current password isn't right.",
+      "socialNote": "You signed in with {provider}. If you haven't set a password for this account, {link} with your email address, then you can sign in either way.",
+      "socialNoteLink": "set one with a code"
     },
     "settings": {
       "pageTitle": "Settings",

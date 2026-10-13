@@ -12,6 +12,17 @@ const error = ref('')
 const saved = ref(false)
 const saving = ref(false)
 
+// Someone who signed up with Google has a password nobody knows. Changing
+// it here needs the current one, so point them to setting one by email.
+const socialProvider = ref<SocialProvider | null>(null)
+onMounted(async () => {
+  try {
+    socialProvider.value = await auth.signedInWith()
+  } catch {
+    // Without it the form still works for anyone who knows their password.
+  }
+})
+
 async function save() {
   const problem = newPasswordProblem(newPassword.value, confirmation.value)
   error.value = problem ? t(problem.key, problem.params ?? {}) : ''
@@ -48,6 +59,21 @@ async function save() {
       }}</CardDescription>
     </CardHeader>
     <CardContent>
+      <p
+        v-if="socialProvider"
+        class="mb-6 rounded-md border bg-muted/50 p-3 text-sm"
+      >
+        <i18n-t keypath="account.security.socialNote" scope="global">
+          <template #provider>{{ socialProvider }}</template>
+          <template #link>
+            <NuxtLink
+              to="/forgot-password"
+              class="font-medium text-primary underline underline-offset-4"
+              >{{ $t('account.security.socialNoteLink') }}</NuxtLink
+            >
+          </template>
+        </i18n-t>
+      </p>
       <form class="flex flex-col gap-4" @submit.prevent="save">
         <FormMessage v-if="error">{{ error }}</FormMessage>
         <FormMessage v-if="saved" tone="success">

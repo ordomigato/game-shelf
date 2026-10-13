@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { signInAs } from './support/session'
 
 const PENDING = 'gameshelf:social-sign-in'
 
@@ -85,4 +86,24 @@ test('explains a Google account with no verified email', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText(
     'no verified email address',
   )
+})
+
+test('Security tells a Google sign-in how to set a password', async ({
+  page,
+}) => {
+  await signInAs(page, { username: 'retro_fan', via: 'Google' })
+  await page.goto('/account/security')
+  await expect(page.getByText('You signed in with Google.')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'set one with a code' }),
+  ).toHaveAttribute('href', '/forgot-password')
+})
+
+test('Security has no such note for email and password', async ({ page }) => {
+  await signInAs(page, { username: 'retro_fan' })
+  await page.goto('/account/security')
+  await expect(
+    page.getByRole('button', { name: 'Change password' }),
+  ).toBeVisible()
+  await expect(page.getByText('You signed in with')).toBeHidden()
 })

@@ -152,6 +152,18 @@ export function useAuth() {
       await signInWithRedirect({ provider })
     },
 
+    /**
+     * The social login this session came from (the ID token's
+     * `identities` claim), or null for email and password.
+     */
+    async signedInWith(): Promise<SocialProvider | null> {
+      const session = await fetchAuthSession()
+      const identities = session.tokens?.idToken?.payload.identities
+      if (!Array.isArray(identities)) return null
+      const first = identities[0] as { providerName?: string } | undefined
+      return (first?.providerName as SocialProvider | undefined) ?? null
+    },
+
     async signOut() {
       await signOut()
       setSignedOut()

@@ -113,10 +113,10 @@ const sections = computed(() => [
     current: route.path === props.shelfPath,
   },
   {
-    to: '/owned',
+    to: `${props.shelfPath}/owned`,
     labelKey: 'header.owned',
     icon: Gamepad2,
-    current: route.path === '/owned',
+    current: route.path === `${props.shelfPath}/owned`,
   },
 ])
 

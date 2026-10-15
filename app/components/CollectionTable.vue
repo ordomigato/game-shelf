@@ -47,10 +47,15 @@ const props = defineProps<{
   fields: FieldDefinition[]
   items: CollectionEntry[]
   editable: boolean
-  /** The owner's other collections, for "Got it" or "Move to". */
+  /**
+   * The owner's other collections, for "Got it" or "Move to". Without
+   * them, rows have no such menu.
+   */
   moveTargets?: CollectionSummary[]
   /** In the Wishlist, moving a game out reads as "Got it". */
   isWishlist?: boolean
+  /** The owner's shelf, for links to the collections in `inCollections`. */
+  shelfPath?: string
 }>()
 const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
@@ -81,6 +86,13 @@ const showWishlist = computed(
     props.items.some((item) => item.wishlisted !== undefined),
 )
 const WISHLIST_FILTER = '__wishlist'
+
+/** Whether rows list the collections each game is in (on Owned). */
+const showCollections = computed(() =>
+  props.items.some((item) => item.inCollections !== undefined),
+)
+const collectionTitles = (item: CollectionEntry) =>
+  (item.inCollections ?? []).map((collection) => collection.title)
 
 const filterableFields = computed(() =>
   props.fields.filter(
@@ -146,6 +158,7 @@ function matchesQuery(item: CollectionEntry) {
   if (!words) return true
   const haystack = [
     item.name,
+    ...collectionTitles(item),
     ...props.fields
       .filter((field) => ['text', 'select', 'multiselect'].includes(field.type))
       .map((field) => formatFieldValue(field, item.data[field.id])),
@@ -174,6 +187,22 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
         numeric: true,
       }),
   },
+  ...(showCollections.value
+    ? [
+        {
+          id: 'inCollections',
+          accessorFn: (item) => collectionTitles(item).join(', '),
+          header: () => t('table.inCollections'),
+          sortingFn: (a, b, id) =>
+            a
+              .getValue<string>(id)
+              .localeCompare(b.getValue<string>(id), locale.value, {
+                sensitivity: 'base',
+                numeric: true,
+              }),
+        } satisfies ColumnDef<CollectionEntry>,
+      ]
+    : []),
   ...props.fields.map((field): ColumnDef<CollectionEntry> => ({
     id: field.id,
     accessorFn: (item) => item.data[field.id],
@@ -547,6 +576,26 @@ const addedFormat = computed(
                   </template>
                 </template>
               </div>
+              <ul
+                v-else-if="cell.column.id === 'inCollections'"
+                class="wishlist-fade flex flex-wrap gap-1.5"
+              >
+                <li
+                  v-for="collection in item.inCollections"
+                  :key="collection.id"
+                >
+                  <Badge as-child variant="secondary">
+                    <NuxtLink :to="`${shelfPath}/${collection.slug}`">
+                      <span
+                        class="size-2 shrink-0 rounded-sm ring-1 ring-foreground/15 ring-inset"
+                        :style="{ background: collectionColour(collection) }"
+                        aria-hidden="true"
+                      />
+                      {{ collection.title }}
+                    </NuxtLink>
+                  </Badge>
+                </li>
+              </ul>
               <span
                 v-else-if="cell.column.id === 'addedAt'"
                 class="wishlist-fade whitespace-nowrap text-muted-foreground"
@@ -575,7 +624,7 @@ const addedFormat = computed(
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-max">
-                  <DropdownMenuSub>
+                  <DropdownMenuSub v-if="moveTargets">
                     <DropdownMenuSubTrigger>
                       <PackageCheck v-if="isWishlist" />
                       <FolderInput v-else />
@@ -589,12 +638,12 @@ const addedFormat = computed(
                       >
                         {{ titleOf(target) }}
                       </DropdownMenuItem>
-                      <DropdownMenuItem v-if="!moveTargets?.length" disabled>
+                      <DropdownMenuItem v-if="!moveTargets.length" disabled>
                         {{ $t('table.noOtherCollections') }}
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator v-if="moveTargets" />
                   <template v-if="reorderable">
                     <DropdownMenuItem
                       :disabled="indexOf(item.id) === 0"
@@ -641,7 +690,11 @@ const addedFormat = computed(
           <TableRow v-if="!visibleItems.length">
             <TableCell
               :colspan="
-                fields.length + 2 + Number(editable) + Number(reorderable)
+                fields.length +
+                2 +
+                Number(showCollections) +
+                Number(editable) +
+                Number(reorderable)
               "
               class="py-10 text-center text-muted-foreground"
             >

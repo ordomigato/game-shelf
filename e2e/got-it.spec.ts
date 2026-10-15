@@ -167,7 +167,7 @@ test.describe('Wishlist games in other collections', () => {
       calls.push(
         `${route.request().method()} ${route.request().url().split('/').pop()}`,
       )
-      return route.fulfill({ status: 204 })
+      return route.fulfill({ json: { collectionIds: [] } })
     })
     await page.goto('/u/retro_fan/shelf/snes-games')
     await expect(page.getByRole('table')).toBeVisible()

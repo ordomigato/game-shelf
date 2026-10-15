@@ -137,7 +137,9 @@ export async function findSharePreview(
     collection:
       collection.kind === 'wishlist'
         ? translate({ key: 'shelf.wishlist' })
-        : collection.title,
+        : collection.kind === 'owned'
+          ? translate({ key: 'shelf.owned' })
+          : collection.title,
     owner: ownerName,
     description: collection.description,
     itemCount,

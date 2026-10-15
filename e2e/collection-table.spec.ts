@@ -228,7 +228,7 @@ test.describe('owners', () => {
     let removed = ''
     await page.route(`**/api/collections/${collectionId}/items/*`, (route) => {
       removed = `${route.request().method()} ${route.request().url().split('/').pop()}`
-      return route.fulfill({ status: 204 })
+      return route.fulfill({ json: { collectionIds: [] } })
     })
     await openCollection(page, true)
     await page.getByRole('button', { name: 'Actions for Mega Man 2' }).click()

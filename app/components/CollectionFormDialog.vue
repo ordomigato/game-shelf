@@ -92,20 +92,24 @@ const isStarter = (id: string): id is StarterBlueprint =>
   STARTER_BLUEPRINTS.includes(id as StarterBlueprint)
 
 const slugPreview = computed(() => slugify(title.value))
-const isWishlist = computed(() => props.collection?.kind === 'wishlist')
-// The Wishlist's name can't be changed, so it never blocks saving.
+const isBuiltInList = computed(() =>
+  props.collection ? isBuiltIn(props.collection.kind) : false,
+)
+// Owned's and the Wishlist's names can't be changed, so never block saving.
 const canSave = computed(
-  () => !saving.value && (isWishlist.value || title.value.trim() !== ''),
+  () => !saving.value && (isBuiltInList.value || title.value.trim() !== ''),
 )
 
 async function save() {
-  const problem = isWishlist.value ? null : collectionTitleProblem(title.value)
+  const problem = isBuiltInList.value
+    ? null
+    : collectionTitleProblem(title.value)
   error.value = problem ? t(problem.key, problem.params ?? {}) : ''
   if (error.value) return
   saving.value = true
   try {
     const details = {
-      ...(!isWishlist.value && { title: title.value.trim() }),
+      ...(!isBuiltInList.value && { title: title.value.trim() }),
       description: description.value.trim() || null,
       color:
         colour.value === 'auto'
@@ -152,7 +156,7 @@ async function save() {
       </DialogHeader>
       <form class="flex flex-col gap-4" @submit.prevent="save">
         <FormMessage v-if="error">{{ error }}</FormMessage>
-        <div v-if="!isWishlist" class="flex flex-col gap-2">
+        <div v-if="!isBuiltInList" class="flex flex-col gap-2">
           <Label for="collection-title">{{
             $t('collections.form.name')
           }}</Label>
@@ -182,8 +186,8 @@ async function save() {
             rows="3"
           />
         </div>
-        <!-- The Wishlist's mark is a heart, so it has no colour. -->
-        <fieldset v-if="!isWishlist" class="flex flex-col gap-2">
+        <!-- Owned and the Wishlist have icons for marks, so no colour. -->
+        <fieldset v-if="!isBuiltInList" class="flex flex-col gap-2">
           <legend class="mb-2 text-sm font-medium">
             {{ $t('collections.form.colour') }}
           </legend>

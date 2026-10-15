@@ -22,7 +22,9 @@ export function useMyCollections() {
   const titleOf = (collection: CollectionSummary) =>
     collection.kind === 'wishlist'
       ? $i18n.t('shelf.wishlist')
-      : collection.title
+      : collection.kind === 'owned'
+        ? $i18n.t('shelf.owned')
+        : collection.title
   const list = useState<CollectionSummary[] | null>(
     'my-collections',
     () => null,
@@ -55,9 +57,9 @@ export function useMyCollections() {
   }
 
   /**
-   * The list, asking the server only if it isn't loaded. Everyone has a
-   * Wishlist, so an empty list means the last try failed. Throws if this
-   * one does too.
+   * The list, asking the server only if it isn't loaded. Everyone has
+   * Owned and a Wishlist, so an empty list means the last try failed.
+   * Throws if this one does too.
    */
   async function load(): Promise<CollectionSummary[]> {
     if (list.value?.length) return list.value

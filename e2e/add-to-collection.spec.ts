@@ -30,6 +30,13 @@ const nes = {
   slug: 'nes-games',
   kind: 'custom',
 }
+const owned = {
+  ...summary,
+  id: '55555555-5555-4555-8555-555555555555',
+  title: 'Owned',
+  slug: 'owned',
+  kind: 'owned',
+}
 const itemId = '33333333-3333-4333-8333-333333333333'
 
 async function searchZelda(page: Page) {
@@ -55,7 +62,7 @@ test.describe('signed in', () => {
   test.beforeEach(async ({ page }) => {
     await signInAs(page, { username: 'retro_fan' })
     await page.route('**/api/collections', (route) =>
-      route.fulfill({ json: [wishlist, nes] }),
+      route.fulfill({ json: [owned, wishlist, nes] }),
     )
   })
 
@@ -101,11 +108,19 @@ test.describe('signed in', () => {
       })
     })
     const linked: string[] = []
+    // The server answers with where the game is now: a custom collection
+    // brings Owned along.
+    const after: Record<string, string[]> = {
+      [`PUT ${nes.id}`]: [wishlist.id, nes.id, owned.id],
+      [`DELETE ${wishlist.id}`]: [nes.id, owned.id],
+    }
     await page.route(`**/api/collections/*/items/${itemId}`, (route) => {
-      linked.push(
-        `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
-      )
-      return route.fulfill({ status: 204 })
+      const method = route.request().method()
+      const collectionId = route.request().url().split('/').at(-3)
+      linked.push(`${method} ${route.request().url().split('/api/')[1]}`)
+      return route.fulfill({
+        json: { collectionIds: after[`${method} ${collectionId}`] },
+      })
     })
 
     await searchZelda(page)
@@ -113,8 +128,9 @@ test.describe('signed in', () => {
       .getByRole('button', { name: 'Add to collection: Zelda Game 1' })
       .click()
     const menu = page.getByRole('menu')
-    // The Wishlist comes first.
+    // Owned and the Wishlist come first.
     await expect(menu.getByRole('menuitemcheckbox')).toHaveText([
+      'Owned',
       'Wishlist',
       'NES Games',
     ])
@@ -135,6 +151,9 @@ test.describe('signed in', () => {
     await expect(
       menu.getByRole('menuitemcheckbox', { name: 'NES Games' }),
     ).toBeChecked()
+    await expect(
+      menu.getByRole('menuitemcheckbox', { name: 'Owned' }),
+    ).toBeChecked()
     await menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }).click()
     await expect(
       menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }),
@@ -148,6 +167,63 @@ test.describe('signed in', () => {
     await expect(
       page.getByRole('button', { name: 'In your collections: Zelda Game 1' }),
     ).toBeVisible()
+  })
+
+  test('unticking Owned asks first, and takes the game out of its collections', async ({
+    page,
+  }) => {
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [{ igdbId: 1, itemId }] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({
+        json: {
+          item: {
+            id: itemId,
+            igdbId: 1,
+            name: 'Zelda Game 1',
+            coverId: null,
+            data: {},
+          },
+          collectionIds: [owned.id, nes.id, wishlist.id],
+        },
+      }),
+    )
+    const removed: string[] = []
+    await page.route(`**/api/collections/*/items/${itemId}`, (route) => {
+      removed.push(
+        `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
+      )
+      return route.fulfill({ json: { collectionIds: [wishlist.id] } })
+    })
+
+    await searchZelda(page)
+    await page
+      .getByRole('button', { name: 'In your collections: Zelda Game 1' })
+      .click()
+    const box = (name: string) =>
+      page.getByRole('menu').getByRole('menuitemcheckbox', { name })
+    await box('Owned').click()
+    const dialog = page.getByRole('alertdialog')
+    await expect(
+      dialog.getByRole('heading', { name: 'Remove Zelda Game 1 from Owned?' }),
+    ).toBeVisible()
+    await expect(dialog).toContainText('This also removes it from NES Games.')
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).toBeHidden()
+    expect(removed).toEqual([])
+
+    // The menu stays open behind the question.
+    await expect(box('Owned')).toBeChecked()
+    await box('Owned').click()
+    await dialog.getByRole('button', { name: 'Remove' }).click()
+    await expect(dialog).toBeHidden()
+    await expect
+      .poll(() => removed)
+      .toEqual([`DELETE collections/${owned.id}/items/${itemId}`])
+    await expect(box('Owned')).not.toBeChecked()
+    await expect(box('NES Games')).not.toBeChecked()
+    await expect(box('Wishlist')).toBeChecked()
   })
 
   test('opening the menu again asks nothing new, and shows the latest ticks', async ({
@@ -179,7 +255,7 @@ test.describe('signed in', () => {
       }),
     )
     await page.route(`**/api/collections/${nes.id}/items/${itemId}`, (route) =>
-      route.fulfill({ status: 204 }),
+      route.fulfill({ json: { collectionIds: [wishlist.id, nes.id] } }),
     )
 
     await searchZelda(page)
@@ -353,7 +429,7 @@ test.describe('signed in', () => {
       const removed: string[] = []
       await page.route('**/api/collections/*/items/*', (route) => {
         removed.push(route.request().url().split('/api/')[1]!)
-        return route.fulfill({ status: 204 })
+        return route.fulfill({ json: { collectionIds: [] } })
       })
 
       await page.route('**/api/games/search?**', (route) =>

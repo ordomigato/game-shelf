@@ -34,7 +34,11 @@ async function shelfWith(page: Page, collections: unknown[]) {
 }
 
 test('the shelf shows collections used out of the plan', async ({ page }) => {
-  await shelfWith(page, [summary('Wishlist', 'wishlist'), summary('NES Games')])
+  await shelfWith(page, [
+    summary('Owned', 'owned'),
+    summary('Wishlist', 'wishlist'),
+    summary('NES Games'),
+  ])
   await expect(page.getByText('1 of 10 collections')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'New collection' }),
@@ -45,7 +49,11 @@ test('at the limit, New collection is off and the sidebar link explains', async 
   page,
 }) => {
   const ten = Array.from({ length: 10 }, (_, i) => summary(`Collection ${i}`))
-  await shelfWith(page, [summary('Wishlist', 'wishlist'), ...ten])
+  await shelfWith(page, [
+    summary('Owned', 'owned'),
+    summary('Wishlist', 'wishlist'),
+    ...ten,
+  ])
   await expect(page.getByText('10 of 10 collections')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'New collection' }),
@@ -54,7 +62,7 @@ test('at the limit, New collection is off and the sidebar link explains', async 
   await page.goto('/u/retro_fan/shelf?new=1')
   await expect(
     page.getByText(
-      "You've reached 10 collections, the most your plan allows. The Wishlist doesn't count.",
+      "You've reached 10 collections, the most your plan allows. Owned and the Wishlist don't count.",
     ),
   ).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -134,12 +142,12 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
   ).toBeVisible()
   const free = page.getByRole('region', { name: 'Free' })
   await expect(
-    free.getByText('10 collections, plus the Wishlist'),
+    free.getByText('10 collections, plus Owned and the Wishlist'),
   ).toBeVisible()
   await expect(free.getByText('3,000 games in total')).toBeVisible()
   const pro = page.getByRole('region', { name: 'Pro' })
   await expect(
-    pro.getByText('100 collections, plus the Wishlist'),
+    pro.getByText('100 collections, plus Owned and the Wishlist'),
   ).toBeVisible()
   await expect(pro.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
   const max = page.getByRole('region', { name: 'Max' })

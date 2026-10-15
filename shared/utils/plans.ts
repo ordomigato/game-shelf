@@ -16,7 +16,7 @@ import { MAX_FIELDS } from './field-changes'
 export type Plan = 'free' | 'pro' | 'max'
 
 export interface PlanLimits {
-  /** Collections, not counting the Wishlist. */
+  /** Collections, not counting Owned and the Wishlist. */
   collections: number
   fieldsPerCollection: number
   gamesPerCollection: number

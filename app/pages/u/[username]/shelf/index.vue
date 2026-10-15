@@ -44,12 +44,12 @@ useHead(() => ({
 
 const creating = ref(false)
 
-// The plan's collection limit (the Wishlist doesn't count), shown next to
-// New collection so reaching it never comes as a surprise.
+// The plan's collection limit (Owned and the Wishlist don't count), shown
+// next to New collection so reaching it never comes as a surprise.
 const { limits } = usePlan()
 const ownCollections = computed(
   () =>
-    (data.value ?? []).filter((collection) => collection.kind !== 'wishlist')
+    (data.value ?? []).filter((collection) => collection.kind === 'custom')
       .length,
 )
 const atLimit = computed(() => ownCollections.value >= limits.value.collections)

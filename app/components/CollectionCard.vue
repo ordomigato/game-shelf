@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Heart, Lock } from '@lucide/vue'
+import { Gamepad2, Heart, Lock } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 defineProps<{
@@ -23,6 +23,11 @@ const titleOf = useCollectionTitle()
       >
         <Heart
           v-if="collection.kind === 'wishlist'"
+          class="size-4 text-primary"
+          aria-hidden="true"
+        />
+        <Gamepad2
+          v-else-if="collection.kind === 'owned'"
           class="size-4 text-primary"
           aria-hidden="true"
         />

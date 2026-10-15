@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GripVertical, Heart, Pin, PinOff } from '@lucide/vue'
+import { Gamepad2, GripVertical, Heart, Pin, PinOff } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /**
@@ -45,6 +45,12 @@ function onGripKey(event: KeyboardEvent) {
       <Heart
         v-if="collection.kind === 'wishlist'"
         class="size-2.5 shrink-0 fill-current text-primary"
+        :class="markClass"
+        aria-hidden="true"
+      />
+      <Gamepad2
+        v-else-if="collection.kind === 'owned'"
+        class="size-3 shrink-0 text-primary"
         :class="markClass"
         aria-hidden="true"
       />

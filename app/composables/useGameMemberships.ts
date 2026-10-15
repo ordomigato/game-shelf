@@ -60,23 +60,16 @@ export function useGameMemberships() {
     change({ ...entries.value, [igdbId]: membership })
   }
 
-  /** Records an item going into a collection, or coming out of one. */
-  function link(itemId: string, collectionId: string, linked: boolean) {
+  /** Records the collections an item is in after a change. */
+  function setCollections(itemId: string, collectionIds: string[]) {
     change(
       Object.fromEntries(
-        Object.entries(entries.value).map(([igdbId, membership]) => {
-          if (membership.item?.id !== itemId) return [igdbId, membership]
-          const others = membership.collectionIds.filter(
-            (id) => id !== collectionId,
-          )
-          return [
-            igdbId,
-            {
-              ...membership,
-              collectionIds: linked ? [...others, collectionId] : others,
-            },
-          ]
-        }),
+        Object.entries(entries.value).map(([igdbId, membership]) => [
+          igdbId,
+          membership.item?.id === itemId
+            ? { ...membership, collectionIds }
+            : membership,
+        ]),
       ),
     )
   }
@@ -100,5 +93,5 @@ export function useGameMemberships() {
     change({})
   }
 
-  return { get, set, link, forgetGame, forgetItem, clear }
+  return { get, set, setCollections, forgetGame, forgetItem, clear }
 }

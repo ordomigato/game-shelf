@@ -16,7 +16,7 @@ export interface Me {
 /** How much of their plan a user has used, for Settings. */
 export interface PlanUsage {
   plan: Plan
-  /** Collections, not counting the Wishlist. */
+  /** Collections, not counting Owned and the Wishlist. */
   collections: number
   /** Games across all collections, each counted once. */
   games: number

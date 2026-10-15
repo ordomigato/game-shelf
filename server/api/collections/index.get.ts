@@ -1,6 +1,6 @@
 import type { CollectionSummary } from '../../../shared/types/collection'
 
-/** The signed-in user's collections, Wishlist first, with their sidebar pins. */
+/** The signed-in user's collections, Owned and the Wishlist first, with pins. */
 export default defineEventHandler(
   async (event): Promise<CollectionSummary[]> => {
     const { sub } = await requireAuth(event)

@@ -1,4 +1,14 @@
-import { and, asc, count, eq, inArray, isNotNull, max, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  eq,
+  inArray,
+  isNotNull,
+  max,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { createError } from 'h3'
 import type { ChartWidget } from '../../shared/types/charts'
 import type {
@@ -9,6 +19,8 @@ import type {
   BlueprintSummary,
   CollectionDetail,
   CollectionEntry,
+  CollectionKind,
+  CollectionLink,
   CollectionSummary,
   FieldDefinition,
   ItemData,
@@ -22,6 +34,7 @@ import {
   type OptionRenames,
 } from '../../shared/utils/field-changes'
 import { copyFields, copyValues } from '../../shared/utils/blueprint-names'
+import { isBuiltIn } from '../../shared/utils/collection-kind'
 import { applyFieldValues } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import {
@@ -103,51 +116,136 @@ export function toLibraryItem(
 }
 
 /**
- * Creates the user's Wishlist (with an empty blueprint) if they don't have
- * one. Called when the user's row is first created.
+ * The lists every user has, in the order they're listed and pinned. Their
+ * titles are stored in English and shown in the reader's language.
  */
-export async function ensureWishlist(ownerId: string): Promise<void> {
+const BUILT_IN_LISTS = [
+  { kind: 'owned', title: 'Owned', slug: 'owned', pin: 1 },
+  { kind: 'wishlist', title: 'Wishlist', slug: 'wishlist', pin: 2 },
+] as const
+
+/**
+ * Creates the user's Owned list and Wishlist (each with an empty blueprint)
+ * if they don't have them, pinned to the sidebar with Owned first. Called
+ * when the user's row is first created.
+ */
+export async function ensureBuiltInLists(ownerId: string): Promise<void> {
   const db = useDb()
-  const [existing] = await db
-    .select({ id: collections.id })
+  const existing = await db
+    .select({ kind: collections.kind })
     .from(collections)
     .where(
-      and(eq(collections.ownerId, ownerId), eq(collections.kind, 'wishlist')),
+      and(
+        eq(collections.ownerId, ownerId),
+        inArray(
+          collections.kind,
+          BUILT_IN_LISTS.map((list) => list.kind),
+        ),
+      ),
     )
-  if (existing) return
-
-  const blueprintId = crypto.randomUUID()
-  const [, inserted] = await db.batch([
-    db.insert(blueprints).values({
-      id: blueprintId,
-      ownerId,
-      fields: starterFields('wishlist'),
+  const have = new Set<CollectionKind>(existing.map((row) => row.kind))
+  const missing = BUILT_IN_LISTS.filter((list) => !have.has(list.kind))
+  await Promise.all(
+    missing.map(async (list) => {
+      const blueprintId = crypto.randomUUID()
+      const [, inserted] = await db.batch([
+        db.insert(blueprints).values({
+          id: blueprintId,
+          ownerId,
+          fields: starterFields(list.kind),
+        }),
+        db
+          .insert(collections)
+          .values({
+            ownerId,
+            blueprintId,
+            title: list.title,
+            slug: list.slug,
+            kind: list.kind,
+          })
+          .onConflictDoNothing()
+          .returning({ id: collections.id }),
+      ])
+      // Another request created it first: drop the unused blueprint.
+      if (inserted.length === 0) {
+        await db.delete(blueprints).where(eq(blueprints.id, blueprintId))
+        return
+      }
+      await db
+        .insert(pinnedCollections)
+        .values({
+          userId: ownerId,
+          collectionId: inserted[0]!.id,
+          position: list.pin,
+        })
+        .onConflictDoNothing()
     }),
-    db
-      .insert(collections)
-      .values({
-        ownerId,
-        blueprintId,
-        title: 'Wishlist',
-        slug: 'wishlist',
-        kind: 'wishlist',
-      })
-      .onConflictDoNothing()
-      .returning({ id: collections.id }),
-  ])
-  // Another request created it first: drop the unused blueprint.
-  if (inserted.length === 0) {
-    await db.delete(blueprints).where(eq(blueprints.id, blueprintId))
-    return
-  }
-  // New users start with their Wishlist pinned to the sidebar.
-  await db
-    .insert(pinnedCollections)
-    .values({ userId: ownerId, collectionId: inserted[0]!.id, position: 1 })
-    .onConflictDoNothing()
+  )
 }
 
-/** A user's collections, Wishlist first, with item counts. */
+/** The id of the user's Owned list, created first if it's missing. */
+export async function ownedListId(ownerId: string): Promise<string> {
+  const find = async () => {
+    const [row] = await useDb()
+      .select({ id: collections.id })
+      .from(collections)
+      .where(
+        and(eq(collections.ownerId, ownerId), eq(collections.kind, 'owned')),
+      )
+    return row?.id
+  }
+  const found = await find()
+  if (found) return found
+  await ensureBuiltInLists(ownerId)
+  const created = await find()
+  if (!created) throw new Error('Owned list missing after creating it')
+  return created
+}
+
+/**
+ * The collections a game goes into when it's put into these: the same
+ * ones, plus the user's Owned list when any of them is a custom
+ * collection, since everything in a collection is owned. 404 when one
+ * isn't the user's.
+ */
+async function withOwnedList(
+  ownerId: string,
+  collectionIds: string[],
+): Promise<string[]> {
+  const asked = [...new Set(collectionIds)]
+  const rows = await useDb()
+    .select({ id: collections.id, kind: collections.kind })
+    .from(collections)
+    .where(
+      and(
+        eq(collections.ownerId, ownerId),
+        or(inArray(collections.id, asked), eq(collections.kind, 'owned')),
+      ),
+    )
+  const found = rows.filter((row) => asked.includes(row.id))
+  if (found.length !== asked.length) throw notFound()
+  if (!found.some((row) => row.kind === 'custom')) return asked
+  const owned =
+    rows.find((row) => row.kind === 'owned')?.id ?? (await ownedListId(ownerId))
+  return asked.includes(owned) ? asked : [...asked, owned]
+}
+
+/** The last position in each of these collections, by collection id. */
+async function lastPositions(
+  collectionIds: string[],
+): Promise<Map<string, number>> {
+  const ends = await useDb()
+    .select({
+      id: collectionItems.collectionId,
+      last: max(collectionItems.position),
+    })
+    .from(collectionItems)
+    .where(inArray(collectionItems.collectionId, collectionIds))
+    .groupBy(collectionItems.collectionId)
+  return new Map(ends.map((row) => [row.id, row.last ?? 0]))
+}
+
+/** A user's collections, Owned and the Wishlist first, with item counts. */
 export async function listCollections(
   ownerId: string,
   options: { publicOnly: boolean },
@@ -166,11 +264,13 @@ export async function listCollections(
       ),
     )
     .groupBy(collections.id)
-    .orderBy(sql`${collections.kind} = 'wishlist' desc`, asc(collections.title))
+    .orderBy(
+      sql`case ${collections.kind} when 'owned' then 0 when 'wishlist' then 1 else 2 end`,
+      asc(collections.title),
+    )
   return rows.map((row) => toSummary(row.collection, row.itemCount))
 }
 
-/** One collection with its blueprint and items, or 404 if it isn't visible. */
 /**
  * Which of a collection's items are also on the owner's Wishlist, or null
  * when that isn't shown: on the Wishlist itself, or to visitors while the
@@ -206,6 +306,43 @@ async function wishlistedItemIds(
   return new Set(rows.map((row) => row.itemId))
 }
 
+/**
+ * For the Owned list: the owner's custom collections each item is in, by
+ * title. Visitors see only the public ones.
+ */
+async function customCollectionsOf(
+  ownerId: string,
+  itemIds: string[],
+  viewerIsOwner: boolean,
+): Promise<Map<string, CollectionLink[]>> {
+  const byItem = new Map<string, CollectionLink[]>()
+  if (!itemIds.length) return byItem
+  const rows = await useDb()
+    .select({
+      itemId: collectionItems.itemId,
+      id: collections.id,
+      title: collections.title,
+      slug: collections.slug,
+      color: collections.color,
+    })
+    .from(collectionItems)
+    .innerJoin(collections, eq(collections.id, collectionItems.collectionId))
+    .where(
+      and(
+        eq(collections.ownerId, ownerId),
+        eq(collections.kind, 'custom'),
+        viewerIsOwner ? undefined : eq(collections.visibility, 'public'),
+        inArray(collectionItems.itemId, itemIds),
+      ),
+    )
+    .orderBy(sql`lower(${collections.title})`)
+  for (const { itemId, ...link } of rows) {
+    byItem.set(itemId, [...(byItem.get(itemId) ?? []), link])
+  }
+  return byItem
+}
+
+/** One collection with its blueprint and items, or 404 if it isn't visible. */
 export async function getCollectionBySlug(
   ownerId: string,
   slug: string,
@@ -233,16 +370,20 @@ export async function getCollectionBySlug(
     .where(eq(collectionItems.collectionId, found.collection.id))
     .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
 
-  const wishlisted = await wishlistedItemIds(
-    ownerId,
-    found.collection,
-    entries.map((entry) => entry.item.id),
-    viewerIsOwner,
-  )
+  const itemIds = entries.map((entry) => entry.item.id)
+  const [wishlisted, inCollections] = await Promise.all([
+    wishlistedItemIds(ownerId, found.collection, itemIds, viewerIsOwner),
+    found.collection.kind === 'owned'
+      ? customCollectionsOf(ownerId, itemIds, viewerIsOwner)
+      : null,
+  ])
   const items: CollectionEntry[] = entries.map((entry) => ({
     ...toLibraryItem(entry.item, entry.game),
     addedAt: entry.addedAt.toISOString(),
     ...(wishlisted && { wishlisted: wishlisted.has(entry.item.id) }),
+    ...(inCollections && {
+      inCollections: inCollections.get(entry.item.id) ?? [],
+    }),
   }))
   const blueprint = toBlueprint(found.blueprint)
   if (viewerIsOwner) {
@@ -507,7 +648,10 @@ export async function createCollection(
   }
 }
 
-/** Renames or edits a custom collection. The Wishlist's title is fixed. */
+/**
+ * Renames or edits a collection. The titles of Owned and the Wishlist are
+ * fixed.
+ */
 export async function updateCollection(
   ownerId: string,
   collectionId: string,
@@ -519,10 +663,10 @@ export async function updateCollection(
   },
 ): Promise<CollectionSummary> {
   const current = await getOwnedCollection(ownerId, collectionId)
-  if (changes.title !== undefined && current.kind === 'wishlist') {
+  if (changes.title !== undefined && isBuiltIn(current.kind)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Wishlist title is fixed',
+      statusMessage: 'Built-in list title is fixed',
     })
   }
   try {
@@ -563,10 +707,10 @@ export async function deleteCollection(
   collectionId: string,
 ): Promise<void> {
   const current = await getOwnedCollection(ownerId, collectionId)
-  if (current.kind === 'wishlist') {
+  if (isBuiltIn(current.kind)) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Wishlist cannot be deleted',
+      statusMessage: 'Built-in list cannot be deleted',
     })
   }
   const db = useDb()
@@ -641,39 +785,23 @@ export async function collectionIdsForItem(itemId: string): Promise<string[]> {
   return rows.map((row) => row.id)
 }
 
-/** Adds an item to collections the user owns, at the end of each. */
+/**
+ * Adds an item to collections the user owns, at the end of each, and to
+ * their Owned list when any is a custom collection. One statement, so the
+ * game is never in a collection without being owned.
+ */
 export async function addItemToCollections(
   ownerId: string,
   itemId: string,
   collectionIds: string[],
 ): Promise<void> {
   if (collectionIds.length === 0) return
-  const db = useDb()
-  const owned = await db
-    .select({ id: collections.id })
-    .from(collections)
-    .where(
-      and(
-        eq(collections.ownerId, ownerId),
-        inArray(collections.id, collectionIds),
-      ),
-    )
-  if (owned.length !== new Set(collectionIds).size) throw notFound()
-
-  const ends = await db
-    .select({
-      id: collectionItems.collectionId,
-      last: max(collectionItems.position),
-    })
-    .from(collectionItems)
-    .where(inArray(collectionItems.collectionId, collectionIds))
-    .groupBy(collectionItems.collectionId)
-  const lastPosition = new Map(ends.map((row) => [row.id, row.last ?? 0]))
-
-  await db
+  const targets = await withOwnedList(ownerId, collectionIds)
+  const lastPosition = await lastPositions(targets)
+  await useDb()
     .insert(collectionItems)
     .values(
-      [...new Set(collectionIds)].map((collectionId) => ({
+      targets.map((collectionId) => ({
         collectionId,
         itemId,
         position: (lastPosition.get(collectionId) ?? 0) + 1,
@@ -685,8 +813,10 @@ export async function addItemToCollections(
 /**
  * Moves an item from one of the user's collections to others, like "Got
  * it" taking a game off the Wishlist into a collection. It goes at the end
- * of each target. Adding and removing happen in one batch, so the game is
- * never in neither.
+ * of each target, and into the Owned list too when a target is a custom
+ * collection. Adding and removing happen in one batch, so the game is
+ * never in neither. Nothing moves out of Owned (400): a game leaves Owned
+ * only by being removed, which takes it out of the custom collections too.
  */
 export async function moveItemToCollections(
   ownerId: string,
@@ -703,7 +833,13 @@ export async function moveItemToCollections(
       statusMessage: 'No target collection',
     })
   }
-  await getOwnedCollection(ownerId, fromCollectionId)
+  const from = await getOwnedCollection(ownerId, fromCollectionId)
+  if (from.kind === 'owned') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Games cannot be moved out of Owned',
+    })
+  }
   const db = useDb()
   const [membership] = await db
     .select({ itemId: collectionItems.itemId })
@@ -715,29 +851,14 @@ export async function moveItemToCollections(
       ),
     )
   if (!membership) throw notFound()
-  const owned = await db
-    .select({ id: collections.id })
-    .from(collections)
-    .where(
-      and(eq(collections.ownerId, ownerId), inArray(collections.id, targets)),
-    )
-  if (owned.length !== targets.length) throw notFound()
-
-  const ends = await db
-    .select({
-      id: collectionItems.collectionId,
-      last: max(collectionItems.position),
-    })
-    .from(collectionItems)
-    .where(inArray(collectionItems.collectionId, targets))
-    .groupBy(collectionItems.collectionId)
-  const lastPosition = new Map(ends.map((row) => [row.id, row.last ?? 0]))
+  const into = await withOwnedList(ownerId, targets)
+  const lastPosition = await lastPositions(into)
 
   await db.batch([
     db
       .insert(collectionItems)
       .values(
-        targets.map((collectionId) => ({
+        into.map((collectionId) => ({
           collectionId,
           itemId,
           position: (lastPosition.get(collectionId) ?? 0) + 1,
@@ -755,16 +876,35 @@ export async function moveItemToCollections(
   ])
 }
 
+/**
+ * Takes an item out of one of the user's collections (404 if it isn't
+ * theirs). Out of Owned, it also leaves every custom collection, but not
+ * the Wishlist, in the same statement.
+ */
 export async function removeItemFromCollection(
+  ownerId: string,
   collectionId: string,
   itemId: string,
 ): Promise<void> {
-  await useDb()
+  const collection = await getOwnedCollection(ownerId, collectionId)
+  const db = useDb()
+  const ownedOrCustom = db
+    .select({ id: collections.id })
+    .from(collections)
+    .where(
+      and(
+        eq(collections.ownerId, ownerId),
+        inArray(collections.kind, ['owned', 'custom']),
+      ),
+    )
+  await db
     .delete(collectionItems)
     .where(
       and(
-        eq(collectionItems.collectionId, collectionId),
         eq(collectionItems.itemId, itemId),
+        collection.kind === 'owned'
+          ? inArray(collectionItems.collectionId, ownedOrCustom)
+          : eq(collectionItems.collectionId, collection.id),
       ),
     )
 }

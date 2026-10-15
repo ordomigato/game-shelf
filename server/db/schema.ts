@@ -17,7 +17,11 @@ import {
 } from 'drizzle-orm/pg-core'
 import type { CustomLimits } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
-import type { FieldDefinition, ItemData } from '../../shared/types/collection'
+import type {
+  CollectionKind,
+  FieldDefinition,
+  ItemData,
+} from '../../shared/types/collection'
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -30,7 +34,11 @@ const timestamps = {
 }
 
 export const visibility = pgEnum('visibility', ['private', 'public'])
-export const collectionKind = pgEnum('collection_kind', ['custom', 'wishlist'])
+export const collectionKind = pgEnum('collection_kind', [
+  'custom',
+  'wishlist',
+  'owned',
+])
 
 export const users = pgTable(
   'users',
@@ -99,7 +107,14 @@ export const collections = pgTable(
     /** A hex code like `#7c3aed`. Null means a colour from the title. */
     color: text('color'),
     visibility: visibility('visibility').notNull().default('private'),
-    kind: collectionKind('kind').notNull().default('custom'),
+    /**
+     * Narrowed to the kinds the app handles, so code can't write a newer
+     * enum value before the release that added it is in production.
+     */
+    kind: collectionKind('kind')
+      .$type<CollectionKind>()
+      .notNull()
+      .default('custom'),
     /** The charts on the collection's dashboard, in order. */
     dashboard: jsonb('dashboard').$type<ChartWidget[]>().notNull().default([]),
     ...timestamps,

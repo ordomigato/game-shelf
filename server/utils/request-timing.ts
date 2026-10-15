@@ -1,4 +1,7 @@
-import { useEvent } from 'nitropack/runtime'
+// The module Nitro auto-imports `useEvent` from. Unlike 'nitropack/runtime'
+// it pulls in none of Nitro's virtual modules, so scripts run with tsx
+// outside Nitro can import the database and IGDB helpers.
+import { useEvent } from 'nitropack/runtime/internal/context'
 
 /** Time a request spent waiting on each outside service, and how often. */
 export interface RequestTimings {

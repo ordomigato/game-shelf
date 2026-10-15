@@ -253,7 +253,7 @@ export function useCollections() {
         ),
       ),
 
-    /** Renames the user's own copy of a game, in all their collections. */
+    /** Renames a game added by hand, in all the user's collections. */
     renameItem: (itemId: string, name: string) =>
       auth.apiFetch<LibraryItem>(`/api/library-items/${itemId}`, {
         method: 'PATCH',

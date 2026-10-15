@@ -100,7 +100,21 @@ so render a placeholder rather than a broken image.
 
 ## Storing games
 
-IGDB only pre-fills. When a user adds a game, the item copies `name`,
-`coverId` and `igdbId` into its own row, and from then on the user owns
-that data and can edit it. ThisPlayShelf doesn't mirror IGDB's catalog. Pages
-render from the database, so don't call IGDB per item on page load.
+ThisPlayShelf keeps its own catalog of the IGDB games people have added:
+`games` (name, cover, release date, genres, platform ids) and `platforms`
+(names), shared by every user and read-only to them. Only the server
+writes it, from what IGDB returns, through `ensureCatalogGames(ids)` in
+`server/utils/catalog.ts`. It never takes a name or cover from a request
+body. A game is read from IGDB when it's missing from the catalog or was
+last read more than 30 days ago (`CATALOG_MAX_AGE_MS`).
+
+A user's library item links to the catalog by `igdb_id`. Its name, cover,
+year and genres come from the catalog row (`catalogJoin`, `itemName`,
+`itemCoverId` and `toLibraryItem` in `server/utils/collections.ts`), so
+IGDB games can't be renamed. A game added by hand (`igdb_id` null) has no
+catalog row and keeps its own name, which the user can change. Until the
+catalog has read a game from IGDB, the item's own name and cover stand in.
+
+Pages render from the database, so don't call IGDB per item on page load.
+`scripts/fill-catalog.ts` fills the catalog for every game already in a
+library, run through `sst shell`.

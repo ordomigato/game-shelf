@@ -35,9 +35,13 @@ export async function listExplore(page: number): Promise<ExplorePage> {
       (
         select json_agg(json_build_object('name', first.name, 'coverId', first.cover_id))
         from (
-          select li.name, li.cover_id
+          select
+            coalesce(g.name, li.name) as name,
+            case when g.igdb_id is null then li.cover_id else g.cover_id end as cover_id
           from collection_items as ci
           join library_items as li on li.id = ci.item_id
+          left join games as g
+            on g.igdb_id = li.igdb_id and g.fetched_at is not null
           where ci.collection_id = c.id
           order by ci.position, ci.added_at
           limit 4

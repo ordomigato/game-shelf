@@ -621,7 +621,7 @@
   },
   "rename": {
     "title": "Rename game",
-    "description": "Changes the name in all your collections. The game stays linked to its IGDB page.",
+    "description": "Changes the name in all your collections.",
     "name": "Name",
     "cancel": "Cancel",
     "save": "Save",

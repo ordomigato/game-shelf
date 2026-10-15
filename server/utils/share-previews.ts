@@ -8,7 +8,8 @@ import {
   shelfPreview,
   type SharePreview,
 } from '../../shared/utils/share-preview'
-import { collectionItems, collections, libraryItems } from '../db/schema'
+import { collectionItems, collections, games, libraryItems } from '../db/schema'
+import { catalogJoin, itemCoverId } from './collections'
 
 /**
  * A message in English, the only language so far. Plural messages pick a
@@ -119,13 +120,14 @@ export async function findSharePreview(
       .from(collectionItems)
       .where(eq(collectionItems.collectionId, collection.id)),
     db
-      .select({ coverId: libraryItems.coverId })
+      .select({ coverId: itemCoverId })
       .from(collectionItems)
       .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
+      .leftJoin(games, catalogJoin)
       .where(
         and(
           eq(collectionItems.collectionId, collection.id),
-          isNotNull(libraryItems.coverId),
+          isNotNull(itemCoverId),
         ),
       )
       .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))

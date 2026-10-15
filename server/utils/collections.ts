@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, max, sql } from 'drizzle-orm'
+import { and, asc, count, eq, inArray, isNotNull, max, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import type { ChartWidget } from '../../shared/types/charts'
 import type {
@@ -32,6 +32,7 @@ import {
   blueprints,
   collectionItems,
   collections,
+  games as catalogGames,
   libraryItems,
   pinnedCollections,
 } from '../db/schema'
@@ -41,6 +42,7 @@ import { positionBetween } from './positions'
 type CollectionRow = typeof collections.$inferSelect
 type BlueprintRow = typeof blueprints.$inferSelect
 type ItemRow = typeof libraryItems.$inferSelect
+type CatalogGameRow = typeof catalogGames.$inferSelect
 
 const notFound = () =>
   createError({ statusCode: 404, statusMessage: 'Not found' })
@@ -63,12 +65,39 @@ function toBlueprint(row: BlueprintRow): Blueprint {
   return { id: row.id, name: row.name, shared: row.shared, fields: row.fields }
 }
 
-export function toLibraryItem(row: ItemRow): LibraryItem {
+/**
+ * Joins an item to its catalog game, once the catalog has read that game
+ * from IGDB. Use with `leftJoin(games, ...)`, so items without one stay.
+ */
+export const catalogJoin = and(
+  eq(catalogGames.igdbId, libraryItems.igdbId),
+  isNotNull(catalogGames.fetchedAt),
+)
+
+/** The name to show for an item: its catalog game's, else its own. */
+export const itemName = sql<string>`coalesce(${catalogGames.name}, ${libraryItems.name})`
+
+/** The cover to show for an item: its catalog game's, else its own. */
+export const itemCoverId = sql<
+  string | null
+>`case when ${catalogGames.igdbId} is null then ${libraryItems.coverId} else ${catalogGames.coverId} end`
+
+/**
+ * An item as the browser sees it. An IGDB game's name, cover, year and
+ * genres come from its catalog row (from `catalogJoin`), and the item's own
+ * name and cover are used when there's none.
+ */
+export function toLibraryItem(
+  row: ItemRow,
+  game: CatalogGameRow | null,
+): LibraryItem {
   return {
     id: row.id,
     igdbId: row.igdbId,
-    name: row.name,
-    coverId: row.coverId,
+    name: game ? game.name : row.name,
+    coverId: game ? game.coverId : row.coverId,
+    year: game?.releaseDate ? Number(game.releaseDate.slice(0, 4)) : null,
+    genres: game?.genres ?? [],
     data: row.data,
   }
 }
@@ -193,9 +222,14 @@ export async function getCollectionBySlug(
     throw notFound()
 
   const entries = await db
-    .select({ item: libraryItems, addedAt: collectionItems.addedAt })
+    .select({
+      item: libraryItems,
+      game: catalogGames,
+      addedAt: collectionItems.addedAt,
+    })
     .from(collectionItems)
     .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
+    .leftJoin(catalogGames, catalogJoin)
     .where(eq(collectionItems.collectionId, found.collection.id))
     .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
 
@@ -206,7 +240,7 @@ export async function getCollectionBySlug(
     viewerIsOwner,
   )
   const items: CollectionEntry[] = entries.map((entry) => ({
-    ...toLibraryItem(entry.item),
+    ...toLibraryItem(entry.item, entry.game),
     addedAt: entry.addedAt.toISOString(),
     ...(wishlisted && { wishlisted: wishlisted.has(entry.item.id) }),
   }))
@@ -826,11 +860,16 @@ export async function updateItemValues(
 ): Promise<LibraryItem> {
   const db = useDb()
   const [found] = await db
-    .select({ item: libraryItems, fields: blueprints.fields })
+    .select({
+      item: libraryItems,
+      game: catalogGames,
+      fields: blueprints.fields,
+    })
     .from(collectionItems)
     .innerJoin(collections, eq(collections.id, collectionItems.collectionId))
     .innerJoin(blueprints, eq(blueprints.id, collections.blueprintId))
     .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
+    .leftJoin(catalogGames, catalogJoin)
     .where(
       and(
         eq(collectionItems.collectionId, collectionId),
@@ -853,7 +892,7 @@ export async function updateItemValues(
     .set({ data: result.data })
     .where(eq(libraryItems.id, itemId))
     .returning()
-  return toLibraryItem(updated!)
+  return toLibraryItem(updated!, found.game)
 }
 
 /**

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."collection_kind" ADD VALUE 'owned';

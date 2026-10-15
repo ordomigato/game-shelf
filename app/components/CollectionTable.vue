@@ -40,8 +40,8 @@ import type {
 /**
  * A collection's games as a table: one column per field in its blueprint.
  * Anyone can sort by a column, search, and filter by select and checkbox
- * fields. Owners edit values in place, rename and remove games, and put games in
- * their own order by dragging or from the row menu.
+ * fields. Owners edit values in place, remove games, rename games added by
+ * hand, and put games in their own order by dragging or from the row menu.
  */
 const props = defineProps<{
   fields: FieldDefinition[]
@@ -622,7 +622,10 @@ const addedFormat = computed(
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </template>
-                  <DropdownMenuItem @select="emit('rename', item.id)">
+                  <DropdownMenuItem
+                    v-if="item.igdbId === null"
+                    @select="emit('rename', item.id)"
+                  >
                     <Pencil /> {{ $t('table.rename') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem

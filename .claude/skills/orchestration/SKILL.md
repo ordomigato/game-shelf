@@ -97,8 +97,9 @@ Every agent prompt includes:
   `commit-conventions`, `plain-language`, `i18n`, `ui-conventions`; plus
   `postgres-change`, `auth`, `igdb`, `aws-infra` when they apply). Match the
   surrounding code's style and comment density.
-- **How to verify:** the block above, with its own `verify-<branch>` folder
-  and `E2E_PORT`.
+- **How to verify:** smoke tests while working (see `release-gate`, "When
+  to run what"), then the block above **once** at the end, with its own
+  `verify-<branch>` folder and `E2E_PORT`.
 - **Commit, don't push.** Conventional commits, ending with the
   co-author line from the session's attribution rules.
 - **What to report back:** the branch and commit(s); what changed, file by
@@ -109,7 +110,8 @@ Every agent prompt includes:
 ## After an agent reports
 
 1. `git log` and `git diff main...<branch>` on its branch. Read the diff.
-2. Rerun the checks when the change is risky, or if the report is vague.
+2. Rerun checks only when the change is risky or the report is vague, and
+   then only the parts in doubt. The agent's full run counts.
 3. Apply any migration to dev (`npm run db:migrate`) only after reading it.
 4. Push and open the PR (or hand the branch to the user to try first, when
    it's UI they review on their `sst dev`).
@@ -119,3 +121,9 @@ Every agent prompt includes:
 
 - 2026-10-15: started. The e2e port was fixed at 3100, so `E2E_PORT` was
   added for parallel agents.
+- 2026-10-15: the user asked for fewer full test runs. Agents run smoke
+  tests while working and the full set once at the end.
+- 2026-10-15: a verify copy's `.sst/platform` can go stale (the typecheck
+  then fails on `process` in `infra/`). Refresh it with
+  `rsync -a --delete <repo>/.sst/platform/ <copy>/.sst/platform/`; it's not
+  the change's fault.

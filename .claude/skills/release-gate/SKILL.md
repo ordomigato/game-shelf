@@ -36,6 +36,26 @@ it. A user-facing flow gets a Playwright test in `e2e/`. E2E tests run
 against a build without AWS, so pages that need the database or IGDB need
 those calls stubbed. Raise it when a flow can't be tested that way.
 
+## When to run what
+
+The user asked (2026-10-15) not to run the whole suite every few minutes.
+Match the checks to the moment:
+
+- **While working:** smoke tests for what changed, and nothing else.
+  - Unit tests for the touched code: `npx vitest run <files>`, or `npm test`
+    (fast) when several areas changed.
+  - Lint and format on the touched files.
+  - The typecheck when types or signatures changed.
+  - Only the e2e spec(s) for the flow you touched:
+    `npx playwright test e2e/<spec>.spec.ts`.
+- **Once, before a PR (or before reporting work as done):** the full block
+  above, both builds and all of e2e. Don't repeat it if nothing has changed
+  since it last passed.
+- **A follow-up push to an open PR:** smoke tests for the change. CI runs
+  the full set on every push anyway.
+- **Never** rerun the full suite just to double-check a passing run, or
+  after a change that only touches docs, comments or copy.
+
 ## What counts as passing
 
 - `typecheck`, `lint`: zero errors. The project starts with none, so any

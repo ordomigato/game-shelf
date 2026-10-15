@@ -11,7 +11,6 @@ import type {
   BlueprintSummary,
   FieldValue,
   LibraryItem,
-  OwnedGame,
 } from '#shared/types/collection'
 import type { PublicProfile } from '#shared/types/user'
 import type { GameMembership } from '~/composables/useGameMemberships'
@@ -103,9 +102,6 @@ export function useCollections() {
 
     /** The signed-in user's blueprints. */
     blueprints: () => auth.apiFetch<BlueprintSummary[]>('/api/blueprints'),
-
-    /** Every game in the user's collections other than the Wishlist. */
-    owned: () => auth.apiFetch<OwnedGame[]>('/api/owned'),
 
     /** Saves a collection's fields as a named set. 409 if the name is taken. */
     saveBlueprint: (collectionId: string, name: string) =>
@@ -242,13 +238,18 @@ export function useCollections() {
         ),
       ),
 
+    /**
+     * Puts an item in a collection (and in Owned, for a custom collection).
+     * Resolves with the collections it's in.
+     */
     addItem: (collectionId: string, itemId: string) =>
       refreshing(
         remembering(
-          auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
-            method: 'PUT',
-          }),
-          () => memberships.link(itemId, collectionId, true),
+          auth.apiFetch<{ collectionIds: string[] }>(
+            `/api/collections/${collectionId}/items/${itemId}`,
+            { method: 'PUT' },
+          ),
+          (saved) => memberships.setCollections(itemId, saved.collectionIds),
           () => memberships.forgetItem(itemId),
         ),
       ),
@@ -321,13 +322,18 @@ export function useCollections() {
         ),
       ),
 
+    /**
+     * Takes an item out of a collection. Out of Owned, it leaves every
+     * custom collection too. Resolves with the collections it's still in.
+     */
     removeItem: (collectionId: string, itemId: string) =>
       refreshing(
         remembering(
-          auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
-            method: 'DELETE',
-          }),
-          () => memberships.link(itemId, collectionId, false),
+          auth.apiFetch<{ collectionIds: string[] }>(
+            `/api/collections/${collectionId}/items/${itemId}`,
+            { method: 'DELETE' },
+          ),
+          (saved) => memberships.setCollections(itemId, saved.collectionIds),
           () => memberships.forgetItem(itemId),
         ),
       ),

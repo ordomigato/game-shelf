@@ -29,7 +29,8 @@ describe('starterFields', () => {
     expect(starterFields('blank')).toEqual([])
   })
 
-  it('starts the Wishlist with no fields', () => {
+  it('starts the Wishlist and Owned with no fields', () => {
     expect(starterFields('wishlist')).toEqual([])
+    expect(starterFields('owned')).toEqual([])
   })
 })

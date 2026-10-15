@@ -4,10 +4,12 @@ import { toast } from 'vue-sonner'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /**
- * The "Add to collection" menu for an IGDB game: the Wishlist first, then
- * the user's collections as checkboxes. Each tick saves straight away. A
- * game is one library item however many collections it's in, so the first
- * tick creates the item and later ticks only link it. The collections
+ * The "Add to collection" menu for an IGDB game: Owned and the Wishlist
+ * first, then the user's collections as checkboxes. Each tick saves
+ * straight away. A game is one library item however many collections it's
+ * in, so the first tick creates the item and later ticks only link it.
+ * Ticking a collection ticks Owned too, and unticking Owned (after asking)
+ * unticks the collections. The collections
  * come from the sidebar's list and the game's ticks are remembered, so
  * opening the menu again doesn't ask the server again.
  */
@@ -28,6 +30,7 @@ const route = useRoute()
 const collections = useCollections()
 const myCollections = useMyCollections()
 const titleOf = useCollectionTitle()
+const unown = useUnownConfirm()
 
 const open = ref(false)
 const loading = ref(false)
@@ -80,9 +83,25 @@ function setSelected(ids: Iterable<string>) {
   tracked.value = selected.value.size > 0
 }
 
+/**
+ * Before unticking Owned: the custom collections the game would leave too,
+ * confirmed. False when the person cancels.
+ */
+async function confirmUnown(collection: CollectionSummary) {
+  if (collection.kind !== 'owned') return true
+  const others = lists.value.filter(
+    (other) => other.kind === 'custom' && selected.value.has(other.id),
+  )
+  return unown.confirm(
+    props.game.name,
+    others.map((other) => titleOf(other)),
+  )
+}
+
 async function toggle(collection: CollectionSummary, checked: boolean) {
   const id = collection.id
   if (saving.value.has(id)) return
+  if (!checked && !(await confirmUnown(collection))) return
   saving.value = new Set(saving.value).add(id)
   error.value = ''
   const before = selected.value
@@ -96,9 +115,11 @@ async function toggle(collection: CollectionSummary, checked: boolean) {
       itemId.value = added.item.id
       setSelected(added.collectionIds)
     } else if (checked) {
-      await collections.addItem(id, itemId.value!)
+      const saved = await collections.addItem(id, itemId.value!)
+      setSelected(saved.collectionIds)
     } else {
-      await collections.removeItem(id, itemId.value!)
+      const saved = await collections.removeItem(id, itemId.value!)
+      setSelected(saved.collectionIds)
     }
   } catch (error) {
     setSelected(before)

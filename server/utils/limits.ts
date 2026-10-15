@@ -39,7 +39,7 @@ export function limitReached(limit: keyof PlanLimits, value: number): never {
   })
 }
 
-/** Room for one more collection (the Wishlist doesn't count). */
+/** Room for one more collection (Owned and the Wishlist don't count). */
 export async function assertCollectionRoom(
   ownerId: string,
   limits: PlanLimits,
@@ -48,7 +48,7 @@ export async function assertCollectionRoom(
     .select({ n: count() })
     .from(collections)
     .where(
-      and(eq(collections.ownerId, ownerId), ne(collections.kind, 'wishlist')),
+      and(eq(collections.ownerId, ownerId), eq(collections.kind, 'custom')),
     )
   if ((row?.n ?? 0) >= limits.collections) {
     limitReached('collections', limits.collections)
@@ -57,7 +57,8 @@ export async function assertCollectionRoom(
 
 /**
  * Room for `adding` more games in each of these collections. Games already
- * in a collection don't need room, so pass only the ones being added.
+ * in a collection don't need room, so pass only the ones being added. The
+ * Owned list has no limit of its own (the library's applies).
  */
 export async function assertCollectionsRoom(
   collectionIds: string[],
@@ -66,14 +67,17 @@ export async function assertCollectionsRoom(
 ): Promise<void> {
   if (!collectionIds.length || adding <= 0) return
   const rows = await useDb()
-    .select({ id: collectionItems.collectionId, n: count() })
-    .from(collectionItems)
-    .where(inArray(collectionItems.collectionId, collectionIds))
-    .groupBy(collectionItems.collectionId)
+    .select({ id: collections.id, n: count(collectionItems.itemId) })
+    .from(collections)
+    .leftJoin(collectionItems, eq(collectionItems.collectionId, collections.id))
+    .where(
+      and(
+        inArray(collections.id, collectionIds),
+        ne(collections.kind, 'owned'),
+      ),
+    )
+    .groupBy(collections.id)
   if (rows.some((row) => row.n + adding > limits.gamesPerCollection)) {
-    limitReached('gamesPerCollection', limits.gamesPerCollection)
-  }
-  if (adding > limits.gamesPerCollection) {
     limitReached('gamesPerCollection', limits.gamesPerCollection)
   }
 }
@@ -114,7 +118,7 @@ export async function usage(ownerId: string) {
       .select({ n: count() })
       .from(collections)
       .where(
-        and(eq(collections.ownerId, ownerId), ne(collections.kind, 'wishlist')),
+        and(eq(collections.ownerId, ownerId), eq(collections.kind, 'custom')),
       ),
     db
       .select({ n: count() })

@@ -112,7 +112,7 @@
     "maxPrice": "Let's talk",
     "maxBlurb": "For the very biggest shelves, consider custom limits, set to fit your collection needs.",
     "maxCta": "Get in touch",
-    "collections": "{count} collections, plus the Wishlist",
+    "collections": "{count} collections, plus Owned and the Wishlist",
     "games": "{count} games in total",
     "gamesPerCollection": "{count} games per collection",
     "fields": "{count} fields per collection",
@@ -136,12 +136,12 @@
     "planFree": "Free plan",
     "planPro": "Pro plan",
     "planMax": "Max plan",
-    "planDescription": "What your shelf can hold. The Wishlist doesn't count as a collection.",
+    "planDescription": "What your shelf can hold. Owned and the Wishlist don't count as collections.",
     "perCollection": "Each collection: up to {games} games, {fields} fields and {charts} charts.",
     "perValue": "Text fields up to {text} characters; CSV imports up to {rows} rows at a time.",
     "seePlans": "See plans and pricing",
     "reached": {
-      "collections": "You've reached {limit} collections, the most your plan allows. The Wishlist doesn't count.",
+      "collections": "You've reached {limit} collections, the most your plan allows. Owned and the Wishlist don't count.",
       "fieldsPerCollection": "A collection can have up to {limit} fields on your plan.",
       "gamesPerCollection": "A collection can hold up to {limit} games on your plan.",
       "games": "Your shelf can hold up to {limit} games on your plan.",
@@ -397,7 +397,7 @@
   "collections": {
     "problems": {
       "noLetters": "Use at least one letter or number in the name.",
-      "reserved": "That name is kept for your Wishlist. Pick another one."
+      "reserved": "That name is kept for your Owned list or Wishlist. Pick another one."
     },
     "nameTaken": "You already have a collection with that name.",
     "form": {
@@ -462,6 +462,7 @@
     "loadFailed": "Couldn't load this shelf. Try again.",
     "retry": "Try again",
     "wishlist": "Wishlist",
+    "owned": "Owned",
     "memberSince": "Member since {date}"
   },
   "collection": {
@@ -563,7 +564,8 @@
     "wishlist": "Wishlist",
     "onYourWishlist": "On your Wishlist",
     "notOnYourWishlist": "Not on your Wishlist",
-    "wishlistFailed": "Couldn't update your Wishlist. Try again."
+    "wishlistFailed": "Couldn't update your Wishlist. Try again.",
+    "inCollections": "Collections"
   },
   "fieldEditor": {
     "title": "Fields",
@@ -889,18 +891,9 @@
       "failed": "Couldn't finish looking games up. The ones found are below, and the rest will be added by hand."
     }
   },
-  "ownedPage": {
-    "title": "Owned games",
-    "description": "Every game in your collections, apart from the Wishlist.",
-    "count": "No games | {count} game | {count} games",
-    "matchCount": "No matches out of {total} | {count} of {total} games | {count} of {total} games",
-    "search": "Search games and collections",
-    "noMatches": "No games match “{query}”.",
-    "empty": "No owned games yet",
-    "emptyHint": "Games you add to a collection other than the Wishlist show up here.",
-    "loadFailed": "Your games couldn't be loaded.",
-    "game": "Game",
-    "collections": "Collections",
-    "added": "Added"
+  "unown": {
+    "title": "Remove {name} from Owned?",
+    "body": "This also removes it from {collections}.",
+    "confirm": "Remove"
   }
 }

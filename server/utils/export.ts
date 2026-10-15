@@ -11,9 +11,9 @@ import {
 import { catalogJoin, itemName } from './collections'
 
 /**
- * Everything the user has: every collection, Wishlist included, as CSV
- * files in one zip, each built the same way as a single collection's export
- * in the browser.
+ * Everything the user has: every collection, Owned and the Wishlist
+ * included, as CSV files in one zip, each built the same way as a single
+ * collection's export in the browser.
  */
 export async function exportEverything(ownerId: string): Promise<Buffer> {
   const db = useDb()

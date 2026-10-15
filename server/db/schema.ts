@@ -34,11 +34,6 @@ const timestamps = {
 }
 
 export const visibility = pgEnum('visibility', ['private', 'public'])
-export const collectionKind = pgEnum('collection_kind', [
-  'custom',
-  'wishlist',
-  'owned',
-])
 
 export const users = pgTable(
   'users',
@@ -108,13 +103,11 @@ export const collections = pgTable(
     color: text('color'),
     visibility: visibility('visibility').notNull().default('private'),
     /**
-     * Narrowed to the kinds the app handles, so code can't write a newer
-     * enum value before the release that added it is in production.
+     * `custom`, or one of the two lists every user has: `wishlist` and
+     * `owned`. Text with a check rather than an enum, so a migration can add
+     * a kind and use it in the same transaction.
      */
-    kind: collectionKind('kind')
-      .$type<CollectionKind>()
-      .notNull()
-      .default('custom'),
+    kind: text('kind').$type<CollectionKind>().notNull().default('custom'),
     /** The charts on the collection's dashboard, in order. */
     dashboard: jsonb('dashboard').$type<ChartWidget[]>().notNull().default([]),
     ...timestamps,
@@ -125,6 +118,13 @@ export const collections = pgTable(
     uniqueIndex('collections_one_wishlist_idx')
       .on(table.ownerId)
       .where(sql`${table.kind} = 'wishlist'`),
+    uniqueIndex('collections_one_owned_idx')
+      .on(table.ownerId)
+      .where(sql`${table.kind} = 'owned'`),
+    check(
+      'collections_kind',
+      sql`${table.kind} in ('custom', 'wishlist', 'owned')`,
+    ),
   ],
 )
 

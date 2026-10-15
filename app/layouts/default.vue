@@ -30,5 +30,6 @@ useSearchShortcut()
       </main>
       <SiteFooter />
     </div>
+    <UnownDialog v-if="app" />
   </div>
 </template>

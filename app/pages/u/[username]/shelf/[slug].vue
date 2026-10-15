@@ -196,8 +196,11 @@ watch(
   },
   { immediate: true },
 )
+// Games don't move out of Owned: removing one is how it leaves.
 const moveTargets = computed(() =>
-  mine.value.filter((collection) => collection.id !== data.value?.id),
+  data.value?.kind === 'owned'
+    ? undefined
+    : mine.value.filter((collection) => collection.id !== data.value?.id),
 )
 
 /** Takes a game out of this collection into another, with a toast. */
@@ -243,7 +246,24 @@ async function toggleWishlist(itemId: string, on: boolean) {
   }
 }
 
+const unown = useUnownConfirm()
+
+/**
+ * Takes a game out of this collection. Out of Owned it leaves the custom
+ * collections too, so that's confirmed first.
+ */
 async function removeItem(itemId: string) {
+  const item = data.value?.items.find((entry) => entry.id === itemId)
+  if (
+    data.value?.kind === 'owned' &&
+    item &&
+    !(await unown.confirm(
+      item.name,
+      (item.inCollections ?? []).map((collection) => collection.title),
+    ))
+  ) {
+    return
+  }
   if (!data.value) return
   const collectionId = data.value.id
   const before = data.value.items
@@ -418,7 +438,7 @@ async function deleteCollection() {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span v-if="data.isOwner">{{
+            <span v-if="data.isOwner && data.kind !== 'owned'">{{
               $t('limits.gamesUsed', {
                 used: data.itemCount,
                 limit: limits.gamesPerCollection,
@@ -541,7 +561,7 @@ async function deleteCollection() {
                   <BookmarkPlus /> {{ $t('blueprints.saveAsBlueprint') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="data.kind !== 'wishlist'"
+                  v-if="!isBuiltIn(data.kind)"
                   class="text-destructive focus:text-destructive"
                   @select="confirmingDelete = true"
                 >
@@ -621,6 +641,7 @@ async function deleteCollection() {
           :editable="data.isOwner"
           :move-targets="moveTargets"
           :is-wishlist="data.kind === 'wishlist'"
+          :shelf-path="shelfPath"
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"

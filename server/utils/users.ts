@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import type { Me, PublicProfile } from '../../shared/types/user'
 import { users } from '../db/schema'
-import { ensureWishlist } from './collections'
+import { ensureBuiltInLists } from './collections'
 
 type UserRow = typeof users.$inferSelect
 
@@ -14,7 +14,7 @@ export async function findOrCreateUser(cognitoSub: string): Promise<UserRow> {
     .onConflictDoNothing({ target: users.cognitoSub })
     .returning()
   if (created) {
-    await ensureWishlist(created.id)
+    await ensureBuiltInLists(created.id)
     return created
   }
   const [existing] = await db

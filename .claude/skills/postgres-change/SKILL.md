@@ -53,8 +53,20 @@ values for other blueprints untouched.
 - `collection_items`: the junction table (composite primary key), with
   `position` and `added_at`.
 - `collections`: owner, `blueprint_id`, title, `slug` (unique per owner),
-  visibility, and `kind` (`custom`, or the one `wishlist` per user, enforced
-  by a partial unique index). The Wishlist is created by `ensureWishlist`.
+  visibility, and `kind`: `custom`, or one of the two built-in lists every
+  user has, `owned` and `wishlist` (one of each per user, enforced by
+  partial unique indexes). `ensureBuiltInLists` creates both, private and
+  pinned with Owned first. Their titles and slugs are fixed (`owned` and
+  `wishlist` are reserved slugs), they can't be deleted, and they don't
+  count toward the plan's collection limit.
+- Everything in a custom collection is also in Owned: every write that
+  puts a game into a custom collection (`addItemToCollections`,
+  `moveItemToCollections`, `importIntoCollection`) puts it into Owned in
+  the same statement or batch. A game can be in Owned alone, and on the
+  Wishlist and in Owned at once. Removing a game from Owned
+  (`removeItemFromCollection`) also takes it out of every custom
+  collection, but not the Wishlist. Owned has no per-collection game
+  limit (the library's applies).
 - `blueprints`: shared (named) or private to one collection. A blueprint in
   use can't be deleted (`restrict`).
 
@@ -83,13 +95,18 @@ querying in routes, and keep the owner filter in every new one.
 7. **The composable and UI** in `app/`. See `ui-conventions` and
    `plain-language`.
 
-## New enum values
+## Kinds are text with a check, not enums
 
-Postgres can't use an enum value in the transaction that added it, and
-drizzle-kit runs all pending migrations in one transaction. So a new
-value (`ALTER TYPE ... ADD VALUE`) gets a migration of its own, with
-nothing else in it, and reaches production in a release before any
-migration or code uses it.
+Postgres can't use an enum value in the transaction that added it.
+drizzle-kit runs all pending migrations in one transaction, and a release
+often bundles many migrations, so a new enum value and the first thing
+that uses it would land in the same transaction and fail. So a column with
+a fixed set of values is `text` with a check constraint (like
+`collections.kind`: `kind in ('custom', 'wishlist', 'owned')`, and
+`users.plan`), narrowed in Drizzle with `.$type<...>()`. Adding a value
+means changing the check in the same migration that starts using it.
+Don't add new `pgEnum`s. `visibility` is the one left, and it doesn't
+change.
 
 ## Correlated subqueries
 

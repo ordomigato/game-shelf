@@ -19,6 +19,8 @@ export function useTrackedGames(
   const { t } = useI18n()
   const auth = useAuth()
   const collections = useCollections()
+  const myCollections = useMyCollections()
+  const unown = useUnownConfirm()
   const items = ref(new Map<number, string>())
   const saving = ref(new Set<number>())
   let checked = new Set<number>()
@@ -71,6 +73,22 @@ export function useTrackedGames(
     items.value = next
   }
 
+  /**
+   * Before taking a game out of Owned: the custom collections it would
+   * leave too, confirmed. False when the person cancels.
+   */
+  async function confirmUnown(game: GameSummary) {
+    const membership = await collections.membership(game.id)
+    const ids = new Set(membership.collectionIds)
+    const others = (myCollections.list.value ?? []).filter(
+      (other) => other.kind === 'custom' && ids.has(other.id),
+    )
+    return unown.confirm(
+      game.name,
+      others.map((other) => other.title),
+    )
+  }
+
   /** Adds the game to the target collection, or removes it if it's there. */
   async function toggle(game: GameSummary) {
     const collection = target.value
@@ -79,6 +97,7 @@ export function useTrackedGames(
     const itemId = items.value.get(game.id)
     try {
       if (itemId) {
+        if (collection.kind === 'owned' && !(await confirmUnown(game))) return
         await collections.removeItem(collection.id, itemId)
         mark(game.id, false)
         return

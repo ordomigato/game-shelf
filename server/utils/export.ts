@@ -5,8 +5,10 @@ import {
   blueprints,
   collectionItems,
   collections,
+  games,
   libraryItems,
 } from '../db/schema'
+import { catalogJoin, itemName } from './collections'
 
 /**
  * Everything the user has: every collection, Wishlist included, as CSV
@@ -33,16 +35,21 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
         .from(blueprints)
         .where(eq(blueprints.id, collection.blueprintId)),
       db
-        .select({ item: libraryItems, addedAt: collectionItems.addedAt })
+        .select({
+          item: libraryItems,
+          name: itemName,
+          addedAt: collectionItems.addedAt,
+        })
         .from(collectionItems)
         .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
+        .leftJoin(games, catalogJoin)
         .where(eq(collectionItems.collectionId, collection.id))
         .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt)),
     ])
     const csv = collectionCsv(
       blueprint?.fields ?? [],
-      entries.map(({ item, addedAt }) => ({
-        name: item.name,
+      entries.map(({ item, name, addedAt }) => ({
+        name,
         igdbId: item.igdbId,
         addedAt: addedAt.toISOString(),
         data: item.data,

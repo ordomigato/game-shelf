@@ -112,8 +112,13 @@ export interface CollectionSummary {
 export interface LibraryItem {
   id: string
   igdbId: number | null
+  /** For an IGDB game, the catalog's name once it has one. */
   name: string
   coverId: string | null
+  /** The IGDB game's first release year. Null when unknown. */
+  year: number | null
+  /** The IGDB game's genres. Empty when unknown or added by hand. */
+  genres: string[]
   data: ItemData
 }
 

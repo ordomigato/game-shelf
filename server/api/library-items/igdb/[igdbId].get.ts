@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import type { LibraryItem } from '../../../../shared/types/collection'
-import { libraryItems } from '../../../db/schema'
+import { games, libraryItems } from '../../../db/schema'
 
 const paramsSchema = z.object({ igdbId: z.coerce.number().int().positive() })
 
@@ -16,16 +16,17 @@ export default defineEventHandler(
     const { sub } = await requireAuth(event)
     const { igdbId } = await getValidatedRouterParams(event, paramsSchema.parse)
     const user = await findOrCreateUser(sub)
-    const [item] = await useDb()
-      .select()
+    const [found] = await useDb()
+      .select({ item: libraryItems, game: games })
       .from(libraryItems)
+      .leftJoin(games, catalogJoin)
       .where(
         and(eq(libraryItems.ownerId, user.id), eq(libraryItems.igdbId, igdbId)),
       )
-    if (!item) return { item: null, collectionIds: [] }
+    if (!found) return { item: null, collectionIds: [] }
     return {
-      item: toLibraryItem(item),
-      collectionIds: await collectionIdsForItem(item.id),
+      item: toLibraryItem(found.item, found.game),
+      collectionIds: await collectionIdsForItem(found.item.id),
     }
   },
 )

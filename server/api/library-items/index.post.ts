@@ -28,11 +28,12 @@ export default defineEventHandler(
       userLimits(user),
     )
     // The catalog gets the game from IGDB, never the name and cover sent.
-    if (game.igdbId !== null) await ensureCatalogGames([game.igdbId])
+    const [catalogGame] =
+      game.igdbId !== null ? await ensureCatalogGames([game.igdbId]) : []
     const item = await findOrCreateItem(user.id, game)
     await addItemToCollections(user.id, item.id, collectionIds)
     return {
-      item: toLibraryItem(item),
+      item: toLibraryItem(item, catalogGame ?? null),
       collectionIds: await collectionIdsForItem(item.id),
     }
   },

@@ -92,6 +92,20 @@
       "when": 1791849789206,
       "tag": "0012_collection_colour",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792097954040,
+      "tag": "0013_games_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792097954515,
+      "tag": "0014_seed_games_catalog",
+      "breakpoints": true
     }
   ]
 }

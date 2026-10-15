@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import {
   check,
   boolean,
+  date,
   doublePrecision,
   index,
   integer,
@@ -111,6 +112,39 @@ export const collections = pgTable(
       .where(sql`${table.kind} = 'wishlist'`),
   ],
 )
+
+/** IGDB platforms, for their names. Written only by the server, from IGDB. */
+export const platforms = pgTable('platforms', {
+  igdbId: integer('igdb_id').primaryKey(),
+  name: text('name').notNull(),
+  abbreviation: text('abbreviation'),
+})
+
+/**
+ * One row per IGDB game anyone has added: the facts that are the same for
+ * every user. Written only by the server from IGDB, never from what a
+ * browser sends. See `server/utils/catalog.ts`.
+ */
+export const games = pgTable('games', {
+  igdbId: integer('igdb_id').primaryKey(),
+  name: text('name').notNull(),
+  coverId: text('cover_id'),
+  /** IGDB's `first_release_date`, as a UTC day. */
+  releaseDate: date('release_date', { mode: 'string' }),
+  /** Genre names. */
+  genres: text('genres')
+    .array()
+    .notNull()
+    .default(sql`'{}'`),
+  /** IGDB platform ids (`platforms.igdb_id`). */
+  platformIds: integer('platform_ids')
+    .array()
+    .notNull()
+    .default(sql`'{}'`),
+  /** When it was last read from IGDB. Null until it has been. */
+  fetchedAt: timestamp('fetched_at', { withTimezone: true }),
+  ...timestamps,
+})
 
 /**
  * A game a user is tracking, once per game per user, however many

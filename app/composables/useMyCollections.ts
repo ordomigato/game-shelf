@@ -1,10 +1,16 @@
 import { toast } from 'vue-sonner'
 import type { CollectionSummary } from '#shared/types/collection'
 
+// Browser only. The newest request for the list until it's answered, so
+// `load` can wait for it instead of asking again.
+let latest: Promise<CollectionSummary[]> | undefined
+
 /**
  * The signed-in user's collections for the sidebar, shared by every
  * component. `null` until the first load. Anything that adds, removes or
- * renames collections, or changes what's in them, calls `refresh`.
+ * renames collections, or changes what's in them, calls `refresh`. Anything
+ * that only needs the list calls `load`, which asks the server only when
+ * nothing has loaded it yet.
  *
  * Pins change here first and are saved after, so the sidebar responds at
  * once. A pin that fails to save is put back, with a message.
@@ -22,13 +28,40 @@ export function useMyCollections() {
     () => null,
   )
 
+  function request(): Promise<CollectionSummary[]> {
+    const asked: Promise<CollectionSummary[]> = auth
+      .apiFetch<CollectionSummary[]>('/api/collections')
+      .then(
+        (collections) => {
+          // An older answer arriving late doesn't replace a newer one.
+          if (latest === asked) list.value = collections
+          return collections
+        },
+        (error: unknown) => {
+          // The sidebar keeps what it had; the pages show their own errors.
+          list.value ??= []
+          throw error
+        },
+      )
+      .finally(() => {
+        if (latest === asked) latest = undefined
+      })
+    latest = asked
+    return asked
+  }
+
   async function refresh() {
-    try {
-      list.value = await auth.apiFetch<CollectionSummary[]>('/api/collections')
-    } catch {
-      // The sidebar keeps what it had; the pages show their own errors.
-      list.value ??= []
-    }
+    await request().catch(() => {})
+  }
+
+  /**
+   * The list, asking the server only if it isn't loaded. Everyone has a
+   * Wishlist, so an empty list means the last try failed. Throws if this
+   * one does too.
+   */
+  async function load(): Promise<CollectionSummary[]> {
+    if (list.value?.length) return list.value
+    return latest ?? request()
   }
 
   /** Pinned collections, in the user's order. */
@@ -112,5 +145,5 @@ export function useMyCollections() {
     }
   }
 
-  return { list, refresh, pinned, unpinned, pin, unpin }
+  return { list, refresh, load, pinned, unpinned, pin, unpin }
 }

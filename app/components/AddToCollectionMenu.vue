@@ -7,7 +7,9 @@ import type { CollectionSummary } from '#shared/types/collection'
  * The "Add to collection" menu for an IGDB game: the Wishlist first, then
  * the user's collections as checkboxes. Each tick saves straight away. A
  * game is one library item however many collections it's in, so the first
- * tick creates the item and later ticks only link it.
+ * tick creates the item and later ticks only link it. The collections
+ * come from the sidebar's list and the game's ticks are remembered, so
+ * opening the menu again doesn't ask the server again.
  */
 const props = withDefaults(
   defineProps<{
@@ -24,12 +26,13 @@ const { t } = useI18n()
 const auth = useAuth()
 const route = useRoute()
 const collections = useCollections()
+const myCollections = useMyCollections()
 const titleOf = useCollectionTitle()
 
 const open = ref(false)
 const loading = ref(false)
 const error = ref('')
-const lists = ref<CollectionSummary[]>([])
+const lists = computed(() => myCollections.list.value ?? [])
 const itemId = ref<string | null>(null)
 const selected = ref(new Set<string>())
 const saving = ref(new Set<string>())
@@ -59,11 +62,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [mine, membership] = await Promise.all([
-      collections.mine(),
+    const [, membership] = await Promise.all([
+      myCollections.load(),
       collections.membership(props.game.igdbId),
     ])
-    lists.value = mine
     itemId.value = membership.item?.id ?? null
     setSelected(membership.collectionIds)
   } catch {
@@ -114,7 +116,6 @@ function startCreating() {
 }
 
 async function onCreated(collection: CollectionSummary) {
-  lists.value = [...lists.value, collection]
   await toggle(collection, true)
 }
 </script>

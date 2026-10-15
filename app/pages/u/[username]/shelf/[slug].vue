@@ -183,17 +183,16 @@ function onRenamed(saved: LibraryItem) {
   )
 }
 
-// The owner's other collections, for "Got it" and "Move to".
-const mine = ref<CollectionSummary[]>([])
+// The owner's collections, from the same list the sidebar uses: for "Got
+// it", "Move to" and pinning. Phones have no sidebar, so load the list here
+// if nothing has yet.
+const sidebar = useMyCollections()
+const mine = computed(() => sidebar.list.value ?? [])
 watch(
   () => data.value?.isOwner,
-  async (isOwner) => {
-    if (!isOwner || mine.value.length) return
-    try {
-      mine.value = await collections.mine()
-    } catch {
-      // The menu just shows no collections to move to.
-    }
+  (isOwner) => {
+    // Without it, the menus just show no collections to move to.
+    if (isOwner) sidebar.load().catch(() => {})
   },
   { immediate: true },
 )
@@ -298,19 +297,8 @@ function setBlueprint(blueprint: Blueprint) {
   data.value = { ...data.value, blueprint }
 }
 
-// Pinning to the sidebar, from the same list the sidebar uses. Phones
-// have no sidebar, so load the list here if nothing has yet.
-const sidebar = useMyCollections()
 const sidebarEntry = computed(
-  () =>
-    sidebar.list.value?.find((entry) => entry.id === data.value?.id) ?? null,
-)
-watch(
-  () => data.value?.isOwner,
-  (isOwner) => {
-    if (isOwner && sidebar.list.value === null) void sidebar.refresh()
-  },
-  { immediate: true },
+  () => mine.value.find((entry) => entry.id === data.value?.id) ?? null,
 )
 function togglePin() {
   const entry = sidebarEntry.value

@@ -14,6 +14,7 @@ import type {
   OwnedGame,
 } from '#shared/types/collection'
 import type { PublicProfile } from '#shared/types/user'
+import type { GameMembership } from '~/composables/useGameMemberships'
 import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
 
 /**
@@ -24,6 +25,7 @@ import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
 export function useCollections() {
   const auth = useAuth()
   const sidebar = useMyCollections()
+  const memberships = useGameMemberships()
 
   /** Refreshes the sidebar's collections once a change has saved. */
   function refreshing<T>(request: Promise<T>): Promise<T> {
@@ -31,6 +33,28 @@ export function useCollections() {
       void sidebar.refresh()
       return result
     })
+  }
+
+  /**
+   * Keeps the games' remembered collections right after a change: `saved`
+   * records a change that worked, and `failed` drops what it could have
+   * touched, since the server may have made part of it.
+   */
+  function remembering<T>(
+    request: Promise<T>,
+    saved: (result: T) => void,
+    failed: () => void = memberships.clear,
+  ): Promise<T> {
+    return request.then(
+      (result) => {
+        saved(result)
+        return result
+      },
+      (error: unknown) => {
+        failed()
+        throw error
+      },
+    )
   }
 
   async function viewerFetch<T>(url: string): Promise<T> {
@@ -151,15 +175,20 @@ export function useCollections() {
       ),
 
     remove: (id: string) =>
-      refreshing(auth.apiFetch(`/api/collections/${id}`, { method: 'DELETE' })),
+      refreshing(
+        remembering(
+          auth.apiFetch(`/api/collections/${id}`, { method: 'DELETE' }),
+          memberships.clear,
+        ),
+      ),
 
-    /** The signed-in user's own collections, Wishlist first. */
-    mine: () => auth.apiFetch<CollectionSummary[]>('/api/collections'),
-
-    /** The user's item for an IGDB game, if any, and its collections. */
+    /**
+     * The user's item for an IGDB game, if any, and its collections. Asked
+     * once per game until the page reloads.
+     */
     membership: (igdbId: number) =>
-      auth.apiFetch<{ item: LibraryItem | null; collectionIds: string[] }>(
-        `/api/library-items/igdb/${igdbId}`,
+      memberships.get(igdbId, () =>
+        auth.apiFetch<GameMembership>(`/api/library-items/igdb/${igdbId}`),
       ),
 
     /**
@@ -183,34 +212,45 @@ export function useCollections() {
       collectionIds: string[],
     ) =>
       refreshing(
-        auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
-          '/api/library-items',
-          { method: 'POST', body: { ...game, collectionIds } },
+        remembering(
+          auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
+            '/api/library-items',
+            { method: 'POST', body: { ...game, collectionIds } },
+          ),
+          (added) => memberships.set(game.igdbId, added),
+          () => memberships.forgetGame(game.igdbId),
         ),
       ),
 
     /** Adds a game IGDB doesn't have, by name, to one collection. */
     addManualGame: (name: string, collectionId: string) =>
       refreshing(
-        auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
-          '/api/library-items',
-          {
-            method: 'POST',
-            body: {
-              igdbId: null,
-              name,
-              coverId: null,
-              collectionIds: [collectionId],
+        remembering(
+          auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
+            '/api/library-items',
+            {
+              method: 'POST',
+              body: {
+                igdbId: null,
+                name,
+                coverId: null,
+                collectionIds: [collectionId],
+              },
             },
-          },
+          ),
+          memberships.clear,
         ),
       ),
 
     addItem: (collectionId: string, itemId: string) =>
       refreshing(
-        auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
-          method: 'PUT',
-        }),
+        remembering(
+          auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
+            method: 'PUT',
+          }),
+          () => memberships.link(itemId, collectionId, true),
+          () => memberships.forgetItem(itemId),
+        ),
       ),
 
     /** Renames the user's own copy of a game, in all their collections. */
@@ -271,17 +311,25 @@ export function useCollections() {
       toCollectionIds: string[],
     ) =>
       refreshing(
-        auth.apiFetch(
-          `/api/collections/${fromCollectionId}/items/${itemId}/move`,
-          { method: 'POST', body: { toCollectionIds } },
+        remembering(
+          auth.apiFetch(
+            `/api/collections/${fromCollectionId}/items/${itemId}/move`,
+            { method: 'POST', body: { toCollectionIds } },
+          ),
+          () => memberships.forgetItem(itemId),
+          () => memberships.forgetItem(itemId),
         ),
       ),
 
     removeItem: (collectionId: string, itemId: string) =>
       refreshing(
-        auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
-          method: 'DELETE',
-        }),
+        remembering(
+          auth.apiFetch(`/api/collections/${collectionId}/items/${itemId}`, {
+            method: 'DELETE',
+          }),
+          () => memberships.link(itemId, collectionId, false),
+          () => memberships.forgetItem(itemId),
+        ),
       ),
   }
 }

@@ -31,6 +31,7 @@ const open = defineModel<boolean>('open', { default: false })
 const { t } = useI18n()
 const auth = useAuth()
 const sidebar = useMyCollections()
+const memberships = useGameMemberships()
 const { limits } = usePlan()
 
 type Step = 'file' | 'map' | 'match' | 'review' | 'importing' | 'done'
@@ -312,6 +313,7 @@ async function runImport() {
     emit('imported')
   } finally {
     void sidebar.refresh()
+    memberships.clear()
   }
 }
 </script>

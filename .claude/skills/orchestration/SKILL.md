@@ -40,6 +40,29 @@ dated line under "Lessons" when something goes wrong or works well.
 6. **Tell the user what each agent did**, in plain words, with what was and
    wasn't verified. Never pass on a report you haven't checked.
 
+## Keep token use down
+
+The user asked (2026-10-15) to cut usage. Every agent starts from zero and
+reads the skills and many files before writing anything (100k+ tokens for a
+build), so:
+
+- **Pick the model per agent** with the Agent tool's `model`: `haiku` for
+  read-only searches (`Explore`), `sonnet` for builders and research. Keep
+  the main model only for design work where judgement matters (`Plan` on a
+  big change).
+- **Agents only for big, self-contained jobs.** A change that touches a
+  handful of files is cheaper done directly than through an agent that has
+  to learn the codebase first. Skip the planner when the design is already
+  clear.
+- **Short briefs.** Point to the skills by name instead of restating them.
+  Give the goal, the decisions, the files owned, the branch and the port;
+  the skills cover the rest.
+- **Lean reports.** Ask for changed files and results in a few lines, not
+  essays.
+- **Long sessions are expensive:** every reply re-reads the conversation.
+  Suggest a fresh session per feature; the plan, memory and skills carry
+  the context.
+
 ## When not to spawn
 
 - Small changes (a few lines, one or two files): do them directly.

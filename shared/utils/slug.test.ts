@@ -29,12 +29,16 @@ describe('collectionTitleProblem', () => {
     expect(collectionTitleProblem('My Zelda games')).toBeNull()
   })
 
-  it('needs a letter or number, and keeps "wishlist" for the Wishlist', () => {
+  it("needs a letter or number, and keeps the built-in lists' names", () => {
     expect(collectionTitleProblem('!!!')?.key).toBe(
       'collections.problems.noLetters',
     )
     expect(collectionTitleProblem('Wishlist')?.key).toBe(
       'collections.problems.reserved',
     )
+    expect(collectionTitleProblem('Owned')?.key).toBe(
+      'collections.problems.reserved',
+    )
+    expect(collectionTitleProblem('Owned games')).toBeNull()
   })
 })

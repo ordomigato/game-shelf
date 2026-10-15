@@ -1,4 +1,7 @@
-import type { FieldDefinition } from '../types/collection'
+import type { CollectionKind, FieldDefinition } from '../types/collection'
+
+/** The lists every user has, which start with no fields. */
+type BuiltInList = Exclude<CollectionKind, 'custom'>
 
 export type StarterBlueprint = 'collector' | 'player' | 'blank'
 export const STARTER_BLUEPRINTS: StarterBlueprint[] = [
@@ -10,11 +13,11 @@ export const STARTER_BLUEPRINTS: StarterBlueprint[] = [
 type FieldTemplate = Omit<FieldDefinition, 'id'>
 
 /**
- * Blueprints offered when creating a collection. The Wishlist starts with
- * none. Names are stored as the user's own data once created, so they start
- * in English.
+ * Blueprints offered when creating a collection. Owned and the Wishlist
+ * start with none. Names are stored as the user's own data once created, so
+ * they start in English.
  */
-const templates: Record<StarterBlueprint | 'wishlist', FieldTemplate[]> = {
+const templates: Record<StarterBlueprint | BuiltInList, FieldTemplate[]> = {
   collector: [
     {
       name: 'Condition',
@@ -42,12 +45,13 @@ const templates: Record<StarterBlueprint | 'wishlist', FieldTemplate[]> = {
     { name: 'Hours played', type: 'number' },
   ],
   wishlist: [],
+  owned: [],
   blank: [],
 }
 
 /** A fresh copy of a starter's fields, each with a new random id. */
 export function starterFields(
-  starter: StarterBlueprint | 'wishlist',
+  starter: StarterBlueprint | BuiltInList,
   newId: () => string = () => crypto.randomUUID(),
 ): FieldDefinition[] {
   return templates[starter].map((field) => ({

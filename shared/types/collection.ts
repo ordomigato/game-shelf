@@ -46,8 +46,12 @@ export type ItemData = Record<string, FieldValue>
 
 export type CollectionVisibility = 'private' | 'public'
 
-/** `wishlist` is the one Wishlist every user has. Everything else is `custom`. */
-export type CollectionKind = 'custom' | 'wishlist'
+/**
+ * `wishlist` and `owned` are the two lists every user has, one of each.
+ * Everything else is `custom`. Every game in a custom collection is also in
+ * Owned.
+ */
+export type CollectionKind = 'custom' | 'wishlist' | 'owned'
 
 export interface Blueprint {
   id: string
@@ -130,6 +134,20 @@ export interface CollectionEntry extends LibraryItem {
    * private.
    */
   wishlisted?: boolean
+  /**
+   * On the Owned list only: the owner's custom collections the game is in,
+   * by title. Visitors see only the public ones.
+   */
+  inCollections?: CollectionLink[]
+}
+
+/** A collection named next to a game, linking to it. */
+export interface CollectionLink {
+  id: string
+  title: string
+  slug: string
+  /** A hex code like `#7c3aed`, or null for a colour from the title. */
+  color: string | null
 }
 
 export interface CollectionDetail extends CollectionSummary {
@@ -159,25 +177,4 @@ export interface ExploreCollection {
 export interface ExplorePage {
   collections: ExploreCollection[]
   hasMore: boolean
-}
-
-/**
- * A game in at least one of the user's collections other than the Wishlist,
- * as listed on the Owned games page.
- */
-export interface OwnedGame {
-  /** The library item's id. */
-  id: string
-  igdbId: number | null
-  name: string
-  coverId: string | null
-  /** When it was first added to one of those collections. */
-  addedAt: string
-  /** The collections it's in, by name (not the Wishlist). */
-  collections: {
-    id: string
-    title: string
-    slug: string
-    color: string | null
-  }[]
 }

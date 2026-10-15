@@ -2,7 +2,7 @@ import type { Message } from '../types/message'
 
 export const SLUG_MAX_LENGTH = 60
 /** Slugs no custom collection can take. */
-export const RESERVED_SLUGS = new Set(['wishlist'])
+export const RESERVED_SLUGS = new Set(['wishlist', 'owned'])
 
 /**
  * The URL name for a title: accents removed, lowercase, anything that isn't

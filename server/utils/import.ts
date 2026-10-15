@@ -11,7 +11,6 @@ import {
   libraryItems,
 } from '../db/schema'
 import type { PlanLimits } from '../../shared/utils/plans'
-import type { IgdbGame } from './igdb-queries'
 
 export interface ImportResult {
   /** Games added to the collection by this request. */
@@ -44,18 +43,6 @@ function checkOnlyAdds(before: FieldDefinition[], after: FieldDefinition[]) {
       })
     }
   }
-}
-
-/** Covers for IGDB games, by id. Ids IGDB doesn't know are left out. */
-async function igdbCovers(ids: number[]): Promise<Map<number, string | null>> {
-  const covers = new Map<number, string | null>()
-  if (!ids.length) return covers
-  const games = await igdbRequest<Pick<IgdbGame, 'id' | 'cover'>[]>(
-    'games',
-    `fields id, cover.image_id; where id = (${ids.join(',')}); limit 500;`,
-  )
-  for (const game of games) covers.set(game.id, game.cover?.image_id ?? null)
-  return covers
 }
 
 /** Only the values that fit their fields, and how many didn't. */
@@ -123,11 +110,12 @@ export async function importIntoCollection(
   })
   const rows = [...merged.values()]
 
-  const covers = await igdbCovers([
-    ...new Set(
-      rows.flatMap((row) => (row.igdbId === null ? [] : [row.igdbId])),
-    ),
-  ])
+  // Covers for the IGDB games, by id, from the catalog (which reads the
+  // ones it lacks from IGDB). Ids IGDB doesn't know are left out.
+  const catalog = await ensureCatalogGames(
+    rows.flatMap((row) => (row.igdbId === null ? [] : [row.igdbId])),
+  )
+  const covers = new Map(catalog.map((game) => [game.igdbId, game.coverId]))
   const known = (row: ImportRow) =>
     row.igdbId !== null && covers.has(row.igdbId)
 

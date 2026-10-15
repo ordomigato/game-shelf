@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildBrowseQuery,
+  buildCatalogQuery,
   buildFilterListQueries,
+  CATALOG_BATCH_SIZE,
   buildGameQuery,
   buildMatchQuery,
   buildSearchQuery,
@@ -11,6 +13,7 @@ import {
   rankSearchResults,
   SEARCH_PAGE_SIZE,
   SEARCH_POOL_SIZE,
+  toCatalogGame,
   toGameDetails,
   toGameSummary,
 } from './igdb-queries'
@@ -264,5 +267,83 @@ describe('buildMatchQuery', () => {
     expect(query).toContain('search "Say \\"Hi\\"";')
     expect(query).toContain('where version_parent = null')
     expect(query).toMatch(/limit 10;$/)
+  })
+})
+
+describe('buildCatalogQuery', () => {
+  it('asks for the catalog fields of the given games', () => {
+    expect(buildCatalogQuery([1, 2, 3])).toBe(
+      'fields name, cover.image_id, first_release_date, genres.name, platforms.name, platforms.abbreviation; where id = (1,2,3); limit 500;',
+    )
+  })
+
+  it('refuses ids that are not positive integers', () => {
+    for (const id of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => buildCatalogQuery([1, id])).toThrow()
+    }
+  })
+
+  it(`asks for 1 to ${CATALOG_BATCH_SIZE} games`, () => {
+    expect(() => buildCatalogQuery([])).toThrow()
+    const ids = Array.from({ length: CATALOG_BATCH_SIZE + 1 }, (_, i) => i + 1)
+    expect(() => buildCatalogQuery(ids)).toThrow()
+    expect(() => buildCatalogQuery(ids.slice(1))).not.toThrow()
+  })
+})
+
+describe('toCatalogGame', () => {
+  it('maps a game and the platforms it mentions', () => {
+    expect(
+      toCatalogGame({
+        id: 1026,
+        name: 'The Legend of Zelda: A Link to the Past',
+        cover: { image_id: 'co3vzn' },
+        first_release_date: 690_681_600,
+        genres: [
+          { id: 12, name: 'Role-playing (RPG)' },
+          { id: 31, name: 'Adventure' },
+        ],
+        platforms: [
+          { id: 19, name: 'Super Nintendo', abbreviation: 'SNES' },
+          { id: 58, name: 'Super Famicom' },
+        ],
+      }),
+    ).toEqual({
+      game: {
+        igdbId: 1026,
+        name: 'The Legend of Zelda: A Link to the Past',
+        coverId: 'co3vzn',
+        releaseDate: '1991-11-21',
+        genres: ['Role-playing (RPG)', 'Adventure'],
+        platformIds: [19, 58],
+      },
+      platforms: [
+        { igdbId: 19, name: 'Super Nintendo', abbreviation: 'SNES' },
+        { igdbId: 58, name: 'Super Famicom', abbreviation: null },
+      ],
+    })
+  })
+
+  it('gives the release day in UTC', () => {
+    // 23:30 UTC on 31 December, already 1 January further east.
+    const lateEvening = Date.UTC(1999, 11, 31, 23, 30) / 1000
+    expect(
+      toCatalogGame({ id: 1, name: 'x', first_release_date: lateEvening }).game
+        .releaseDate,
+    ).toBe('1999-12-31')
+  })
+
+  it('handles a game with almost nothing filled in', () => {
+    expect(toCatalogGame({ id: 1, name: 'Bare' })).toEqual({
+      game: {
+        igdbId: 1,
+        name: 'Bare',
+        coverId: null,
+        releaseDate: null,
+        genres: [],
+        platformIds: [],
+      },
+      platforms: [],
+    })
   })
 })

@@ -40,22 +40,57 @@ dated line under "Lessons" when something goes wrong or works well.
 6. **Tell the user what each agent did**, in plain words, with what was and
    wasn't verified. Never pass on a report you haven't checked.
 
-## When not to spawn
+## Keep token use down
 
-- Small changes (a few lines, one or two files): do them directly.
-- Anything that needs the user mid-way (UI they need to look at on their
-  `sst dev`, choices, secrets, AWS sign-in): keep it in the main
-  conversation.
-- Work that depends on something not yet merged.
+The user asked (2026-10-15) to cut usage. Every agent starts from zero and
+reads the skills and many files before writing anything (100k+ tokens for a
+build), so:
+
+- **Pick the model per agent** with the Agent tool's `model`: `haiku` for
+  read-only searches (`Explore`), `sonnet` for builders and research. Keep
+  the main model only for design work where judgement matters (`Plan` on a
+  big change).
+- **Small jobs stay small.** A small change still goes to a `builder`,
+  but with a few-line brief and no planner. Skip the `Plan` agent whenever
+  the design is already clear, and skip the reviewer only for docs-only
+  changes.
+- **Short briefs.** Point to the skills by name instead of restating them.
+  Give the goal, the decisions, the files owned, the branch and the port;
+  the skills cover the rest.
+- **Lean reports.** Ask for changed files and results in a few lines, not
+  essays.
+- **Long sessions are expensive:** every reply re-reads the conversation.
+  Suggest a fresh session per feature; the plan, memory and skills carry
+  the context.
+
+## Everything goes to an agent
+
+The user asked (2026-10-15) that the orchestrator only orchestrate: every
+task, small ones too, goes to the agent made for it. The orchestrator
+itself only:
+
+- talks to the user and asks for their decisions;
+- writes briefs and reads reports;
+- pushes branches and opens or updates PRs;
+- applies reviewed migrations to dev and checks SQL there (agents can't
+  reach AWS);
+- keeps `PLANNING.local.md` current: tick an item (`- [x]`, with the PR
+  number) when its PR is opened or merged, and add new decisions as they're
+  made.
+
+Still keep in the main conversation anything that needs the user mid-way:
+choices, secrets, AWS sign-in, and UI they check on their `sst dev`.
 
 ## Which agent
 
-| Work                                                     | Agent                                      | Notes                                                             |
-| -------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| Find where something lives, map a pattern across the app | `Explore`                                  | Read-only. Say how thorough ("medium", "very thorough").          |
-| Design an approach for something big before building it  | `Plan`                                     | Read-only. Ask for files to change, order, risks.                 |
-| Build a change and test it                               | `general-purpose`, `isolation: "worktree"` | Gets its own git worktree, so it can't touch the user's checkout. |
-| Look things up online (provider docs, limits, prices)    | `general-purpose`                          | Ask for sources.                                                  |
+| Work                                          | Agent                                                            | Notes                                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Build or change code, tests, migrations, docs | `builder` (`.claude/agents/builder.md`), `isolation: "worktree"` | Sonnet. Knows the check commands and commit rules, so the brief only needs the task. |
+| Review a finished branch before it's pushed   | `reviewer` (`.claude/agents/reviewer.md`)                        | Sonnet, read-only. Ranked findings; send fixes back to a builder.                    |
+| Design UI/UX options to compare               | `designer` (`.claude/agents/designer.md`)                        | Sonnet. Mockups on a design canvas, no app changes.                                  |
+| Find where something lives, map a pattern     | `Explore`, `model: "haiku"`                                      | Read-only. Say how thorough.                                                         |
+| Design the approach for a big change          | `Plan`                                                           | Read-only, main model. Only when the design isn't clear yet.                         |
+| Look things up online                         | `general-purpose`, `model: "sonnet"`                             | Ask for sources.                                                                     |
 
 Run agents in the background unless the very next step needs the answer.
 Run independent agents in parallel, in one message.
@@ -67,16 +102,9 @@ Run independent agents in parallel, in one message.
 - **Builds and tests:** never in the user's main checkout (it's under their
   running `sst dev`). In a worktree, the build picks up the wrong
   `node_modules`, so each agent verifies in its own copy outside the repo:
-  ```bash
-  V=<scratchpad>/verify-<branch>          # one per agent
-  [ -d "$V" ] || cp -cR <scratchpad>/verify "$V"   # fast copy-on-write clone
-  rsync -a --delete --exclude node_modules --exclude .git --exclude .output \
-    --exclude .nuxt --exclude .sst --exclude .claude/worktrees ./ "$V"/
-  cd "$V" && npm run lint && npm run format:check && npm test && \
-    npm run typecheck && npm run build && \
-    NITRO_PRESET=node-server npx nuxt build && \
-    E2E_PORT=<unique> npx playwright test --reporter=line
-  ```
+  The `builder` agent's instructions (`.claude/agents/builder.md`) give
+  the exact commands: a copy per branch under
+  `/Users/jeremy/.cache/game-shelf-verify/`, cloned from `base` there.
   Give each agent its own `E2E_PORT` (3101, 3102, …). The e2e config reuses
   any server already on its port, so two agents on one port would test each
   other's code without noticing.
@@ -107,15 +135,17 @@ Every agent prompt includes:
   counts); anything not done or not verified; decisions it had to make,
   and why; follow-ups it noticed.
 
-## After an agent reports
+## After a builder reports
 
-1. `git log` and `git diff main...<branch>` on its branch. Read the diff.
-2. Rerun checks only when the change is risky or the report is vague, and
-   then only the parts in doubt. The agent's full run counts.
+1. Send the branch to a `reviewer`. If it finds real problems, send them
+   back to a builder on the same branch, then review again.
+2. Rerun checks only when something is in doubt. The builder's full run
+   counts.
 3. Apply any migration to dev (`npm run db:migrate`) only after reading it.
 4. Push and open the PR (or hand the branch to the user to try first, when
    it's UI they review on their `sst dev`).
 5. Clean up: remove the agent's worktree once its branch is pushed.
+6. Tick the item in `PLANNING.local.md` with the PR number.
 
 ## Lessons
 

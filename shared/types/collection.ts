@@ -135,8 +135,9 @@ export interface CollectionEntry extends LibraryItem {
    */
   wishlisted?: boolean
   /**
-   * On the Owned list only: the owner's custom collections the game is in,
-   * by title. Visitors see only the public ones.
+   * On the Owned list, and for the owner on custom collections: the
+   * owner's custom collections the game is in. Visitors to Owned see only
+   * the public ones.
    */
   inCollections?: CollectionLink[]
 }

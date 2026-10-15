@@ -31,40 +31,54 @@ const items = ['Chrono Trigger', 'EarthBound'].map((name, i) => ({
   addedAt: '2026-01-01T00:00:00.000Z',
 }))
 
-async function openWishlist(page: Page, moveStatus = 204) {
+const owned = {
+  ...summary,
+  id: '10000000-0000-4000-8000-000000000006',
+  title: 'Owned',
+  slug: 'owned',
+  kind: 'owned',
+}
+const rpg = {
+  ...summary,
+  id: '10000000-0000-4000-8000-000000000009',
+  title: 'RPGs',
+  slug: 'rpgs',
+  kind: 'custom',
+}
+
+const blueprint = {
+  id: '20000000-0000-4000-8000-000000000007',
+  name: null,
+  shared: false,
+  fields: [],
+}
+
+/** Stubs the list and the collection page. `lists` is what the user has. */
+async function openCollection(
+  page: Page,
+  list: typeof wishlist,
+  lists: object[],
+  rows: object[],
+  moveStatus = 204,
+) {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) =>
-    route.fulfill({ json: [wishlist, snes] }),
+    route.fulfill({ json: lists }),
   )
-  await page.route('**/api/u/retro_fan/collections/wishlist', (route) =>
+  await page.route(`**/api/u/retro_fan/collections/${list.slug}`, (route) =>
     route.fulfill({
       json: {
-        ...wishlist,
-        itemCount: items.length,
+        ...list,
+        itemCount: rows.length,
         isOwner: true,
-        blueprint: {
-          id: '20000000-0000-4000-8000-000000000007',
-          name: null,
-          shared: false,
-          fields: [],
-        },
-        items,
+        blueprint,
+        items: rows,
       },
     }),
   )
-  await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
+  await page.route('**/api/u/retro_fan/collections/rpgs', (route) =>
     route.fulfill({
-      json: {
-        ...snes,
-        isOwner: true,
-        blueprint: {
-          id: '20000000-0000-4000-8000-000000000008',
-          name: null,
-          shared: false,
-          fields: [],
-        },
-        items: [],
-      },
+      json: { ...rpg, isOwner: true, blueprint, items: [] },
     }),
   )
   const moves: unknown[] = []
@@ -75,50 +89,136 @@ async function openWishlist(page: Page, moveStatus = 204) {
     })
     return route.fulfill({ status: moveStatus })
   })
-  await page.goto('/u/retro_fan/shelf/wishlist')
+  const adds: string[] = []
+  await page.route(/\/api\/collections\/[^/]+\/items\/[^/]+$/, (route) => {
+    adds.push(
+      `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
+    )
+    return route.fulfill({ json: { collectionIds: [] } })
+  })
+  await page.goto(`/u/retro_fan/shelf/${list.slug}`)
   await expect(page.getByRole('table')).toBeVisible()
-  return moves
+  return { moves, adds }
 }
 
-async function gotIt(page: Page, name: string, collection: string) {
+const openWishlist = (
+  page: Page,
+  lists: object[] = [owned, wishlist, snes, rpg],
+  moveStatus = 204,
+) => openCollection(page, wishlist, lists, items, moveStatus)
+
+async function gotIt(page: Page, name: string) {
   await page.getByRole('button', { name: `Actions for ${name}` }).click()
-  // The keyboard way in: focus "Got it", open its submenu, pick.
-  await page.getByRole('menuitem', { name: 'Got it' }).focus()
-  await page.keyboard.press('ArrowRight')
-  const target = page.getByRole('menuitem', { name: collection })
-  await expect(target).toBeFocused()
-  await page.keyboard.press('Enter')
+  // One click: no submenu.
+  await page.getByRole('menuitem', { name: 'Got it' }).click()
 }
 
-test('"Got it" moves a game from the Wishlist into a collection', async ({
+test('"Got it" moves a game to Owned at once and offers the collections', async ({
   page,
 }) => {
-  const moves = await openWishlist(page)
-  await gotIt(page, 'Chrono Trigger', 'SNES Games')
+  const { moves, adds } = await openWishlist(page)
+  await gotIt(page, 'Chrono Trigger')
 
   await expect(page.getByRole('link', { name: 'Chrono Trigger' })).toHaveCount(
     0,
   )
-  await expect(page.getByText('Moved to SNES Games')).toBeVisible()
+  await expect(page.getByText('Moved to Owned')).toBeVisible()
   expect(moves).toEqual([
     {
       url: `collections/${wishlist.id}/items/${items[0]!.id}/move`,
-      body: { toCollectionIds: [snes.id] },
+      body: { toCollectionIds: [owned.id] },
     },
   ])
 
-  // The toast's View button goes to the collection.
-  await page.getByRole('button', { name: 'View' }).click()
-  await expect(page).toHaveURL(/\/u\/retro_fan\/shelf\/snes-games$/)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Add Chrono Trigger')).toBeVisible()
+  await dialog.getByRole('checkbox', { name: 'SNES Games' }).click()
+  await dialog.getByRole('checkbox', { name: 'RPGs' }).click()
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  expect(adds).toEqual([
+    `PUT collections/${snes.id}/items/${items[0]!.id}`,
+    `PUT collections/${rpg.id}/items/${items[0]!.id}`,
+  ])
+  await expect(page.getByText('Added to SNES Games, RPGs')).toBeVisible()
+})
+
+test('skipping the popup adds nothing', async ({ page }) => {
+  const { adds } = await openWishlist(page)
+  await gotIt(page, 'Chrono Trigger')
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Skip' }).click()
+  await expect(dialog).toBeHidden()
+  expect(adds).toEqual([])
+})
+
+test('"Got it" with no collections of your own has no popup', async ({
+  page,
+}) => {
+  const { moves } = await openWishlist(page, [owned, wishlist])
+  await gotIt(page, 'Chrono Trigger')
+  await expect(page.getByText('Moved to Owned')).toBeVisible()
+  expect(moves).toHaveLength(1)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 test('a failed move puts the game back', async ({ page }) => {
-  await openWishlist(page, 500)
-  await gotIt(page, 'EarthBound', 'SNES Games')
+  await openWishlist(page, [owned, wishlist, snes], 500)
+  await gotIt(page, 'EarthBound')
   await expect(
     page.getByText("Couldn't move that game. Try again."),
   ).toBeVisible()
   await expect(page.getByRole('link', { name: 'EarthBound' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test.describe('Add to', () => {
+  const rows = [
+    { ...items[0]!, inCollections: [] },
+    {
+      ...items[1]!,
+      inCollections: [{ id: rpg.id, title: 'RPGs', slug: 'rpgs', color: null }],
+    },
+  ]
+  const lists = [owned, wishlist, snes, rpg]
+
+  test('adds a game to another collection and keeps it here', async ({
+    page,
+  }) => {
+    const { adds, moves } = await openCollection(page, snes, lists, rows)
+    await page
+      .getByRole('button', { name: 'Actions for Chrono Trigger' })
+      .click()
+    // The keyboard way in: focus "Add to", open its submenu, pick.
+    await page.getByRole('menuitem', { name: 'Add to' }).focus()
+    await page.keyboard.press('ArrowRight')
+    // The Wishlist is not offered.
+    await expect(page.getByRole('menuitem', { name: 'Wishlist' })).toHaveCount(
+      0,
+    )
+    await expect(page.getByRole('menuitem', { name: 'RPGs' })).toBeFocused()
+    await page.keyboard.press('Enter')
+
+    await expect(page.getByText('Added to RPGs')).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: 'Chrono Trigger' }),
+    ).toBeVisible()
+    expect(moves).toEqual([])
+    expect(adds).toEqual([`PUT collections/${rpg.id}/items/${items[0]!.id}`])
+
+    await page.getByRole('button', { name: 'View' }).click()
+    await expect(page).toHaveURL(/\/u\/retro_fan\/shelf\/rpgs$/)
+  })
+
+  test('leaves out collections the game is already in', async ({ page }) => {
+    await openCollection(page, snes, lists, rows)
+    await page.getByRole('button', { name: 'Actions for EarthBound' }).click()
+    await page.getByRole('menuitem', { name: 'Add to' }).focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(
+      page.getByRole('menuitem', { name: 'No other collections to add to' }),
+    ).toBeVisible()
+  })
 })
 
 test('the pinned name matches the row while its menu is open', async ({

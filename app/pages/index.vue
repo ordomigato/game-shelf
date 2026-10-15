@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Search } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { CollectionSummary, LibraryItem } from '#shared/types/collection'
+import type { LibraryItem } from '#shared/types/collection'
 import type { GameSummary } from '#shared/types/game'
 
 const {
@@ -44,24 +44,24 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
-const collections = useCollections()
+const myCollections = useMyCollections()
 const targetSlug = computed(() =>
   typeof route.query.to === 'string' ? route.query.to : null,
 )
-const mine = ref<CollectionSummary[]>([])
+const mine = computed(() => myCollections.list.value ?? [])
 const target = computed(
   () => mine.value.find((c) => c.slug === targetSlug.value) ?? null,
 )
 
 async function loadTarget() {
-  if (!targetSlug.value || mine.value.length) return
+  if (!targetSlug.value) return
   await auth.ensureLoaded()
   if (auth.status.value !== 'signedIn') {
     await navigateTo({ path: '/login', query: { redirect: route.fullPath } })
     return
   }
   try {
-    mine.value = await collections.mine()
+    await myCollections.load()
   } catch {
     // Search still works, just without the collection.
   }

@@ -150,6 +150,71 @@ test.describe('signed in', () => {
     ).toBeVisible()
   })
 
+  test('opening the menu again asks nothing new, and shows the latest ticks', async ({
+    page,
+  }) => {
+    const asked: string[] = []
+    page.on('request', (request) => {
+      const path = new URL(request.url()).pathname
+      if (request.method() === 'GET' && path.startsWith('/api/')) {
+        asked.push(path)
+      }
+    })
+    const count = (path: string) => asked.filter((p) => p === path).length
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [{ igdbId: 1, itemId }] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({
+        json: {
+          item: {
+            id: itemId,
+            igdbId: 1,
+            name: 'Zelda Game 1',
+            coverId: null,
+            data: {},
+          },
+          collectionIds: [wishlist.id],
+        },
+      }),
+    )
+    await page.route(`**/api/collections/${nes.id}/items/${itemId}`, (route) =>
+      route.fulfill({ status: 204 }),
+    )
+
+    await searchZelda(page)
+    const trigger = page.getByRole('button', {
+      name: 'In your collections: Zelda Game 1',
+    })
+    const menu = page.getByRole('menu')
+    const nesBox = menu.getByRole('menuitemcheckbox', { name: 'NES Games' })
+
+    await trigger.click()
+    await expect(
+      menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }),
+    ).toBeChecked()
+    await expect(nesBox).not.toBeChecked()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+
+    await trigger.click()
+    await expect(nesBox).not.toBeChecked()
+    expect(count('/api/library-items/igdb/1')).toBe(1)
+    expect(count('/api/collections')).toBeLessThanOrEqual(1)
+
+    await nesBox.click()
+    await expect(nesBox).toBeChecked()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+
+    await trigger.click()
+    await expect(nesBox).toBeChecked()
+    await expect(
+      menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }),
+    ).toBeChecked()
+    expect(count('/api/library-items/igdb/1')).toBe(1)
+  })
+
   test('undoes the tick and says so when saving fails', async ({ page }) => {
     await page.route('**/api/library-items/igdb?**', (route) =>
       route.fulfill({ json: [] }),
@@ -222,6 +287,42 @@ test.describe('signed in', () => {
     await expect(
       page.getByRole('menuitemcheckbox', { name: 'NES Games' }),
     ).toBeChecked()
+  })
+
+  test('the game page and its menu ask once between them', async ({ page }) => {
+    let asked = 0
+    await page.route('**/api/library-items/igdb/1', (route) => {
+      asked += 1
+      return route.fulfill({ json: { item: null, collectionIds: [] } })
+    })
+    await page.route('**/api/games/1', (route) =>
+      route.fulfill({
+        json: {
+          id: 1,
+          name: 'Zelda Game 1',
+          coverId: null,
+          releaseDate: null,
+          summary: null,
+          platforms: [],
+          genres: [],
+          developers: [],
+          publishers: [],
+          screenshotIds: [],
+          igdbUrl: null,
+        },
+      }),
+    )
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [] }),
+    )
+    await searchZelda(page)
+    await page.getByRole('link', { name: 'Zelda Game 1' }).click()
+    await expect(page).toHaveURL(/\/games\/1$/)
+    await page.getByRole('button', { name: 'Add to collection' }).click()
+    await expect(
+      page.getByRole('menuitemcheckbox', { name: 'NES Games' }),
+    ).not.toBeChecked()
+    expect(asked).toBe(1)
   })
 
   test.describe('from a collection', () => {

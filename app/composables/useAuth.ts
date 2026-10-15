@@ -53,6 +53,7 @@ export function useAuth() {
     status.value = 'signedOut'
     hint.value = null
     clearNuxtState('my-collections')
+    useGameMemberships().clear()
   }
 
   async function accessToken(): Promise<string | null> {

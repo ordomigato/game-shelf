@@ -32,10 +32,11 @@ const ids = {
   list: useId(),
 }
 const root = useTemplateRef<HTMLElement>('root')
-const { list, refresh, pinned, unpinned, pin, unpin } = useMyCollections()
+const { list, load, pinned, unpinned, pin, unpin } = useMyCollections()
 
 onMounted(() => {
-  if (list.value === null) onNuxtReady(() => void refresh())
+  // The page or the other copy of this list may be loading it already.
+  if (list.value === null) onNuxtReady(() => void load().catch(() => {}))
 })
 
 // Folding the list is remembered in a cookie, so the server draws it the

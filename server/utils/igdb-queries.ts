@@ -237,3 +237,77 @@ export function toGameDetails(game: IgdbGameDetails): GameDetails {
     igdbUrl: game.url ?? null,
   }
 }
+
+/** The most ids one catalog request asks for: IGDB's limit per request. */
+export const CATALOG_BATCH_SIZE = 500
+
+/** The fields of an IGDB `games` row that the catalog keeps. */
+export interface IgdbCatalogGame {
+  id: number
+  name: string
+  cover?: { image_id: string }
+  first_release_date?: number
+  genres?: { id: number; name: string }[]
+  platforms?: { id: number; name: string; abbreviation?: string }[]
+}
+
+/** A `games` row as read from IGDB, minus the timestamps. */
+export interface CatalogGame {
+  igdbId: number
+  name: string
+  coverId: string | null
+  releaseDate: string | null
+  genres: string[]
+  platformIds: number[]
+}
+
+/** A `platforms` row. */
+export interface CatalogPlatform {
+  igdbId: number
+  name: string
+  abbreviation: string | null
+}
+
+/** Reads up to `CATALOG_BATCH_SIZE` games by IGDB id, for the catalog. */
+export function buildCatalogQuery(ids: number[]): string {
+  if (!ids.length || ids.length > CATALOG_BATCH_SIZE) {
+    throw new Error(`Expected 1 to ${CATALOG_BATCH_SIZE} ids`)
+  }
+  for (const id of ids) {
+    if (!Number.isSafeInteger(id) || id < 1) {
+      throw new Error(`Invalid IGDB game id: ${id}`)
+    }
+  }
+  return [
+    'fields name, cover.image_id, first_release_date, genres.name,',
+    'platforms.name, platforms.abbreviation;',
+    `where id = (${ids.join(',')});`,
+    `limit ${CATALOG_BATCH_SIZE};`,
+  ].join(' ')
+}
+
+/** The catalog row for an IGDB game, and the platforms it mentions. */
+export function toCatalogGame(game: IgdbCatalogGame): {
+  game: CatalogGame
+  platforms: CatalogPlatform[]
+} {
+  const platforms = game.platforms ?? []
+  return {
+    game: {
+      igdbId: game.id,
+      name: game.name,
+      coverId: game.cover?.image_id ?? null,
+      releaseDate:
+        game.first_release_date === undefined
+          ? null
+          : new Date(game.first_release_date * 1000).toISOString().slice(0, 10),
+      genres: [...new Set((game.genres ?? []).map((genre) => genre.name))],
+      platformIds: [...new Set(platforms.map((platform) => platform.id))],
+    },
+    platforms: platforms.map((platform) => ({
+      igdbId: platform.id,
+      name: platform.name,
+      abbreviation: platform.abbreviation ?? null,
+    })),
+  }
+}

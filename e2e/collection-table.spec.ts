@@ -8,6 +8,8 @@ const item = (n: number, name: string, data: Record<string, unknown>) => ({
   igdbId: 100 + n,
   name,
   coverId: null,
+  year: 1990 + n,
+  genres: ['Role-playing (RPG)'],
   data,
   addedAt: `2026-01-0${n}T00:00:00.000Z`,
 })
@@ -21,14 +23,14 @@ const items = [
   item(2, 'EarthBound', { status: 'Playing', hours: 9 }),
   item(3, 'Mega Man 2', { status: 'Backlog', hours: 100, notes: 'Hard mode' }),
 ]
-const detail = (isOwner: boolean) => ({
+const detail = (isOwner: boolean, list: object[] = items) => ({
   id: collectionId,
   title: 'SNES Games',
   slug: 'snes-games',
   description: null,
   visibility: 'public',
   kind: 'custom',
-  itemCount: items.length,
+  itemCount: list.length,
   updatedAt: '2026-01-01T00:00:00.000Z',
   isOwner,
   blueprint: {
@@ -48,13 +50,17 @@ const detail = (isOwner: boolean) => ({
       { id: 'notes', name: 'Notes', type: 'text' },
     ],
   },
-  items,
+  items: list,
 })
 
-async function openCollection(page: Page, owner: boolean) {
+async function openCollection(
+  page: Page,
+  owner: boolean,
+  list: object[] = items,
+) {
   if (owner) await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
-    route.fulfill({ json: detail(owner) }),
+    route.fulfill({ json: detail(owner, list) }),
   )
   await page.goto('/u/retro_fan/shelf/snes-games')
   await expect(page.getByRole('table')).toBeVisible()
@@ -232,21 +238,33 @@ test.describe('owners', () => {
     expect(removed).toBe(`DELETE ${items[2]!.id}`)
   })
 
-  test('rename a game', async ({ page }) => {
+  test('rename a game added by hand', async ({ page }) => {
+    const byHand = { ...items[1]!, igdbId: null, year: null, genres: [] }
     let renamed: unknown
-    await page.route(`**/api/library-items/${items[1]!.id}`, (route) => {
+    await page.route(`**/api/library-items/${byHand.id}`, (route) => {
       renamed = route.request().postDataJSON()
-      return route.fulfill({ json: { ...items[1], name: 'Mother 2' } })
+      return route.fulfill({ json: { ...byHand, name: 'Mother 2' } })
     })
-    await openCollection(page, true)
+    await openCollection(page, true, [items[0]!, byHand, items[2]!])
     await page.getByRole('button', { name: 'Actions for EarthBound' }).click()
     await page.getByRole('menuitem', { name: 'Rename' }).click()
     const dialog = page.getByRole('dialog', { name: 'Rename game' })
     await dialog.getByRole('textbox', { name: 'Name' }).fill('Mother 2')
     await dialog.getByRole('button', { name: 'Save' }).click()
     await expect(dialog).toBeHidden()
-    await expect(page.getByRole('link', { name: 'Mother 2' })).toBeVisible()
+    await expect(
+      page.getByRole('table').getByText('Mother 2', { exact: true }),
+    ).toBeVisible()
     expect(renamed).toEqual({ name: 'Mother 2' })
+  })
+
+  test('an IGDB game cannot be renamed', async ({ page }) => {
+    await openCollection(page, true)
+    await page.getByRole('button', { name: 'Actions for EarthBound' }).click()
+    await expect(
+      page.getByRole('menuitem', { name: 'Remove from collection' }),
+    ).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0)
   })
 
   test('the header row does not light up on hover', async ({ page }) => {

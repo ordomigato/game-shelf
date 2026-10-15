@@ -2,8 +2,8 @@
 import type { CollectionEntry, LibraryItem } from '#shared/types/collection'
 
 /**
- * Renames the user's own copy of a game. The name changes in all their
- * collections. The game stays linked to IGDB.
+ * Renames a game the user added by hand. The name changes in all their
+ * collections. IGDB games take their name from the catalog.
  */
 const props = defineProps<{ item: CollectionEntry | null }>()
 const emit = defineEmits<{ saved: [item: LibraryItem] }>()

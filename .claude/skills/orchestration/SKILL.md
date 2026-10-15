@@ -73,12 +73,12 @@ build), so:
 
 ## Which agent
 
-| Work                                                     | Agent                                      | Notes                                                             |
-| -------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
-| Find where something lives, map a pattern across the app | `Explore`                                  | Read-only. Say how thorough ("medium", "very thorough").          |
-| Design an approach for something big before building it  | `Plan`                                     | Read-only. Ask for files to change, order, risks.                 |
-| Build a change and test it                               | `general-purpose`, `isolation: "worktree"` | Gets its own git worktree, so it can't touch the user's checkout. |
-| Look things up online (provider docs, limits, prices)    | `general-purpose`                          | Ask for sources.                                                  |
+| Work                                                     | Agent                                                         | Notes                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Find where something lives, map a pattern across the app | `Explore`, `model: "haiku"`                                   | Read-only. Say how thorough ("medium", "very thorough").                                |
+| Design an approach for something big before building it  | `Plan`                                                        | Read-only. Only when the design isn't clear yet. Ask for files to change, order, risks. |
+| Build a change and test it                               | `general-purpose`, `isolation: "worktree"`, `model: "sonnet"` | Gets its own git worktree, so it can't touch the user's checkout.                       |
+| Look things up online (provider docs, limits, prices)    | `general-purpose`, `model: "sonnet"`                          | Ask for sources.                                                                        |
 
 Run agents in the background unless the very next step needs the answer.
 Run independent agents in parallel, in one message.

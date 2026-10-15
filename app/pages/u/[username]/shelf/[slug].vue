@@ -196,12 +196,14 @@ watch(
   },
   { immediate: true },
 )
-// The owner's custom collections other than this one: where "Add to" puts a
-// game, and what "Got it" offers.
+// The owner's custom collections, and those other than this one, which is
+// where "Add to" puts a game.
+const customCollections = computed(() =>
+  mine.value.filter((collection) => collection.kind === 'custom'),
+)
 const addTargets = computed(() =>
-  mine.value.filter(
-    (collection) =>
-      collection.kind === 'custom' && collection.id !== data.value?.id,
+  customCollections.value.filter(
+    (collection) => collection.id !== data.value?.id,
   ),
 )
 
@@ -209,8 +211,18 @@ const addTargets = computed(() =>
 async function addToCollection(itemId: string, collectionId: string) {
   const target = mine.value.find((collection) => collection.id === collectionId)
   if (!data.value || !target) return
+  const pageId = data.value.id
   try {
     await collections.addItem(collectionId, itemId)
+  } catch (error) {
+    toast.error(
+      limitMessage(error, t) ??
+        t('table.addToFailed', { collection: titleOf(target) }),
+    )
+    return
+  }
+  // The page may have moved on to another collection while this saved.
+  if (data.value?.id === pageId) {
     setItems(
       data.value.items.map((entry) =>
         entry.id === itemId && entry.inCollections
@@ -229,15 +241,13 @@ async function addToCollection(itemId: string, collectionId: string) {
           : entry,
       ),
     )
-    toast.success(t('table.addedTo', { collection: titleOf(target) }), {
-      action: {
-        label: t('table.view'),
-        onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
-      },
-    })
-  } catch (error) {
-    toast.error(limitMessage(error, t) ?? t('table.addToFailed'))
   }
+  toast.success(t('table.addedTo', { collection: titleOf(target) }), {
+    action: {
+      label: t('table.view'),
+      onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
+    },
+  })
 }
 
 const gotItItem = ref<CollectionEntry | null>(null)
@@ -251,12 +261,13 @@ async function gotIt(itemId: string) {
   const owned = mine.value.find((collection) => collection.kind === 'owned')
   const item = data.value?.items.find((entry) => entry.id === itemId)
   if (!data.value || !owned || !item) return
+  const pageId = data.value.id
   const before = data.value.items
   setItems(before.filter((entry) => entry.id !== itemId))
   try {
-    await collections.moveToCollections(data.value.id, itemId, [owned.id])
+    await collections.moveToCollections(pageId, itemId, [owned.id])
   } catch (error) {
-    setItems(before)
+    if (data.value?.id === pageId) setItems(before)
     toast.error(limitMessage(error, t) ?? t('table.moveToFailed'))
     return
   }
@@ -266,7 +277,7 @@ async function gotIt(itemId: string) {
       onClick: () => navigateTo(`${shelfPath.value}/${owned.slug}`),
     },
   })
-  if (addTargets.value?.length) {
+  if (customCollections.value.length) {
     gotItItem.value = item
     offeringCollections.value = true
   }
@@ -777,7 +788,8 @@ async function deleteCollection() {
         v-model:open="offeringCollections"
         :item-id="gotItItem?.id ?? null"
         :item-name="gotItItem?.name ?? ''"
-        :collections="addTargets ?? []"
+        :collections="customCollections"
+        :already-in="gotItItem?.inCollections?.map(({ id }) => id)"
       />
       <RenameItemDialog
         v-if="data.isOwner"

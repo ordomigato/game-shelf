@@ -12,6 +12,8 @@ const props = defineProps<{
   itemId: string | null
   itemName: string
   collections: CollectionSummary[]
+  /** Collections the game is already in, which aren't offered. */
+  alreadyIn?: string[]
 }>()
 const open = defineModel<boolean>('open', { default: false })
 
@@ -25,7 +27,11 @@ const added = ref(new Set<string>())
 const saving = ref(false)
 
 const choices = computed(() =>
-  props.collections.filter((collection) => !added.value.has(collection.id)),
+  props.collections.filter(
+    (collection) =>
+      !added.value.has(collection.id) &&
+      !props.alreadyIn?.includes(collection.id),
+  ),
 )
 
 watch(open, (isOpen) => {
@@ -45,18 +51,29 @@ async function add() {
   if (!props.itemId || saving.value || !selected.value.size) return
   saving.value = true
   const done: CollectionSummary[] = []
+  let failed: CollectionSummary | undefined
   try {
     for (const collection of choices.value) {
       if (!selected.value.has(collection.id)) continue
+      failed = collection
       await library.addItem(collection.id, props.itemId)
       done.push(collection)
     }
     open.value = false
   } catch (error) {
-    toast.error(limitMessage(error, t) ?? t('gotIt.failed'))
+    toast.error(
+      limitMessage(error, t) ??
+        t('table.addToFailed', {
+          collection: failed ? titleOf(failed) : '',
+        }),
+    )
   } finally {
     saving.value = false
-    added.value = new Set([...added.value, ...done.map(({ id }) => id)])
+    const doneIds = done.map(({ id }) => id)
+    added.value = new Set([...added.value, ...doneIds])
+    selected.value = new Set(
+      [...selected.value].filter((id) => !doneIds.includes(id)),
+    )
     if (done.length) {
       const only = done.length === 1 ? done[0] : undefined
       toast.success(

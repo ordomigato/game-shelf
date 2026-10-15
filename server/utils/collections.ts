@@ -307,6 +307,19 @@ async function wishlistedItemIds(
 }
 
 /**
+ * Which of the owner's custom collections a collection's games say they're
+ * in: all of them for the owner on any list, only the public ones for a
+ * visitor to Owned, and none for a visitor to anything else.
+ */
+export function listedCollections(
+  kind: CollectionRow['kind'],
+  viewerIsOwner: boolean,
+): 'all' | 'public' | null {
+  if (viewerIsOwner) return 'all'
+  return kind === 'owned' ? 'public' : null
+}
+
+/**
  * The owner's custom collections each item is in, by title, for the Owned
  * list and for the owner's own custom collections. Visitors see only the
  * public ones.
@@ -374,8 +387,7 @@ export async function getCollectionBySlug(
   const itemIds = entries.map((entry) => entry.item.id)
   const [wishlisted, inCollections] = await Promise.all([
     wishlistedItemIds(ownerId, found.collection, itemIds, viewerIsOwner),
-    found.collection.kind === 'owned' ||
-    (found.collection.kind === 'custom' && viewerIsOwner)
+    listedCollections(found.collection.kind, viewerIsOwner)
       ? customCollectionsOf(ownerId, itemIds, viewerIsOwner)
       : null,
   ])

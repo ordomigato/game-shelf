@@ -558,7 +558,7 @@
     "movedTo": "Moved to {collection}",
     "view": "View",
     "moveToFailed": "Couldn't move that game. Try again.",
-    "addToFailed": "Couldn't add that game. Try again.",
+    "addToFailed": "Couldn't add it to {collection}. Try again.",
     "onWishlist": "On your Wishlist: {name}",
     "addToWishlist": "Add to your Wishlist",
     "removeFromWishlist": "Take off your Wishlist",
@@ -627,9 +627,8 @@
     "title": "Add {name} to your collections?",
     "description": "It's in Owned now. Tick any collections you'd like it in too.",
     "add": "Add",
-    "adding": "Adding...",
-    "skip": "Skip",
-    "failed": "Couldn't add that game. Try again."
+    "adding": "Adding…",
+    "skip": "Skip"
   },
   "rename": {
     "title": "Rename game",

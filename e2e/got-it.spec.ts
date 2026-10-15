@@ -60,6 +60,8 @@ async function openCollection(
   lists: object[],
   rows: object[],
   moveStatus = 204,
+  /** Collections that refuse a game, over the plan's limit. */
+  full: string[] = [],
 ) {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) =>
@@ -91,9 +93,20 @@ async function openCollection(
   })
   const adds: string[] = []
   await page.route(/\/api\/collections\/[^/]+\/items\/[^/]+$/, (route) => {
-    adds.push(
-      `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
-    )
+    const url = route.request().url().split('/api/')[1]!
+    adds.push(`${route.request().method()} ${url}`)
+    if (full.some((id) => url.includes(id))) {
+      return route.fulfill({
+        status: 403,
+        json: {
+          statusCode: 403,
+          data: {
+            key: 'limits.reached.gamesPerCollection',
+            params: { limit: 1000 },
+          },
+        },
+      })
+    }
     return route.fulfill({ json: { collectionIds: [] } })
   })
   await page.goto(`/u/retro_fan/shelf/${list.slug}`)
@@ -105,7 +118,9 @@ const openWishlist = (
   page: Page,
   lists: object[] = [owned, wishlist, snes, rpg],
   moveStatus = 204,
-) => openCollection(page, wishlist, lists, items, moveStatus)
+  full: string[] = [],
+  rows: object[] = items,
+) => openCollection(page, wishlist, lists, rows, moveStatus, full)
 
 async function gotIt(page: Page, name: string) {
   await page.getByRole('button', { name: `Actions for ${name}` }).click()
@@ -150,6 +165,50 @@ test('skipping the popup adds nothing', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Skip' }).click()
   await expect(dialog).toBeHidden()
   expect(adds).toEqual([])
+})
+
+test('the popup leaves out collections the game is already in', async ({
+  page,
+}) => {
+  await openWishlist(
+    page,
+    undefined,
+    204,
+    [],
+    items.map((item) => ({
+      ...item,
+      inCollections: [
+        { id: snes.id, title: 'SNES Games', slug: 'snes-games', color: null },
+      ],
+    })),
+  )
+  await gotIt(page, 'Chrono Trigger')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('checkbox', { name: 'RPGs' })).toBeVisible()
+  await expect(
+    dialog.getByRole('checkbox', { name: 'SNES Games' }),
+  ).toHaveCount(0)
+})
+
+test('a collection that is full is named, and the rest still go in', async ({
+  page,
+}) => {
+  const { adds } = await openWishlist(page, undefined, 204, [rpg.id])
+  await gotIt(page, 'Chrono Trigger')
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox', { name: 'SNES Games' }).click()
+  await dialog.getByRole('checkbox', { name: 'RPGs' }).click()
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+
+  await expect(
+    page.getByText('A collection can hold up to 1000 games on your plan.'),
+  ).toBeVisible()
+  await expect(page.getByText('Added to SNES Games')).toBeVisible()
+  // The one that went in is gone from the list, and only RPGs is left.
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('checkbox')).toHaveCount(1)
+  await expect(dialog.getByRole('checkbox', { name: 'RPGs' })).toBeChecked()
+  expect(adds).toHaveLength(2)
 })
 
 test('"Got it" with no collections of your own has no popup', async ({
@@ -208,6 +267,23 @@ test.describe('Add to', () => {
 
     await page.getByRole('button', { name: 'View' }).click()
     await expect(page).toHaveURL(/\/u\/retro_fan\/shelf\/rpgs$/)
+  })
+
+  test('on Owned, the collections column updates', async ({ page }) => {
+    await openCollection(page, owned as typeof wishlist, lists, rows)
+    const row = page.locator('table tbody tr').first()
+    await expect(row.getByRole('link', { name: 'SNES Games' })).toHaveCount(0)
+    await page
+      .getByRole('button', { name: 'Actions for Chrono Trigger' })
+      .click()
+    await page.getByRole('menuitem', { name: 'Add to' }).focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(
+      page.getByRole('menuitem', { name: 'SNES Games' }),
+    ).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByText('Added to SNES Games')).toBeVisible()
+    await expect(row.getByRole('link', { name: 'SNES Games' })).toBeVisible()
   })
 
   test('leaves out collections the game is already in', async ({ page }) => {

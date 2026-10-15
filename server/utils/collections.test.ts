@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogRow } from './catalog'
-import { toLibraryItem } from './collections'
+import { listedCollections, toLibraryItem } from './collections'
 
 const item = {
   id: '30000000-0000-4000-8000-000000000001',
@@ -63,5 +63,22 @@ describe('toLibraryItem', () => {
       name: 'Homebrew',
       coverId: null,
     })
+  })
+})
+
+describe('listedCollections', () => {
+  it('shows the owner every collection, private ones too, on any list', () => {
+    for (const kind of ['owned', 'wishlist', 'custom'] as const) {
+      expect(listedCollections(kind, true)).toBe('all')
+    }
+  })
+
+  it('shows a visitor to Owned only the public collections', () => {
+    expect(listedCollections('owned', false)).toBe('public')
+  })
+
+  it('shows a visitor to anything else none', () => {
+    expect(listedCollections('custom', false)).toBeNull()
+    expect(listedCollections('wishlist', false)).toBeNull()
   })
 })

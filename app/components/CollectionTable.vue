@@ -14,7 +14,7 @@ import {
   ArrowDownToLine,
   ArrowUpDown,
   ArrowUpToLine,
-  FolderInput,
+  FolderPlus,
   Heart,
   PackageCheck,
   ChevronLeft,
@@ -48,12 +48,15 @@ const props = defineProps<{
   items: CollectionEntry[]
   editable: boolean
   /**
-   * The owner's other collections, for "Got it" or "Move to". Without
-   * them, rows have no such menu.
+   * The owner's custom collections other than this one, for "Add to". A
+   * row lists the ones its game isn't in yet. Without them, rows have no
+   * such menu.
    */
-  moveTargets?: CollectionSummary[]
-  /** In the Wishlist, moving a game out reads as "Got it". */
+  addTargets?: CollectionSummary[]
+  /** In the Wishlist, rows have "Got it" instead of "Add to". */
   isWishlist?: boolean
+  /** On the Owned list, rows say which collections each game is in. */
+  isOwned?: boolean
   /** The owner's shelf, for links to the collections in `inCollections`. */
   shelfPath?: string
 }>()
@@ -61,8 +64,10 @@ const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
   remove: [itemId: string]
   rename: [itemId: string]
-  /** Move the game out of this collection into another. */
-  moveTo: [itemId: string, collectionId: string]
+  /** Add the game to another collection. It stays in this one. */
+  addTo: [itemId: string, collectionId: string]
+  /** Move the game from the Wishlist to Owned. */
+  gotIt: [itemId: string]
   /** Put the game on the owner's Wishlist, or take it off. */
   wishlist: [itemId: string, on: boolean]
   /** Place `itemId` right after `afterItemId`, or first when null. */
@@ -88,9 +93,18 @@ const showWishlist = computed(
 const WISHLIST_FILTER = '__wishlist'
 
 /** Whether rows list the collections each game is in (on Owned). */
-const showCollections = computed(() =>
-  props.items.some((item) => item.inCollections !== undefined),
+const showCollections = computed(
+  () =>
+    props.isOwned &&
+    props.items.some((item) => item.inCollections !== undefined),
 )
+
+/** The collections a game can still be added to. */
+const addTargetsFor = (item: CollectionEntry) =>
+  (props.addTargets ?? []).filter(
+    (target) =>
+      !item.inCollections?.some((collection) => collection.id === target.id),
+  )
 const collectionTitles = (item: CollectionEntry) =>
   (item.inCollections ?? []).map((collection) => collection.title)
 
@@ -624,26 +638,33 @@ const addedFormat = computed(
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-max">
-                  <DropdownMenuSub v-if="moveTargets">
+                  <DropdownMenuItem
+                    v-if="isWishlist"
+                    @select="emit('gotIt', item.id)"
+                  >
+                    <PackageCheck /> {{ $t('table.gotIt') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSub v-else-if="addTargets">
                     <DropdownMenuSubTrigger>
-                      <PackageCheck v-if="isWishlist" />
-                      <FolderInput v-else />
-                      {{ isWishlist ? $t('table.gotIt') : $t('table.moveTo') }}
+                      <FolderPlus /> {{ $t('table.addTo') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent class="w-max">
                       <DropdownMenuItem
-                        v-for="target in moveTargets ?? []"
+                        v-for="target in addTargetsFor(item)"
                         :key="target.id"
-                        @select="emit('moveTo', item.id, target.id)"
+                        @select="emit('addTo', item.id, target.id)"
                       >
                         {{ titleOf(target) }}
                       </DropdownMenuItem>
-                      <DropdownMenuItem v-if="!moveTargets.length" disabled>
+                      <DropdownMenuItem
+                        v-if="!addTargetsFor(item).length"
+                        disabled
+                      >
                         {{ $t('table.noOtherCollections') }}
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-                  <DropdownMenuSeparator v-if="moveTargets" />
+                  <DropdownMenuSeparator v-if="isWishlist || addTargets" />
                   <template v-if="reorderable">
                     <DropdownMenuItem
                       :disabled="indexOf(item.id) === 0"

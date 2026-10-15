@@ -184,43 +184,102 @@ function onRenamed(saved: LibraryItem) {
 }
 
 // The owner's collections, from the same list the sidebar uses: for "Got
-// it", "Move to" and pinning. Phones have no sidebar, so load the list here
+// it", "Add to" and pinning. Phones have no sidebar, so load the list here
 // if nothing has yet.
 const sidebar = useMyCollections()
 const mine = computed(() => sidebar.list.value ?? [])
 watch(
   () => data.value?.isOwner,
   (isOwner) => {
-    // Without it, the menus just show no collections to move to.
+    // Without it, the menus just show no collections to add to.
     if (isOwner) sidebar.load().catch(() => {})
   },
   { immediate: true },
 )
-// Games don't move out of Owned: removing one is how it leaves.
-const moveTargets = computed(() =>
-  data.value?.kind === 'owned'
-    ? undefined
-    : mine.value.filter((collection) => collection.id !== data.value?.id),
+// The owner's custom collections, and those other than this one, which is
+// where "Add to" puts a game.
+const customCollections = computed(() =>
+  mine.value.filter((collection) => collection.kind === 'custom'),
+)
+const addTargets = computed(() =>
+  customCollections.value.filter(
+    (collection) => collection.id !== data.value?.id,
+  ),
 )
 
-/** Takes a game out of this collection into another, with a toast. */
-async function moveToCollection(itemId: string, collectionId: string) {
+/** Adds a game to another collection. It stays in this one. */
+async function addToCollection(itemId: string, collectionId: string) {
   const target = mine.value.find((collection) => collection.id === collectionId)
   if (!data.value || !target) return
-  const fromId = data.value.id
+  const pageId = data.value.id
+  try {
+    await collections.addItem(collectionId, itemId)
+  } catch (error) {
+    toast.error(
+      limitMessage(error, t) ??
+        t('table.addToFailed', { collection: titleOf(target) }),
+    )
+    return
+  }
+  // The page may have moved on to another collection while this saved.
+  if (data.value?.id === pageId) {
+    setItems(
+      data.value.items.map((entry) =>
+        entry.id === itemId && entry.inCollections
+          ? {
+              ...entry,
+              inCollections: [
+                ...entry.inCollections,
+                {
+                  id: target.id,
+                  title: target.title,
+                  slug: target.slug,
+                  color: target.color,
+                },
+              ],
+            }
+          : entry,
+      ),
+    )
+  }
+  toast.success(t('table.addedTo', { collection: titleOf(target) }), {
+    action: {
+      label: t('table.view'),
+      onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
+    },
+  })
+}
+
+const gotItItem = ref<CollectionEntry | null>(null)
+const offeringCollections = ref(false)
+
+/**
+ * Moves a game from the Wishlist to Owned. Then, if the user has
+ * collections of their own, offers to add it to some of them.
+ */
+async function gotIt(itemId: string) {
+  const owned = mine.value.find((collection) => collection.kind === 'owned')
+  const item = data.value?.items.find((entry) => entry.id === itemId)
+  if (!data.value || !owned || !item) return
+  const pageId = data.value.id
   const before = data.value.items
   setItems(before.filter((entry) => entry.id !== itemId))
   try {
-    await collections.moveToCollections(fromId, itemId, [collectionId])
-    toast.success(t('table.movedTo', { collection: titleOf(target) }), {
-      action: {
-        label: t('table.view'),
-        onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
-      },
-    })
+    await collections.moveToCollections(pageId, itemId, [owned.id])
   } catch (error) {
-    setItems(before)
+    if (data.value?.id === pageId) setItems(before)
     toast.error(limitMessage(error, t) ?? t('table.moveToFailed'))
+    return
+  }
+  toast.success(t('table.movedTo', { collection: titleOf(owned) }), {
+    action: {
+      label: t('table.view'),
+      onClick: () => navigateTo(`${shelfPath.value}/${owned.slug}`),
+    },
+  })
+  if (customCollections.value.length) {
+    gotItItem.value = item
+    offeringCollections.value = true
   }
 }
 
@@ -639,14 +698,16 @@ async function deleteCollection() {
           :fields="data.blueprint.fields"
           :items="data.items"
           :editable="data.isOwner"
-          :move-targets="moveTargets"
+          :add-targets="addTargets"
           :is-wishlist="data.kind === 'wishlist'"
+          :is-owned="data.kind === 'owned'"
           :shelf-path="shelfPath"
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"
           @rename="startRenaming"
-          @move-to="moveToCollection"
+          @add-to="addToCollection"
+          @got-it="gotIt"
           @wishlist="toggleWishlist"
         />
 
@@ -721,6 +782,14 @@ async function deleteCollection() {
         v-model:open="addingByHand"
         :collection="data"
         @added="refresh()"
+      />
+      <GotItDialog
+        v-if="data.isOwner"
+        v-model:open="offeringCollections"
+        :item-id="gotItItem?.id ?? null"
+        :item-name="gotItItem?.name ?? ''"
+        :collections="customCollections"
+        :already-in="gotItItem?.inCollections?.map(({ id }) => id)"
       />
       <RenameItemDialog
         v-if="data.isOwner"

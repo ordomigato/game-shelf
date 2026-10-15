@@ -552,11 +552,13 @@
       "text": "That's too long"
     },
     "gotIt": "Got it",
-    "moveTo": "Move to",
-    "noOtherCollections": "No other collections yet",
+    "addTo": "Add to",
+    "noOtherCollections": "No other collections to add to",
+    "addedTo": "Added to {collection}",
     "movedTo": "Moved to {collection}",
     "view": "View",
     "moveToFailed": "Couldn't move that game. Try again.",
+    "addToFailed": "Couldn't add it to {collection}. Try again.",
     "onWishlist": "On your Wishlist: {name}",
     "addToWishlist": "Add to your Wishlist",
     "removeFromWishlist": "Take off your Wishlist",
@@ -620,6 +622,13 @@
     "detachAndEdit": "Detach and edit here",
     "close": "Close",
     "reviewTitle": "Before you save"
+  },
+  "gotIt": {
+    "title": "Add {name} to your collections?",
+    "description": "It's in Owned now. Tick any collections you'd like it in too.",
+    "add": "Add",
+    "adding": "Adding…",
+    "skip": "Skip"
   },
   "rename": {
     "title": "Rename game",

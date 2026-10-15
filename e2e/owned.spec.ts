@@ -134,7 +134,8 @@ test('the sidebar links to the Owned list, with the collections each game is in'
   await expect(rows).toHaveCount(1)
   await page.getByRole('searchbox', { name: 'Search this collection' }).fill('')
 
-  // Owned can't be deleted, and games don't move out of it.
+  // Owned can't be deleted, and games don't move out of it. They can be
+  // added to other collections.
   await page.getByRole('button', { name: 'Collection actions' }).click()
   await expect(
     page.getByRole('menuitem', { name: 'Delete collection' }),
@@ -145,6 +146,9 @@ test('the sidebar links to the Owned list, with the collections each game is in'
     .click()
   await expect(
     page.getByRole('menuitem', { name: 'Remove from collection' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('menuitem', { name: 'Add to', exact: true }),
   ).toBeVisible()
   await expect(
     page.getByRole('menuitem', { name: 'Move to', exact: true }),

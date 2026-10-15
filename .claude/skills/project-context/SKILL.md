@@ -12,8 +12,10 @@ description: >
 
 ThisPlayShelf lets people build their own game collections and share them.
 Each collection has columns the user defines (a collector tracks price and
-quantity, a player tracks console and progress), and IGDB search only
-pre-fills new items. Users own their data. Public collections can be
+quantity, a player tracks console and progress). Facts about a game that
+are the same for everyone (title, cover, year, genres, platforms) come
+from a shared catalog filled from IGDB on the server, and a user's item
+links to it. Users own the values they enter. Public collections can be
 browsed by others, with posts and comments planned around them. `main` is v3, a clean rewrite with no
 shared history. The `archive/v1` tag holds the original (Nuxt 2, Heroku, Firebase)
 and the `v2` branch an abandoned Netlify attempt. Read them for behavior

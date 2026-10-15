@@ -39,8 +39,17 @@ values for other blueprints untouched.
 
 ## The collections model
 
+- `games` and `platforms`: the shared catalog of IGDB games, keyed by IGDB
+  id, the same for every user. Only the server writes them, from IGDB
+  (`ensureCatalogGames` in `server/utils/catalog.ts`), never from a request
+  body, and refreshes a game older than 30 days. No owner column, so no
+  owner filter, and nothing a user sends changes them. See `igdb`.
 - `library_items`: one row per game per user (a partial unique index on
-  owner + `igdb_id`), however many collections it's in.
+  owner + `igdb_id`), however many collections it's in. An IGDB game links
+  to the catalog by `igdb_id`, and its name and cover come from there
+  (left join with `catalogJoin`, then `itemName` / `itemCoverId` or
+  `toLibraryItem`). A game added by hand has no `igdb_id` and keeps its own
+  `name`.
 - `collection_items`: the junction table (composite primary key), with
   `position` and `added_at`.
 - `collections`: owner, `blueprint_id`, title, `slug` (unique per owner),
@@ -73,6 +82,14 @@ querying in routes, and keep the owner filter in every new one.
    before it reaches the database. Cap string lengths.
 7. **The composable and UI** in `app/`. See `ui-conventions` and
    `plain-language`.
+
+## New enum values
+
+Postgres can't use an enum value in the transaction that added it, and
+drizzle-kit runs all pending migrations in one transaction. So a new
+value (`ALTER TYPE ... ADD VALUE`) gets a migration of its own, with
+nothing else in it, and reaches production in a release before any
+migration or code uses it.
 
 ## Correlated subqueries
 

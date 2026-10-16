@@ -27,7 +27,6 @@ const summary = {
   slug: 'gamecube-games',
   description: null,
   visibility: 'private',
-  kind: 'custom',
   itemCount: 1,
   updatedAt: '2026-01-01T00:00:00.000Z',
 }

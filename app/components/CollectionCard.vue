@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Gamepad2, Heart, Lock } from '@lucide/vue'
+import { Lock } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 defineProps<{
@@ -8,8 +8,6 @@ defineProps<{
   /** Show owner-only details, like the Private badge. */
   showVisibility: boolean
 }>()
-
-const titleOf = useCollectionTitle()
 </script>
 
 <template>
@@ -21,17 +19,7 @@ const titleOf = useCollectionTitle()
       <h2
         class="flex items-center gap-2 font-heading text-lg font-semibold group-hover:underline"
       >
-        <Heart
-          v-if="collection.kind === 'wishlist'"
-          class="size-4 text-primary"
-          aria-hidden="true"
-        />
-        <Gamepad2
-          v-else-if="collection.kind === 'owned'"
-          class="size-4 text-primary"
-          aria-hidden="true"
-        />
-        {{ titleOf(collection) }}
+        {{ collection.title }}
       </h2>
       <Badge
         v-if="showVisibility && collection.visibility === 'private'"

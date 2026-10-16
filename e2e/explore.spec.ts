@@ -20,7 +20,6 @@ const card = (n: number) => ({
   id: `10000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}`,
   title: `Collection ${n}`,
   slug: `collection-${n}`,
-  kind: 'custom',
   description: n === 1 ? 'Every licensed cart.' : null,
   itemCount: n,
   activeAt: '2026-10-01T00:00:00.000Z',

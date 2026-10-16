@@ -1,25 +1,35 @@
 import type { Ref } from 'vue'
 import { toast } from 'vue-sonner'
-import type { CollectionSummary } from '#shared/types/collection'
+import type { ListName } from '#shared/types/collection'
 import type { GameSummary } from '#shared/types/game'
+
+/** Where search is adding games: one of the user's collections, or a list. */
+export interface SearchTarget {
+  /** The address of its page under the shelf. */
+  slug: string
+  title: string
+  /** Set for a collection. */
+  collectionId?: string
+  /** Set for Owned or the Wishlist. */
+  list?: ListName
+}
 
 /**
  * Which search results the signed-in user already has, as IGDB id to
- * library item id. With a `target` collection it means "in that
- * collection", and `toggle` adds or removes a game in one click. Without
- * one it means "in any collection".
+ * library item id. With a `target` it means "in that collection" or "on
+ * that list", and `toggle` adds or removes a game in one click. Without
+ * one it means "on either list".
  *
  * Checked in the browser only, after hydration, and only for results not
  * checked yet, so loading more results doesn't re-ask for the first page.
  */
 export function useTrackedGames(
   games: Ref<GameSummary[]>,
-  target: Ref<CollectionSummary | null>,
+  target: Ref<SearchTarget | null>,
 ) {
   const { t } = useI18n()
   const auth = useAuth()
   const collections = useCollections()
-  const myCollections = useMyCollections()
   const unown = useUnownConfirm()
   const items = ref(new Map<number, string>())
   const saving = ref(new Set<number>())
@@ -35,7 +45,10 @@ export function useTrackedGames(
     const asked = checked
     ids.forEach((id) => asked.add(id))
     try {
-      const found = await collections.tracked(ids, target.value?.id)
+      const found = await collections.tracked(ids, {
+        collectionId: target.value?.collectionId,
+        list: target.value?.list,
+      })
       // The target changed while this was in flight.
       if (asked !== checked) return
       const next = new Map(items.value)
@@ -56,7 +69,7 @@ export function useTrackedGames(
     onNuxtReady(() => {
       watch(games, () => void check(), { immediate: true })
       watch(
-        () => target.value?.id,
+        () => target.value?.slug,
         () => {
           reset()
           void check()
@@ -73,38 +86,28 @@ export function useTrackedGames(
     items.value = next
   }
 
-  /**
-   * Before taking a game out of Owned: the custom collections it would
-   * leave too, confirmed. False when the person cancels.
-   */
-  async function confirmUnown(game: GameSummary) {
-    const membership = await collections.membership(game.id)
-    const ids = new Set(membership.collectionIds)
-    const others = (myCollections.list.value ?? []).filter(
-      (other) => other.kind === 'custom' && ids.has(other.id),
-    )
-    return unown.confirm(
-      game.name,
-      others.map((other) => other.title),
-    )
-  }
-
-  /** Adds the game to the target collection, or removes it if it's there. */
+  /** Adds the game to the target, or removes it if it's there. */
   async function toggle(game: GameSummary) {
-    const collection = target.value
-    if (!collection || saving.value.has(game.id)) return
+    const goal = target.value
+    if (!goal || saving.value.has(game.id)) return
     saving.value = new Set(saving.value).add(game.id)
     const itemId = items.value.get(game.id)
     try {
       if (itemId) {
-        if (collection.kind === 'owned' && !(await confirmUnown(game))) return
-        await collections.removeItem(collection.id, itemId)
+        if (goal.list) {
+          const { item } = await collections.membership(game.id)
+          // Cancelled when the person says no to deleting the game.
+          if (item && !(await unown.leave(item, goal.list))) return
+        } else {
+          await collections.removeItem(goal.collectionId!, itemId)
+        }
         mark(game.id, false)
         return
       }
       const added = await collections.addGame(
         { igdbId: game.id, name: game.name, coverId: game.coverId },
-        [collection.id],
+        goal.collectionId ? [goal.collectionId] : [],
+        goal.list ? { list: goal.list } : {},
       )
       items.value = new Map(items.value).set(game.id, added.item.id)
     } catch (error) {

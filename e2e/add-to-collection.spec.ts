@@ -16,28 +16,37 @@ const summary = {
   itemCount: 0,
   updatedAt: '2026-10-01T00:00:00.000Z',
 }
-const wishlist = {
-  ...summary,
-  id: '11111111-1111-4111-8111-111111111111',
-  title: 'Wishlist',
-  slug: 'wishlist',
-  kind: 'wishlist',
-}
 const nes = {
   ...summary,
   id: '22222222-2222-4222-8222-222222222222',
   title: 'NES Games',
   slug: 'nes-games',
-  kind: 'custom',
 }
-const owned = {
-  ...summary,
-  id: '55555555-5555-4555-8555-555555555555',
-  title: 'Owned',
-  slug: 'owned',
-  kind: 'owned',
+const nesLink = {
+  id: nes.id,
+  title: 'NES Games',
+  slug: 'nes-games',
+  color: null,
 }
 const itemId = '33333333-3333-4333-8333-333333333333'
+const platforms = [
+  { id: 12, name: 'X360' },
+  { id: 48, name: 'PS4' },
+]
+/** The item as the server sends it: owned only, unless `extra` says more. */
+const itemOf = (extra: Record<string, unknown> = {}) => ({
+  id: itemId,
+  igdbId: 1,
+  name: 'Zelda Game 1',
+  coverId: null,
+  data: {},
+  owned: true,
+  wishlisted: false,
+  ownedOn: [],
+  wantedOn: [],
+  ...extra,
+})
+const wantedOnly = { owned: false, wishlisted: true }
 
 async function searchZelda(page: Page) {
   await page.route('**/api/games/search?**', (route) =>
@@ -48,6 +57,20 @@ async function searchZelda(page: Page) {
   await expect(
     page.getByRole('heading', { name: 'Zelda Game 1' }),
   ).toBeVisible()
+}
+
+const gameStub = {
+  id: 1,
+  name: 'Zelda Game 1',
+  coverId: null,
+  releaseDate: null,
+  summary: null,
+  platforms: [],
+  genres: [],
+  developers: [],
+  publishers: [],
+  screenshotIds: [],
+  igdbUrl: null,
 }
 
 test('signed-out visitors are sent to sign in first', async ({ page }) => {
@@ -62,7 +85,7 @@ test.describe('signed in', () => {
   test.beforeEach(async ({ page }) => {
     await signInAs(page, { username: 'retro_fan' })
     await page.route('**/api/collections', (route) =>
-      route.fulfill({ json: [owned, wishlist, nes] }),
+      route.fulfill({ json: [nes] }),
     )
   })
 
@@ -82,45 +105,35 @@ test.describe('signed in', () => {
     expect(asked).toBe('1,2')
   })
 
-  test('adds a new game, then links it to another collection and back out', async ({
+  test('adds a new game to the Wishlist, links it to a collection, then takes it off', async ({
     page,
   }) => {
     await page.route('**/api/library-items/igdb?**', (route) =>
       route.fulfill({ json: [] }),
     )
     await page.route('**/api/library-items/igdb/1', (route) =>
-      route.fulfill({ json: { item: null, collectionIds: [] } }),
+      route.fulfill({ json: { item: null, collectionIds: [], platforms: [] } }),
     )
     let created: unknown
     await page.route('**/api/library-items', (route) => {
       created = route.request().postDataJSON()
       return route.fulfill({
-        json: {
-          item: {
-            id: itemId,
-            igdbId: 1,
-            name: 'Zelda Game 1',
-            coverId: null,
-            data: {},
-          },
-          collectionIds: [wishlist.id],
-        },
+        json: { item: itemOf(wantedOnly), collectionIds: [] },
       })
     })
-    const linked: string[] = []
-    // The server answers with where the game is now: a custom collection
-    // brings Owned along.
-    const after: Record<string, string[]> = {
-      [`PUT ${nes.id}`]: [wishlist.id, nes.id, owned.id],
-      [`DELETE ${wishlist.id}`]: [nes.id, owned.id],
-    }
+    const calls: string[] = []
     await page.route(`**/api/collections/*/items/${itemId}`, (route) => {
-      const method = route.request().method()
-      const collectionId = route.request().url().split('/').at(-3)
-      linked.push(`${method} ${route.request().url().split('/api/')[1]}`)
-      return route.fulfill({
-        json: { collectionIds: after[`${method} ${collectionId}`] },
-      })
+      calls.push(
+        `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
+      )
+      return route.fulfill({ json: { collectionIds: [nes.id] } })
+    })
+    await page.route(`**/api/library-items/${itemId}/collections`, (route) =>
+      route.fulfill({ json: [nesLink] }),
+    )
+    await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
+      calls.push(`PUT lists ${JSON.stringify(route.request().postDataJSON())}`)
+      return route.fulfill({ json: { item: null, collectionIds: [] } })
     })
 
     await searchZelda(page)
@@ -128,48 +141,120 @@ test.describe('signed in', () => {
       .getByRole('button', { name: 'Add to collection: Zelda Game 1' })
       .click()
     const menu = page.getByRole('menu')
-    // Owned and the Wishlist come first.
+    const box = (name: string) =>
+      menu.getByRole('menuitemcheckbox', { name, exact: true })
+    // Owned and the Wishlist come first, then the collections.
     await expect(menu.getByRole('menuitemcheckbox')).toHaveText([
       'Owned',
       'Wishlist',
       'NES Games',
     ])
 
-    await menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }).click()
+    await box('Wishlist').click()
+    await expect(box('Wishlist')).toBeChecked()
+    await expect(box('Owned')).not.toBeChecked()
+    expect(created).toEqual({
+      igdbId: 1,
+      name: 'Zelda Game 1',
+      coverId: null,
+      collectionIds: [],
+      list: 'wishlist',
+    })
+
+    // The menu stays open, so a second tick only links the same item, and
+    // leaves its lists alone.
+    await box('NES Games').click()
+    await expect(box('NES Games')).toBeChecked()
+    await expect(box('Wishlist')).toBeChecked()
+    await expect(box('Owned')).not.toBeChecked()
+
+    // On no other list, so taking it off deletes it: the question names
+    // the collection it leaves.
+    await box('Wishlist').click()
+    const dialog = page.getByRole('alertdialog')
     await expect(
-      menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }),
+      dialog.getByRole('heading', {
+        name: 'Remove Zelda Game 1 from your Wishlist?',
+      }),
+    ).toBeVisible()
+    await expect(dialog).toContainText('It also leaves NES Games.')
+    await dialog.getByRole('button', { name: 'Remove' }).click()
+    await expect(box('Wishlist')).not.toBeChecked()
+    await expect(box('NES Games')).not.toBeChecked()
+    expect(calls).toEqual([
+      `PUT collections/${nes.id}/items/${itemId}`,
+      'PUT lists {"type":"unwant"}',
+    ])
+
+    await page.keyboard.press('Escape')
+    await expect(
+      page.getByRole('button', { name: 'Add to collection: Zelda Game 1' }),
+    ).toBeVisible()
+  })
+
+  test('ticking Owned on a wanted game gets it', async ({ page }) => {
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [{ igdbId: 1, itemId }] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({
+        json: { item: itemOf(wantedOnly), collectionIds: [], platforms: [] },
+      }),
+    )
+    let sent: unknown
+    await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
+      sent = route.request().postDataJSON()
+      return route.fulfill({ json: { item: itemOf(), collectionIds: [] } })
+    })
+    await searchZelda(page)
+    await page
+      .getByRole('button', { name: 'In your collections: Zelda Game 1' })
+      .click()
+    const box = (name: string) =>
+      page
+        .getByRole('menu')
+        .getByRole('menuitemcheckbox', { name, exact: true })
+    await expect(box('Wishlist')).toBeChecked()
+    await box('Owned').click()
+    await expect(box('Owned')).toBeChecked()
+    await expect(box('Wishlist')).not.toBeChecked()
+    expect(sent).toEqual({ type: 'own' })
+  })
+
+  test('a new game ticked into a collection is created owned', async ({
+    page,
+  }) => {
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({ json: { item: null, collectionIds: [], platforms: [] } }),
+    )
+    let created: unknown
+    await page.route('**/api/library-items', (route) => {
+      created = route.request().postDataJSON()
+      return route.fulfill({
+        json: { item: itemOf(), collectionIds: [nes.id] },
+      })
+    })
+    await searchZelda(page)
+    await page
+      .getByRole('button', { name: 'Add to collection: Zelda Game 1' })
+      .click()
+    const menu = page.getByRole('menu')
+    await menu.getByRole('menuitemcheckbox', { name: 'NES Games' }).click()
+    await expect(
+      menu.getByRole('menuitemcheckbox', { name: 'Owned' }),
     ).toBeChecked()
     expect(created).toEqual({
       igdbId: 1,
       name: 'Zelda Game 1',
       coverId: null,
-      collectionIds: [wishlist.id],
+      collectionIds: [nes.id],
     })
-
-    // The menu stays open, so a second tick only links the same item.
-    await menu.getByRole('menuitemcheckbox', { name: 'NES Games' }).click()
-    await expect(
-      menu.getByRole('menuitemcheckbox', { name: 'NES Games' }),
-    ).toBeChecked()
-    await expect(
-      menu.getByRole('menuitemcheckbox', { name: 'Owned' }),
-    ).toBeChecked()
-    await menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }).click()
-    await expect(
-      menu.getByRole('menuitemcheckbox', { name: 'Wishlist' }),
-    ).not.toBeChecked()
-    expect(linked).toEqual([
-      `PUT collections/${nes.id}/items/${itemId}`,
-      `DELETE collections/${wishlist.id}/items/${itemId}`,
-    ])
-
-    await page.keyboard.press('Escape')
-    await expect(
-      page.getByRole('button', { name: 'In your collections: Zelda Game 1' }),
-    ).toBeVisible()
   })
 
-  test('unticking Owned asks first, and takes the game out of its collections', async ({
+  test('unticking Owned asks first, naming the collections the game leaves', async ({
     page,
   }) => {
     await page.route('**/api/library-items/igdb?**', (route) =>
@@ -177,24 +262,16 @@ test.describe('signed in', () => {
     )
     await page.route('**/api/library-items/igdb/1', (route) =>
       route.fulfill({
-        json: {
-          item: {
-            id: itemId,
-            igdbId: 1,
-            name: 'Zelda Game 1',
-            coverId: null,
-            data: {},
-          },
-          collectionIds: [owned.id, nes.id, wishlist.id],
-        },
+        json: { item: itemOf(), collectionIds: [nes.id], platforms: [] },
       }),
     )
+    await page.route(`**/api/library-items/${itemId}/collections`, (route) =>
+      route.fulfill({ json: [nesLink] }),
+    )
     const removed: string[] = []
-    await page.route(`**/api/collections/*/items/${itemId}`, (route) => {
-      removed.push(
-        `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
-      )
-      return route.fulfill({ json: { collectionIds: [wishlist.id] } })
+    await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
+      removed.push(JSON.stringify(route.request().postDataJSON()))
+      return route.fulfill({ json: { item: null, collectionIds: [] } })
     })
 
     await searchZelda(page)
@@ -208,7 +285,7 @@ test.describe('signed in', () => {
     await expect(
       dialog.getByRole('heading', { name: 'Remove Zelda Game 1 from Owned?' }),
     ).toBeVisible()
-    await expect(dialog).toContainText('This also removes it from NES Games.')
+    await expect(dialog).toContainText('It also leaves NES Games.')
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(dialog).toBeHidden()
     expect(removed).toEqual([])
@@ -218,12 +295,115 @@ test.describe('signed in', () => {
     await box('Owned').click()
     await dialog.getByRole('button', { name: 'Remove' }).click()
     await expect(dialog).toBeHidden()
-    await expect
-      .poll(() => removed)
-      .toEqual([`DELETE collections/${owned.id}/items/${itemId}`])
+    await expect.poll(() => removed).toEqual(['{"type":"unown"}'])
     await expect(box('Owned')).not.toBeChecked()
     await expect(box('NES Games')).not.toBeChecked()
+  })
+
+  test('a game owned on one version and wanted on another clears one side at a time', async ({
+    page,
+  }) => {
+    const both = itemOf({ wishlisted: true, ownedOn: [12], wantedOn: [48] })
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [{ igdbId: 1, itemId }] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({
+        json: { item: both, collectionIds: [nes.id], platforms },
+      }),
+    )
+    let asked = false
+    await page.route(`**/api/library-items/${itemId}/collections`, (route) => {
+      asked = true
+      return route.fulfill({ json: [] })
+    })
+    const sent: string[] = []
+    await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
+      const body = route.request().postDataJSON() as { type: string }
+      sent.push(body.type)
+      return route.fulfill({
+        json: {
+          item: { ...both, owned: false, ownedOn: [] },
+          collectionIds: [nes.id],
+        },
+      })
+    })
+
+    await searchZelda(page)
+    await page
+      .getByRole('button', { name: 'In your collections: Zelda Game 1' })
+      .click()
+    const menu = page.getByRole('menu')
+    const box = (name: string) =>
+      menu.getByRole('menuitemcheckbox', { name, exact: true })
+    await expect(box('Owned')).toBeChecked()
     await expect(box('Wishlist')).toBeChecked()
+
+    // It stays on the Wishlist, so there is nothing to ask.
+    await box('Owned').click()
+    await expect(box('Owned')).not.toBeChecked()
+    await expect(box('Wishlist')).toBeChecked()
+    await expect(box('NES Games')).toBeChecked()
+    expect(sent).toEqual(['unown'])
+    expect(asked).toBe(false)
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+  })
+
+  test('picks the platforms a game is owned or wanted on', async ({ page }) => {
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({ json: { item: null, collectionIds: [], platforms } }),
+    )
+    let created: unknown
+    await page.route('**/api/library-items', (route) => {
+      created = route.request().postDataJSON()
+      return route.fulfill({
+        json: { item: itemOf({ ownedOn: [12] }), collectionIds: [] },
+      })
+    })
+    const sent: unknown[] = []
+    await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
+      sent.push(route.request().postDataJSON())
+      return route.fulfill({
+        json: {
+          item: itemOf({ wishlisted: true, ownedOn: [12], wantedOn: [48] }),
+          collectionIds: [],
+        },
+      })
+    })
+
+    await searchZelda(page)
+    await page
+      .getByRole('button', { name: 'Add to collection: Zelda Game 1' })
+      .click()
+    await page.getByRole('menuitem', { name: 'Owned on' }).click()
+    const x360 = page.getByRole('menuitemcheckbox', { name: 'X360' })
+    await x360.click()
+    await expect(x360).toBeChecked()
+    expect(created).toEqual({
+      igdbId: 1,
+      name: 'Zelda Game 1',
+      coverId: null,
+      collectionIds: [],
+      list: 'owned',
+      platforms: [12],
+    })
+
+    // Wanting it on another platform puts it on both lists, as two versions.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toBeHidden()
+    await page
+      .getByRole('button', { name: 'In your collections: Zelda Game 1' })
+      .click()
+    await page.getByRole('menuitem', { name: 'Wanted on' }).click()
+    await page.getByRole('menuitemcheckbox', { name: 'PS4' }).click()
+    await expect(
+      page.getByRole('menuitemcheckbox', { name: 'PS4' }),
+    ).toBeChecked()
+    expect(sent).toEqual([{ type: 'setWantedOn', platforms: [48] }])
   })
 
   test('opening the menu again asks nothing new, and shows the latest ticks', async ({
@@ -242,20 +422,11 @@ test.describe('signed in', () => {
     )
     await page.route('**/api/library-items/igdb/1', (route) =>
       route.fulfill({
-        json: {
-          item: {
-            id: itemId,
-            igdbId: 1,
-            name: 'Zelda Game 1',
-            coverId: null,
-            data: {},
-          },
-          collectionIds: [wishlist.id],
-        },
+        json: { item: itemOf(wantedOnly), collectionIds: [], platforms: [] },
       }),
     )
     await page.route(`**/api/collections/${nes.id}/items/${itemId}`, (route) =>
-      route.fulfill({ json: { collectionIds: [wishlist.id, nes.id] } }),
+      route.fulfill({ json: { collectionIds: [nes.id] } }),
     )
 
     await searchZelda(page)
@@ -296,7 +467,7 @@ test.describe('signed in', () => {
       route.fulfill({ json: [] }),
     )
     await page.route('**/api/library-items/igdb/1', (route) =>
-      route.fulfill({ json: { item: null, collectionIds: [] } }),
+      route.fulfill({ json: { item: null, collectionIds: [], platforms: [] } }),
     )
     await page.route('**/api/library-items', (route) =>
       route.fulfill({ status: 500, json: {} }),
@@ -320,34 +491,11 @@ test.describe('signed in', () => {
   }) => {
     await page.route('**/api/library-items/igdb/1', (route) =>
       route.fulfill({
-        json: {
-          item: {
-            id: itemId,
-            igdbId: 1,
-            name: 'Zelda Game 1',
-            coverId: null,
-            data: {},
-          },
-          collectionIds: [nes.id],
-        },
+        json: { item: itemOf(), collectionIds: [nes.id], platforms: [] },
       }),
     )
     await page.route('**/api/games/1', (route) =>
-      route.fulfill({
-        json: {
-          id: 1,
-          name: 'Zelda Game 1',
-          coverId: null,
-          releaseDate: null,
-          summary: null,
-          platforms: [],
-          genres: [],
-          developers: [],
-          publishers: [],
-          screenshotIds: [],
-          igdbUrl: null,
-        },
-      }),
+      route.fulfill({ json: gameStub }),
     )
     await page.route('**/api/library-items/igdb?**', (route) =>
       route.fulfill({ json: [{ igdbId: 1, itemId }] }),
@@ -369,24 +517,12 @@ test.describe('signed in', () => {
     let asked = 0
     await page.route('**/api/library-items/igdb/1', (route) => {
       asked += 1
-      return route.fulfill({ json: { item: null, collectionIds: [] } })
+      return route.fulfill({
+        json: { item: null, collectionIds: [], platforms: [] },
+      })
     })
     await page.route('**/api/games/1', (route) =>
-      route.fulfill({
-        json: {
-          id: 1,
-          name: 'Zelda Game 1',
-          coverId: null,
-          releaseDate: null,
-          summary: null,
-          platforms: [],
-          genres: [],
-          developers: [],
-          publishers: [],
-          screenshotIds: [],
-          igdbUrl: null,
-        },
-      }),
+      route.fulfill({ json: gameStub }),
     )
     await page.route('**/api/library-items/igdb?**', (route) =>
       route.fulfill({ json: [] }),
@@ -415,13 +551,7 @@ test.describe('signed in', () => {
         created = route.request().postDataJSON()
         return route.fulfill({
           json: {
-            item: {
-              id: '44444444-4444-4444-8444-444444444444',
-              igdbId: 1,
-              name: 'Zelda Game 1',
-              coverId: null,
-              data: {},
-            },
+            item: itemOf({ id: '44444444-4444-4444-8444-444444444444' }),
             collectionIds: [nes.id],
           },
         })
@@ -472,12 +602,11 @@ test.describe('signed in', () => {
       )
     })
 
-    test('can switch to another collection', async ({ page }) => {
+    test('can switch to another collection or a list', async ({ page }) => {
       const asked: string[] = []
       await page.route('**/api/library-items/igdb?**', (route) => {
-        asked.push(
-          new URL(route.request().url()).searchParams.get('collection') ?? '',
-        )
+        const query = new URL(route.request().url()).searchParams
+        asked.push(query.get('collection') ?? query.get('list') ?? '')
         return route.fulfill({ json: [] })
       })
       await page.route('**/api/games/search?**', (route) =>
@@ -489,6 +618,11 @@ test.describe('signed in', () => {
       await expect(page.getByText('Adding to NES Games')).toBeVisible()
       await page.getByRole('searchbox', { name: 'Search games' }).fill('zelda')
       await page.getByRole('button', { name: 'Change' }).click()
+      await expect(page.getByRole('menuitemradio')).toHaveText([
+        'Owned',
+        'Wishlist',
+        'NES Games',
+      ])
       await page.getByRole('menuitemradio', { name: 'Wishlist' }).click()
 
       await expect(page.getByText('Adding to Wishlist')).toBeVisible()
@@ -497,7 +631,79 @@ test.describe('signed in', () => {
       await expect(
         page.getByRole('button', { name: 'Add Zelda Game 1 to Wishlist' }),
       ).toBeVisible()
-      await expect.poll(() => asked).toContain(wishlist.id)
+      await expect.poll(() => asked).toContain('wishlist')
+      await expect(page.getByRole('link', { name: 'Done' })).toHaveAttribute(
+        'href',
+        '/u/retro_fan/shelf/wishlist',
+      )
+    })
+
+    test('adds to the Wishlist in one click, and takes a game off Owned', async ({
+      page,
+    }) => {
+      await page.route('**/api/library-items/igdb?**', (route) =>
+        route.fulfill({ json: [{ igdbId: 2, itemId }] }),
+      )
+      await page.route('**/api/library-items/igdb/2', (route) =>
+        route.fulfill({
+          json: {
+            item: itemOf({ igdbId: 2 }),
+            collectionIds: [],
+            platforms: [],
+          },
+        }),
+      )
+      const bodies: unknown[] = []
+      await page.route('**/api/library-items', (route) => {
+        bodies.push(route.request().postDataJSON())
+        return route.fulfill({
+          json: { item: itemOf(wantedOnly), collectionIds: [] },
+        })
+      })
+      await page.route(`**/api/library-items/${itemId}/collections`, (route) =>
+        route.fulfill({ json: [] }),
+      )
+      const lists: unknown[] = []
+      await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
+        lists.push(route.request().postDataJSON())
+        return route.fulfill({ json: { item: null, collectionIds: [] } })
+      })
+      await page.route('**/api/games/search?**', (route) =>
+        route.fulfill({ json: { games, page: 1, hasMore: false } }),
+      )
+
+      await page.goto('/?to=wishlist')
+      await expect(page.getByText('Adding to Wishlist')).toBeVisible()
+      await page.getByRole('searchbox', { name: 'Search games' }).fill('zelda')
+      await page
+        .getByRole('button', { name: 'Add Zelda Game 1 to Wishlist' })
+        .click()
+      await expect(
+        page.getByRole('button', {
+          name: 'Remove Zelda Game 1 from Wishlist',
+        }),
+      ).toBeVisible()
+      expect(bodies).toEqual([
+        {
+          igdbId: 1,
+          name: 'Zelda Game 1',
+          coverId: null,
+          collectionIds: [],
+          list: 'wishlist',
+        },
+      ])
+
+      // Zelda Game 2 is on Owned only. Taking it off deletes it, and it's in
+      // no collections, so there's nothing to ask.
+      await page.goto('/?to=owned')
+      await page.getByRole('searchbox', { name: 'Search games' }).fill('zelda')
+      await page
+        .getByRole('button', { name: 'Remove Zelda Game 2 from Owned' })
+        .click()
+      await expect(
+        page.getByRole('button', { name: 'Add Zelda Game 2 to Owned' }),
+      ).toBeVisible()
+      expect(lists).toEqual([{ type: 'unown' }])
     })
   })
 })

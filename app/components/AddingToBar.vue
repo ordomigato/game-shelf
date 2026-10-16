@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import type { CollectionSummary } from '#shared/types/collection'
+import type { SearchTarget } from '~/composables/useTrackedGames'
 
 /**
- * Shown above search results when searching on behalf of one collection.
- * Says which collection results go into, lets the user switch to another,
- * and links back to it with Done.
+ * Shown above search results when searching on behalf of one collection or
+ * list. Says where results go, lets the user switch to another, and links
+ * back to it with Done.
  */
 const props = defineProps<{
-  target: CollectionSummary
-  collections: CollectionSummary[]
+  target: SearchTarget
+  targets: SearchTarget[]
   username: string
 }>()
 const emit = defineEmits<{ change: [slug: string] }>()
-
-const titleOf = useCollectionTitle()
 
 function choose(slug: unknown) {
   if (typeof slug === 'string' && slug !== props.target.slug)
@@ -32,11 +30,11 @@ function choose(slug: unknown) {
       class="min-w-0"
     >
       <template #collection>
-        <strong class="font-semibold">{{ titleOf(target) }}</strong>
+        <strong class="font-semibold">{{ target.title }}</strong>
       </template>
     </i18n-t>
     <div class="flex items-center gap-2">
-      <DropdownMenu v-if="collections.length > 1">
+      <DropdownMenu v-if="targets.length > 1">
         <DropdownMenuTrigger as-child>
           <Button variant="outline" size="sm">
             {{ $t('addToCollection.change') }}
@@ -48,11 +46,11 @@ function choose(slug: unknown) {
             @update:model-value="choose"
           >
             <DropdownMenuRadioItem
-              v-for="collection in collections"
-              :key="collection.id"
-              :value="collection.slug"
+              v-for="option in targets"
+              :key="option.slug"
+              :value="option.slug"
             >
-              {{ titleOf(collection) }}
+              {{ option.title }}
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>

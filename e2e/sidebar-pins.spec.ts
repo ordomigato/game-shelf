@@ -12,14 +12,13 @@ const collection = (
   slug: title.toLowerCase().replaceAll(' ', '-'),
   description: null,
   visibility: 'private',
-  kind: 'custom',
   itemCount: 3,
   updatedAt: '2026-05-01T00:00:00.000Z',
   pinnedPosition,
   ...extra,
 })
 
-const wishlist = collection('Wishlist', 1, { kind: 'wishlist' })
+const snes = collection('SNES Games', 1)
 const nes = collection('NES Games', 2)
 const atari = collection('Atari', null)
 
@@ -28,7 +27,7 @@ type PinRequest = { method: string; id: string; body: unknown }
 async function openSidebar(page: Page, { failPins = false } = {}) {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) =>
-    route.fulfill({ json: [wishlist, nes, atari] }),
+    route.fulfill({ json: [snes, nes, atari] }),
   )
   await page.route('**/api/blueprints', (route) => route.fulfill({ json: [] }))
   const requests: PinRequest[] = []
@@ -60,7 +59,7 @@ test('pins a collection to the bottom of the pinned list', async ({ page }) => {
   await page.getByRole('button', { name: 'Pin Atari' }).click()
 
   await expect(pinned.getByRole('link')).toHaveText([
-    'Wishlist',
+    'SNES Games',
     'NES Games',
     'Atari',
   ])
@@ -70,7 +69,7 @@ test('pins a collection to the bottom of the pinned list', async ({ page }) => {
 
 test('unpins, and explains the empty pinned list', async ({ page }) => {
   const { requests, pinned, others } = await openSidebar(page)
-  for (const name of ['Wishlist', 'NES Games']) {
+  for (const name of ['SNES Games', 'NES Games']) {
     await pinned.getByRole('listitem').filter({ hasText: name }).hover()
     await page.getByRole('button', { name: `Unpin ${name}` }).click()
   }
@@ -79,7 +78,7 @@ test('unpins, and explains the empty pinned list', async ({ page }) => {
   ).toBeVisible()
   await expect(others.getByRole('link')).toHaveCount(3)
   expect(requests.map(({ method, id }) => [method, id])).toEqual([
-    ['DELETE', wishlist.id],
+    ['DELETE', snes.id],
     ['DELETE', nes.id],
   ])
 })
@@ -89,7 +88,7 @@ test('the arrow keys move a pin up and down', async ({ page }) => {
   const grip = page.getByRole('button', { name: /^Reorder NES Games/ })
   await grip.focus()
   await grip.press('ArrowUp')
-  await expect(pinned.getByRole('link')).toHaveText(['NES Games', 'Wishlist'])
+  await expect(pinned.getByRole('link')).toHaveText(['NES Games', 'SNES Games'])
   await expect(grip).toBeFocused()
   expect(requests).toEqual([
     { method: 'PUT', id: nes.id, body: { afterCollectionId: null } },
@@ -103,6 +102,6 @@ test('a pin that fails to save is put back, with a message', async ({
   await others.getByRole('listitem').filter({ hasText: 'Atari' }).hover()
   await page.getByRole('button', { name: 'Pin Atari' }).click()
   await expect(page.getByText("Couldn't pin Atari. Try again.")).toBeVisible()
-  await expect(pinned.getByRole('link')).toHaveText(['Wishlist', 'NES Games'])
+  await expect(pinned.getByRole('link')).toHaveText(['SNES Games', 'NES Games'])
   await expect(others.getByRole('link')).toHaveText(['Atari'])
 })

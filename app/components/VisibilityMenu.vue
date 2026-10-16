@@ -8,8 +8,6 @@ import type { CollectionVisibility } from '#shared/types/collection'
  */
 defineProps<{
   visibility: CollectionVisibility
-  /** The Wishlist's public option also mentions hearts in collections. */
-  isWishlist?: boolean
   disabled?: boolean
 }>()
 const emit = defineEmits<{ change: [visibility: CollectionVisibility] }>()
@@ -59,11 +57,7 @@ const emit = defineEmits<{ change: [visibility: CollectionVisibility] }>()
         <span class="flex flex-1 flex-col gap-0.5">
           <span class="font-medium">{{ $t('shelf.public') }}</span>
           <span class="text-xs text-muted-foreground">
-            {{
-              isWishlist
-                ? $t('visibility.publicWishlistHint')
-                : $t('visibility.publicHint')
-            }}
+            {{ $t('visibility.publicHint') }}
           </span>
         </span>
         <Check v-if="visibility === 'public'" class="mt-0.5" />

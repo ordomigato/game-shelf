@@ -92,24 +92,16 @@ const isStarter = (id: string): id is StarterBlueprint =>
   STARTER_BLUEPRINTS.includes(id as StarterBlueprint)
 
 const slugPreview = computed(() => slugify(title.value))
-const isBuiltInList = computed(() =>
-  props.collection ? isBuiltIn(props.collection.kind) : false,
-)
-// Owned's and the Wishlist's names can't be changed, so never block saving.
-const canSave = computed(
-  () => !saving.value && (isBuiltInList.value || title.value.trim() !== ''),
-)
+const canSave = computed(() => !saving.value && title.value.trim() !== '')
 
 async function save() {
-  const problem = isBuiltInList.value
-    ? null
-    : collectionTitleProblem(title.value)
+  const problem = collectionTitleProblem(title.value)
   error.value = problem ? t(problem.key, problem.params ?? {}) : ''
   if (error.value) return
   saving.value = true
   try {
     const details = {
-      ...(!isBuiltInList.value && { title: title.value.trim() }),
+      title: title.value.trim(),
       description: description.value.trim() || null,
       color:
         colour.value === 'auto'
@@ -156,7 +148,7 @@ async function save() {
       </DialogHeader>
       <form class="flex flex-col gap-4" @submit.prevent="save">
         <FormMessage v-if="error">{{ error }}</FormMessage>
-        <div v-if="!isBuiltInList" class="flex flex-col gap-2">
+        <div class="flex flex-col gap-2">
           <Label for="collection-title">{{
             $t('collections.form.name')
           }}</Label>
@@ -186,8 +178,7 @@ async function save() {
             rows="3"
           />
         </div>
-        <!-- Owned and the Wishlist have icons for marks, so no colour. -->
-        <fieldset v-if="!isBuiltInList" class="flex flex-col gap-2">
+        <fieldset class="flex flex-col gap-2">
           <legend class="mb-2 text-sm font-medium">
             {{ $t('collections.form.colour') }}
           </legend>

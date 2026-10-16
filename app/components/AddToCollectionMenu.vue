@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import { CircleCheck, CirclePlus, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { CollectionSummary } from '#shared/types/collection'
+import type {
+  CollectionSummary,
+  LibraryItem,
+  ListName,
+} from '#shared/types/collection'
 
 /**
  * The "Add to collection" menu for an IGDB game: Owned and the Wishlist
- * first, then the user's collections as checkboxes. Each tick saves
- * straight away. A game is one library item however many collections it's
- * in, so the first tick creates the item and later ticks only link it.
- * Ticking a collection ticks Owned too, and unticking Owned (after asking)
- * unticks the collections. The collections
- * come from the sidebar's list and the game's ticks are remembered, so
- * opening the menu again doesn't ask the server again.
+ * first (the heart), then the user's collections as checkboxes. Each tick
+ * saves straight away. A game is one library item however many places it's
+ * in, so the first tick creates the item and later ticks only change it.
+ * Ticking a collection for a new game makes it owned, and ticking one for
+ * a game already there leaves its lists alone. When the catalog knows the
+ * game's platforms, "Owned on" and "Wanted on" let the user say which
+ * version they have or want. The collections come from the sidebar's list
+ * and the game's state is remembered, so opening the menu again doesn't
+ * ask the server again.
  */
 const props = withDefaults(
   defineProps<{
@@ -21,7 +27,7 @@ const props = withDefaults(
   }>(),
   { variant: 'button' },
 )
-/** Whether the game is in at least one collection. Drives the trigger. */
+/** Whether the game is on a list. Drives the trigger. */
 const tracked = defineModel<boolean>('tracked', { default: false })
 
 const { t } = useI18n()
@@ -29,14 +35,14 @@ const auth = useAuth()
 const route = useRoute()
 const collections = useCollections()
 const myCollections = useMyCollections()
-const titleOf = useCollectionTitle()
-const unown = useUnownConfirm()
+const leaving = useUnownConfirm()
 
 const open = ref(false)
 const loading = ref(false)
 const error = ref('')
-const lists = computed(() => myCollections.list.value ?? [])
-const itemId = ref<string | null>(null)
+const customCollections = computed(() => myCollections.list.value ?? [])
+const item = ref<LibraryItem | null>(null)
+const platforms = ref<{ id: number; name: string }[]>([])
 const selected = ref(new Set<string>())
 const saving = ref(new Set<string>())
 const creating = ref(false)
@@ -69,8 +75,8 @@ async function load() {
       myCollections.load(),
       collections.membership(props.game.igdbId),
     ])
-    itemId.value = membership.item?.id ?? null
-    setSelected(membership.collectionIds)
+    platforms.value = membership.platforms ?? []
+    show(membership.item, membership.collectionIds)
   } catch {
     error.value = t('addToCollection.loadFailed')
   } finally {
@@ -78,57 +84,84 @@ async function load() {
   }
 }
 
-function setSelected(ids: Iterable<string>) {
-  selected.value = new Set(ids)
-  tracked.value = selected.value.size > 0
+function show(next: LibraryItem | null, collectionIds: string[]) {
+  item.value = next
+  selected.value = new Set(collectionIds)
+  tracked.value = next !== null
 }
 
-/**
- * Before unticking Owned: the custom collections the game would leave too,
- * confirmed. False when the person cancels.
- */
-async function confirmUnown(collection: CollectionSummary) {
-  if (collection.kind !== 'owned') return true
-  const others = lists.value.filter(
-    (other) => other.kind === 'custom' && selected.value.has(other.id),
-  )
-  return unown.confirm(
-    props.game.name,
-    others.map((other) => titleOf(other)),
-  )
-}
+const ownedOn = computed(() => item.value?.ownedOn ?? [])
+const wantedOn = computed(() => item.value?.wantedOn ?? [])
 
-async function toggle(collection: CollectionSummary, checked: boolean) {
-  const id = collection.id
-  if (saving.value.has(id)) return
-  if (!checked && !(await confirmUnown(collection))) return
-  saving.value = new Set(saving.value).add(id)
+/** Runs one change, keyed so its checkbox is disabled until it's saved. */
+async function save(key: string, change: () => Promise<void>) {
+  if (saving.value.has(key)) return
+  saving.value = new Set(saving.value).add(key)
   error.value = ''
-  const before = selected.value
-  const next = new Set(before)
-  if (checked) next.add(id)
-  else next.delete(id)
-  setSelected(next)
   try {
-    if (checked && !itemId.value) {
-      const added = await collections.addGame(props.game, [id])
-      itemId.value = added.item.id
-      setSelected(added.collectionIds)
-    } else if (checked) {
-      const saved = await collections.addItem(id, itemId.value!)
-      setSelected(saved.collectionIds)
-    } else {
-      const saved = await collections.removeItem(id, itemId.value!)
-      setSelected(saved.collectionIds)
-    }
+    await change()
   } catch (error) {
-    setSelected(before)
     toast.error(limitMessage(error, t) ?? t('addToCollection.saveFailed'))
   } finally {
     const done = new Set(saving.value)
-    done.delete(id)
+    done.delete(key)
     saving.value = done
   }
+}
+
+function toggleList(list: ListName, checked: boolean) {
+  return save(list, async () => {
+    if (checked) {
+      if (item.value) {
+        const saved = await collections.changeLists(item.value.id, {
+          type: list === 'owned' ? 'own' : 'want',
+        })
+        show(saved.item, saved.collectionIds)
+      } else {
+        const added = await collections.addGame(props.game, [], { list })
+        show(added.item, added.collectionIds)
+      }
+      return
+    }
+    if (!item.value) return
+    const saved = await leaving.leave(item.value, list)
+    if (saved) show(saved.item, saved.collectionIds)
+  })
+}
+
+function togglePlatform(list: ListName, id: number, checked: boolean) {
+  const current = list === 'owned' ? ownedOn.value : wantedOn.value
+  const next = checked ? [...current, id] : current.filter((n) => n !== id)
+  return save(`${list}:${id}`, async () => {
+    if (item.value) {
+      const saved = await collections.changeLists(item.value.id, {
+        type: list === 'owned' ? 'setOwnedOn' : 'setWantedOn',
+        platforms: next,
+      })
+      show(saved.item, saved.collectionIds)
+    } else {
+      const added = await collections.addGame(props.game, [], {
+        list,
+        platforms: next,
+      })
+      show(added.item, added.collectionIds)
+    }
+  })
+}
+
+function toggleCollection(collection: CollectionSummary, checked: boolean) {
+  return save(collection.id, async () => {
+    if (checked && !item.value) {
+      const added = await collections.addGame(props.game, [collection.id])
+      show(added.item, added.collectionIds)
+    } else if (checked) {
+      const saved = await collections.addItem(collection.id, item.value!.id)
+      show(item.value, saved.collectionIds)
+    } else {
+      const saved = await collections.removeItem(collection.id, item.value!.id)
+      show(item.value, saved.collectionIds)
+    }
+  })
 }
 
 function startCreating() {
@@ -137,7 +170,7 @@ function startCreating() {
 }
 
 async function onCreated(collection: CollectionSummary) {
-  await toggle(collection, true)
+  await toggleCollection(collection, true)
 }
 </script>
 
@@ -162,14 +195,61 @@ async function onCreated(collection: CollectionSummary) {
       </p>
       <template v-else>
         <DropdownMenuCheckboxItem
-          v-for="collection in lists"
+          :model-value="item?.owned === true"
+          :disabled="saving.has('owned')"
+          @update:model-value="toggleList('owned', $event === true)"
+          @select.prevent
+        >
+          {{ $t('shelf.owned') }}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          :model-value="item?.wishlisted === true"
+          :disabled="saving.has('wishlist')"
+          @update:model-value="toggleList('wishlist', $event === true)"
+          @select.prevent
+        >
+          {{ $t('shelf.wishlist') }}
+        </DropdownMenuCheckboxItem>
+        <template v-if="platforms.length">
+          <DropdownMenuSub
+            v-for="list in ['owned', 'wishlist'] as const"
+            :key="list"
+          >
+            <DropdownMenuSubTrigger>
+              {{
+                list === 'owned'
+                  ? $t('addToCollection.ownedOn')
+                  : $t('addToCollection.wantedOn')
+              }}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent class="max-h-72 w-56 overflow-y-auto">
+              <DropdownMenuCheckboxItem
+                v-for="platform in platforms"
+                :key="platform.id"
+                :model-value="
+                  (list === 'owned' ? ownedOn : wantedOn).includes(platform.id)
+                "
+                :disabled="saving.has(`${list}:${platform.id}`)"
+                @update:model-value="
+                  togglePlatform(list, platform.id, $event === true)
+                "
+                @select.prevent
+              >
+                <span class="truncate">{{ platform.name }}</span>
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </template>
+        <DropdownMenuSeparator v-if="customCollections.length" />
+        <DropdownMenuCheckboxItem
+          v-for="collection in customCollections"
           :key="collection.id"
           :model-value="selected.has(collection.id)"
           :disabled="saving.has(collection.id)"
-          @update:model-value="toggle(collection, $event === true)"
+          @update:model-value="toggleCollection(collection, $event === true)"
           @select.prevent
         >
-          <span class="truncate">{{ titleOf(collection) }}</span>
+          <span class="truncate">{{ collection.title }}</span>
         </DropdownMenuCheckboxItem>
       </template>
       <p v-if="error" role="alert" class="px-2 py-1.5 text-sm text-destructive">

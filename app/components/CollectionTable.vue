@@ -42,6 +42,11 @@ import type {
  * Anyone can sort by a column, search, and filter by select and checkbox
  * fields. Owners edit values in place, remove games, rename games added by
  * hand, and put games in their own order by dragging or from the row menu.
+ * Games the owner wants but doesn't have yet are marked and faded.
+ *
+ * The same table shows Owned and the Wishlist (`mode`), which have no
+ * fields and no order of their own: they list which collections each game
+ * is in and the platforms for that list.
  */
 const props = defineProps<{
   fields: FieldDefinition[]
@@ -53,10 +58,8 @@ const props = defineProps<{
    * such menu.
    */
   addTargets?: CollectionSummary[]
-  /** In the Wishlist, rows have "Got it" instead of "Add to". */
-  isWishlist?: boolean
-  /** On the Owned list, rows say which collections each game is in. */
-  isOwned?: boolean
+  /** A collection, or one of the owner's two lists. */
+  mode?: 'collection' | 'owned' | 'wishlist'
   /** The owner's shelf, for links to the collections in `inCollections`. */
   shelfPath?: string
 }>()
@@ -66,16 +69,15 @@ const emit = defineEmits<{
   rename: [itemId: string]
   /** Add the game to another collection. It stays in this one. */
   addTo: [itemId: string, collectionId: string]
-  /** Move the game from the Wishlist to Owned. */
+  /** The owner has the game now: it moves from the Wishlist to Owned. */
   gotIt: [itemId: string]
-  /** Put the game on the owner's Wishlist, or take it off. */
-  wishlist: [itemId: string, on: boolean]
+  /** The owner wants the game instead: it moves from Owned to the Wishlist. */
+  toWishlist: [itemId: string]
   /** Place `itemId` right after `afterItemId`, or first when null. */
   move: [itemId: string, afterItemId: string | null]
 }>()
 
 const { t, locale } = useI18n()
-const titleOf = useCollectionTitle()
 const NuxtLink = resolveComponent('NuxtLink')
 
 // Search and filters
@@ -84,20 +86,28 @@ const query = ref('')
 /** Field id to the values to keep: select options, or "yes"/"no". */
 const filters = ref<Record<string, string[]>>({})
 
-/** Whether rows say if they're on the Wishlist (not on the Wishlist itself). */
-const showWishlist = computed(
-  () =>
-    !props.isWishlist &&
-    props.items.some((item) => item.wishlisted !== undefined),
-)
-const WISHLIST_FILTER = '__wishlist'
+const tableMode = computed(() => props.mode ?? 'collection')
+const isList = computed(() => tableMode.value !== 'collection')
 
-/** Whether rows list the collections each game is in (on Owned). */
-const showCollections = computed(
-  () =>
-    props.isOwned &&
-    props.items.some((item) => item.inCollections !== undefined),
+/** Whether a collection has games the owner only wants. */
+const showWanted = computed(
+  () => !isList.value && props.items.some((item) => item.wishlisted),
 )
+const STATE_FILTER = '__state'
+
+/** Whether rows list the collections each game is in (on the lists). */
+const showCollections = computed(() => isList.value)
+const showPlatforms = computed(() => isList.value)
+
+/** Whether a game is only wanted, so it's marked and faded. */
+const isWanted = (item: CollectionEntry) =>
+  !isList.value && item.wishlisted && !item.owned
+
+const showGotIt = (item: CollectionEntry) =>
+  tableMode.value === 'wishlist' || (!isList.value && item.wishlisted)
+const showToWishlist = (item: CollectionEntry) =>
+  tableMode.value === 'owned' ||
+  (!isList.value && item.owned && !item.wishlisted)
 
 /** The collections a game can still be added to. */
 const addTargetsFor = (item: CollectionEntry) =>
@@ -129,9 +139,9 @@ function filterChoices(field: FieldDefinition) {
     : (field.options ?? []).map((option) => ({ value: option, label: option }))
 }
 
-const wishlistChoices = computed(() => [
-  { value: 'yes', label: t('table.onYourWishlist') },
-  { value: 'no', label: t('table.notOnYourWishlist') },
+const stateChoices = computed(() => [
+  { value: 'owned', label: t('table.owned') },
+  { value: 'wanted', label: t('table.wanted') },
 ])
 
 function toggleFilter(fieldId: string, value: string, on: boolean) {
@@ -150,8 +160,14 @@ function clearFilters() {
 }
 
 function matchesFilters(item: CollectionEntry) {
-  const wishlist = filters.value[WISHLIST_FILTER]
-  if (wishlist?.length && !wishlist.includes(item.wishlisted ? 'yes' : 'no')) {
+  const state = filters.value[STATE_FILTER]
+  if (
+    state?.length &&
+    !(
+      (state.includes('owned') && item.owned) ||
+      (state.includes('wanted') && item.wishlisted)
+    )
+  ) {
     return false
   }
   return props.fields.every((field) => {
@@ -173,6 +189,7 @@ function matchesQuery(item: CollectionEntry) {
   const haystack = [
     item.name,
     ...collectionTitles(item),
+    ...(item.platforms ?? []),
     ...props.fields
       .filter((field) => ['text', 'select', 'multiselect'].includes(field.type))
       .map((field) => formatFieldValue(field, item.data[field.id])),
@@ -207,6 +224,22 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
           id: 'inCollections',
           accessorFn: (item) => collectionTitles(item).join(', '),
           header: () => t('table.inCollections'),
+          sortingFn: (a, b, id) =>
+            a
+              .getValue<string>(id)
+              .localeCompare(b.getValue<string>(id), locale.value, {
+                sensitivity: 'base',
+                numeric: true,
+              }),
+        } satisfies ColumnDef<CollectionEntry>,
+      ]
+    : []),
+  ...(showPlatforms.value
+    ? [
+        {
+          id: 'platforms',
+          accessorFn: (item) => (item.platforms ?? []).join(', '),
+          header: () => t('table.platforms'),
           sortingFn: (a, b, id) =>
             a
               .getValue<string>(id)
@@ -315,6 +348,7 @@ function setPageSize(size: unknown) {
 const reorderable = computed(
   () =>
     props.editable &&
+    !isList.value &&
     !sorting.value.length &&
     !query.value.trim() &&
     !activeFilterCount.value,
@@ -385,7 +419,7 @@ const addedFormat = computed(
           class="pl-8"
         />
       </div>
-      <DropdownMenu v-if="filterableFields.length || showWishlist">
+      <DropdownMenu v-if="filterableFields.length || showWanted">
         <DropdownMenuTrigger as-child>
           <Button variant="outline">
             <ListFilter />
@@ -396,19 +430,19 @@ const addedFormat = computed(
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" class="w-56">
-          <DropdownMenuSub v-if="showWishlist">
+          <DropdownMenuSub v-if="showWanted">
             <DropdownMenuSubTrigger>{{
-              $t('table.wishlist')
+              $t('table.state')
             }}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuCheckboxItem
-                v-for="choice in wishlistChoices"
+                v-for="choice in stateChoices"
                 :key="choice.value"
                 :model-value="
-                  (filters[WISHLIST_FILTER] ?? []).includes(choice.value)
+                  (filters[STATE_FILTER] ?? []).includes(choice.value)
                 "
                 @update:model-value="
-                  toggleFilter(WISHLIST_FILTER, choice.value, $event === true)
+                  toggleFilter(STATE_FILTER, choice.value, $event === true)
                 "
                 @select.prevent
               >
@@ -517,7 +551,7 @@ const addedFormat = computed(
           <TableRow
             v-for="item in pageItems"
             :key="item.id"
-            :class="{ 'is-wishlisted': showWishlist && item.wishlisted }"
+            :class="{ 'is-wanted': isWanted(item) }"
           >
             <TableCell v-if="reorderable" class="w-8 pr-0">
               <!-- Keyboard users move games from the row menu instead. -->
@@ -544,7 +578,7 @@ const addedFormat = computed(
                 <component
                   :is="item.igdbId ? NuxtLink : 'div'"
                   :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
-                  class="wishlist-fade flex min-w-0 flex-1 items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  class="wanted-fade flex min-w-0 flex-1 items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   :class="{ 'hover:underline': item.igdbId }"
                 >
                   <GameCover
@@ -555,44 +589,18 @@ const addedFormat = computed(
                   />
                   <span class="line-clamp-2">{{ item.name }}</span>
                 </component>
-                <!-- On the Wishlist too: owners toggle it, visitors see it. -->
-                <template v-if="showWishlist">
-                  <button
-                    v-if="editable"
-                    type="button"
-                    class="shrink-0 rounded-sm p-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    :class="
-                      item.wishlisted
-                        ? 'text-primary'
-                        : 'text-muted-foreground/40 hover:text-primary'
-                    "
-                    :aria-label="$t('table.onWishlist', { name: item.name })"
-                    :aria-pressed="item.wishlisted === true"
-                    :title="
-                      item.wishlisted
-                        ? $t('table.removeFromWishlist')
-                        : $t('table.addToWishlist')
-                    "
-                    @click="emit('wishlist', item.id, !item.wishlisted)"
-                  >
-                    <Heart
-                      class="size-4"
-                      :class="{ 'fill-current': item.wishlisted }"
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <template v-else-if="item.wishlisted">
-                    <Heart
-                      class="size-4 shrink-0 fill-current text-primary"
-                      aria-hidden="true"
-                    />
-                    <span class="sr-only">{{ $t('table.wishlisted') }}</span>
-                  </template>
-                </template>
+                <Badge
+                  v-if="!isList && item.wishlisted"
+                  variant="outline"
+                  class="shrink-0 gap-1 text-muted-foreground"
+                >
+                  <Heart class="size-3 fill-current" aria-hidden="true" />
+                  {{ $t('table.wanted') }}
+                </Badge>
               </div>
               <ul
                 v-else-if="cell.column.id === 'inCollections'"
-                class="wishlist-fade flex flex-wrap gap-1.5"
+                class="wanted-fade flex flex-wrap gap-1.5"
               >
                 <li
                   v-for="collection in item.inCollections"
@@ -610,13 +618,21 @@ const addedFormat = computed(
                   </Badge>
                 </li>
               </ul>
+              <ul
+                v-else-if="cell.column.id === 'platforms'"
+                class="flex flex-wrap gap-1"
+              >
+                <li v-for="platform in item.platforms" :key="platform">
+                  <PlatformPill :name="platform" />
+                </li>
+              </ul>
               <span
                 v-else-if="cell.column.id === 'addedAt'"
-                class="wishlist-fade whitespace-nowrap text-muted-foreground"
+                class="wanted-fade whitespace-nowrap text-muted-foreground"
               >
                 {{ addedFormat.format(new Date(item.addedAt)) }}
               </span>
-              <div v-else-if="fieldOf(cell.column.id)" class="wishlist-fade">
+              <div v-else-if="fieldOf(cell.column.id)" class="wanted-fade">
                 <FieldCell
                   :field="fieldOf(cell.column.id)!"
                   :value="item.data[cell.column.id]"
@@ -639,12 +655,18 @@ const addedFormat = computed(
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-max">
                   <DropdownMenuItem
-                    v-if="isWishlist"
+                    v-if="showGotIt(item)"
                     @select="emit('gotIt', item.id)"
                   >
                     <PackageCheck /> {{ $t('table.gotIt') }}
                   </DropdownMenuItem>
-                  <DropdownMenuSub v-else-if="addTargets">
+                  <DropdownMenuItem
+                    v-if="showToWishlist(item)"
+                    @select="emit('toWishlist', item.id)"
+                  >
+                    <Heart /> {{ $t('table.moveToWishlist') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSub v-if="!isList && addTargets">
                     <DropdownMenuSubTrigger>
                       <FolderPlus /> {{ $t('table.addTo') }}
                     </DropdownMenuSubTrigger>
@@ -654,7 +676,7 @@ const addedFormat = computed(
                         :key="target.id"
                         @select="emit('addTo', item.id, target.id)"
                       >
-                        {{ titleOf(target) }}
+                        {{ target.title }}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         v-if="!addTargetsFor(item).length"
@@ -664,7 +686,13 @@ const addedFormat = computed(
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-                  <DropdownMenuSeparator v-if="isWishlist || addTargets" />
+                  <DropdownMenuSeparator
+                    v-if="
+                      showGotIt(item) ||
+                      showToWishlist(item) ||
+                      (!isList && addTargets)
+                    "
+                  />
                   <template v-if="reorderable">
                     <DropdownMenuItem
                       :disabled="indexOf(item.id) === 0"
@@ -702,7 +730,14 @@ const addedFormat = computed(
                     class="text-destructive focus:text-destructive"
                     @select="emit('remove', item.id)"
                   >
-                    <Trash2 /> {{ $t('table.remove') }}
+                    <Trash2 />
+                    {{
+                      tableMode === 'owned'
+                        ? $t('table.removeFromOwned')
+                        : tableMode === 'wishlist'
+                          ? $t('table.removeFromWishlist')
+                          : $t('table.remove')
+                    }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -714,6 +749,7 @@ const addedFormat = computed(
                 fields.length +
                 2 +
                 Number(showCollections) +
+                Number(showPlatforms) +
                 Number(editable) +
                 Number(reorderable)
               "

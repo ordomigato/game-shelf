@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import type { CollectionSummary, LibraryItem } from '#shared/types/collection'
+import type { LibraryItem, ListName } from '#shared/types/collection'
 
 /**
  * Adds a game IGDB doesn't have, like a homebrew or a bootleg, to one
- * collection. It gets a generated cover, and works like any other game.
+ * collection or list. It gets a generated cover, and works like any other
+ * game.
  */
 const props = defineProps<{
-  collection: Pick<CollectionSummary, 'id' | 'title' | 'kind'>
+  /** Where it goes, by name, for the dialog's text. */
+  title: string
+  target: { collectionId: string } | { list: ListName }
   /** Prefilled, e.g. with what was searched for. */
   initialName?: string
 }>()
@@ -15,7 +18,6 @@ const open = defineModel<boolean>('open', { default: false })
 
 const { t } = useI18n()
 const collections = useCollections()
-const titleOf = useCollectionTitle()
 
 const name = ref('')
 const saving = ref(false)
@@ -36,7 +38,7 @@ async function save() {
   try {
     const { item } = await collections.addManualGame(
       name.value.trim(),
-      props.collection.id,
+      props.target,
     )
     emit('added', item)
     open.value = false
@@ -54,7 +56,7 @@ async function save() {
       <DialogHeader>
         <DialogTitle>{{ $t('byHand.title') }}</DialogTitle>
         <DialogDescription>
-          {{ $t('byHand.description', { collection: titleOf(collection) }) }}
+          {{ $t('byHand.description', { collection: title }) }}
         </DialogDescription>
       </DialogHeader>
       <form class="flex flex-col gap-4" @submit.prevent="save">

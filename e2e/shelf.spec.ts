@@ -2,13 +2,12 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { signInAs } from './support/session'
 
-const wishlist = {
+const secretShelf = {
   id: '10000000-0000-4000-8000-000000000001',
-  title: 'Wishlist',
-  slug: 'wishlist',
+  title: 'Secret Stash',
+  slug: 'secret-stash',
   description: null,
   visibility: 'private',
-  kind: 'wishlist',
   color: null,
   itemCount: 0,
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -19,7 +18,6 @@ const zelda = {
   slug: 'zelda-games',
   description: 'Every Zelda I own.',
   visibility: 'public',
-  kind: 'custom',
   color: null,
   itemCount: 1,
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -50,7 +48,7 @@ const zeldaDetail = (isOwner: boolean) => ({
 
 async function stubShelf(page: Page, owner: boolean) {
   await page.route('**/api/u/retro_fan/collections', (route) =>
-    route.fulfill({ json: owner ? [wishlist, zelda] : [zelda] }),
+    route.fulfill({ json: owner ? [secretShelf, zelda] : [zelda] }),
   )
   await page.route('**/api/u/retro_fan/collections/zelda-games', (route) =>
     route.fulfill({ json: zeldaDetail(owner) }),
@@ -69,7 +67,7 @@ test.describe('as a visitor', () => {
       page.getByRole('heading', { level: 1, name: "retro_fan's shelf" }),
     ).toBeVisible()
     await expect(page.getByRole('link', { name: /Zelda Games/ })).toBeVisible()
-    await expect(page.getByRole('link', { name: /Wishlist/ })).toBeHidden()
+    await expect(page.getByRole('link', { name: /Secret Stash/ })).toBeHidden()
     await expect(
       page.getByRole('button', { name: 'New collection' }),
     ).toBeHidden()
@@ -112,9 +110,9 @@ test.describe('as the owner', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: 'My shelf' }),
     ).toBeVisible()
-    await expect(page.getByRole('link', { name: /Wishlist/ })).toContainText(
-      'Private',
-    )
+    await expect(
+      page.getByRole('link', { name: /Secret Stash/ }),
+    ).toContainText('Private')
     await expect(page.getByRole('link', { name: /Zelda Games/ })).toContainText(
       'Public',
     )
@@ -127,7 +125,7 @@ test.describe('as the owner', () => {
     await page.route('**/api/collections', async (route) => {
       // The new collection's page also lists the owner's collections.
       if (route.request().method() === 'GET') {
-        return route.fulfill({ json: [wishlist, zelda] })
+        return route.fulfill({ json: [secretShelf, zelda] })
       }
       created = route.request().postDataJSON()
       await route.fulfill({
@@ -232,20 +230,7 @@ test.describe('as the owner', () => {
     ])
   })
 
-  test('the Wishlist has no colour to pick', async ({ page }) => {
-    await page.route('**/api/u/retro_fan/collections/wishlist', (route) =>
-      route.fulfill({ json: { ...zeldaDetail(true), ...wishlist, items: [] } }),
-    )
-    await page.goto('/u/retro_fan/shelf/wishlist')
-    await page.getByRole('button', { name: 'Collection actions' }).click()
-    await page.getByRole('menuitem', { name: 'Edit details' }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByRole('radio', { name: 'Purple' })).toBeHidden()
-  })
-
-  test('can edit and delete a collection, but not the Wishlist', async ({
-    page,
-  }) => {
+  test('can edit and delete a collection', async ({ page }) => {
     await page.goto('/u/retro_fan/shelf/zelda-games')
     await page.getByRole('button', { name: 'Collection actions' }).click()
     await expect(
@@ -254,18 +239,5 @@ test.describe('as the owner', () => {
     await expect(
       page.getByRole('menuitem', { name: 'Delete collection' }),
     ).toBeVisible()
-    await page.keyboard.press('Escape')
-
-    await page.route('**/api/u/retro_fan/collections/wishlist', (route) =>
-      route.fulfill({ json: { ...zeldaDetail(true), ...wishlist, items: [] } }),
-    )
-    await page.goto('/u/retro_fan/shelf/wishlist')
-    await page.getByRole('button', { name: 'Collection actions' }).click()
-    await expect(
-      page.getByRole('menuitem', { name: 'Edit details' }),
-    ).toBeVisible()
-    await expect(
-      page.getByRole('menuitem', { name: 'Delete collection' }),
-    ).toBeHidden()
   })
 })

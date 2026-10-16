@@ -2,13 +2,12 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { signInAs } from './support/session'
 
-const summary = (title: string, kind = 'custom') => ({
+const summary = (title: string) => ({
   id: crypto.randomUUID(),
   title,
   slug: title.toLowerCase().replaceAll(' ', '-'),
   description: null,
   visibility: 'private',
-  kind,
   itemCount: 0,
   updatedAt: '2026-05-01T00:00:00.000Z',
 })
@@ -34,11 +33,7 @@ async function shelfWith(page: Page, collections: unknown[]) {
 }
 
 test('the shelf shows collections used out of the plan', async ({ page }) => {
-  await shelfWith(page, [
-    summary('Owned', 'owned'),
-    summary('Wishlist', 'wishlist'),
-    summary('NES Games'),
-  ])
+  await shelfWith(page, [summary('NES Games')])
   await expect(page.getByText('1 of 10 collections')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'New collection' }),
@@ -49,11 +44,7 @@ test('at the limit, New collection is off and the sidebar link explains', async 
   page,
 }) => {
   const ten = Array.from({ length: 10 }, (_, i) => summary(`Collection ${i}`))
-  await shelfWith(page, [
-    summary('Owned', 'owned'),
-    summary('Wishlist', 'wishlist'),
-    ...ten,
-  ])
+  await shelfWith(page, [...ten])
   await expect(page.getByText('10 of 10 collections')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'New collection' }),
@@ -107,7 +98,9 @@ test('a refusal from the server says which limit', async ({ page }) => {
   await page.getByRole('button', { name: 'Add to collection: Zelda' }).click()
   await page.getByRole('menuitemcheckbox', { name: 'NES Games' }).click()
   await expect(
-    page.getByText('A collection can hold up to 1000 games on your plan.'),
+    page.getByText(
+      'A collection or your Wishlist can hold up to 1000 games on your plan.',
+    ),
   ).toBeVisible()
 })
 

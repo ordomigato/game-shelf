@@ -12,14 +12,12 @@ const summary = (
   slug: title.toLowerCase().replaceAll(' ', '-'),
   description: null,
   visibility: 'private',
-  kind: 'custom',
   itemCount: 3,
   updatedAt,
   ...extra,
 })
 
-const wishlist = summary('Wishlist', '2026-01-01T00:00:00.000Z', {
-  kind: 'wishlist',
+const pinned = summary('Retro Pins', '2026-01-01T00:00:00.000Z', {
   itemCount: 12,
   pinnedPosition: 1,
 })
@@ -73,7 +71,7 @@ test.describe('signed in', () => {
     page,
   }) => {
     await signedInWith(page, [
-      wishlist,
+      pinned,
       summary('Atari', '2026-03-01T00:00:00.000Z'),
       summary('NES Games', '2026-05-01T00:00:00.000Z'),
     ])
@@ -81,7 +79,7 @@ test.describe('signed in', () => {
     const sidebar = page.getByRole('complementary')
     await expect(
       sidebar.getByRole('list', { name: 'Pinned' }).getByRole('listitem'),
-    ).toHaveText([/Wishlist\s*12/])
+    ).toHaveText([/Retro Pins\s*12/])
     await expect(
       sidebar.getByRole('list', { name: 'Collections' }).getByRole('listitem'),
     ).toHaveText([/NES Games\s*3/, /Atari\s*3/])
@@ -101,7 +99,7 @@ test.describe('signed in', () => {
     const many = Array.from({ length: 10 }, (_, i) =>
       summary(`Collection ${i}`, `2026-02-${String(i + 10)}T00:00:00.000Z`),
     )
-    await signedInWith(page, [wishlist, ...many])
+    await signedInWith(page, [pinned, ...many])
     await page.goto('/blueprints')
     const list = page.getByRole('list', { name: 'Collections' })
     await expect(list.getByRole('listitem')).toHaveCount(9)
@@ -111,7 +109,7 @@ test.describe('signed in', () => {
   })
 
   test('folding the collections is remembered', async ({ page }) => {
-    await signedInWith(page, [wishlist])
+    await signedInWith(page, [pinned])
     await page.goto('/blueprints')
     const toggle = page.getByRole('button', {
       name: 'Show or hide collections',
@@ -142,7 +140,7 @@ test.describe('signed in', () => {
   test('phones get a drawer with the same navigation', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 })
     await signedInWith(page, [
-      wishlist,
+      pinned,
       summary('NES Games', '2026-05-01T00:00:00.000Z'),
     ])
     await page.goto('/blueprints')
@@ -152,10 +150,10 @@ test.describe('signed in', () => {
     const drawer = page.getByRole('dialog', { name: 'Menu' })
     await expect(
       drawer.getByRole('navigation', { name: 'Main' }).getByRole('link'),
-    ).toHaveText(['Search', 'Explore', 'My shelf', 'Owned games'])
+    ).toHaveText(['Search', 'Explore', 'My shelf', 'Owned', 'Wishlist'])
     await expect(
       drawer.getByRole('list', { name: 'Pinned' }).getByRole('link'),
-    ).toHaveText(['Wishlist'])
+    ).toHaveText(['Retro Pins'])
 
     // Following a link closes it.
     await drawer.getByRole('link', { name: 'NES Games' }).click()

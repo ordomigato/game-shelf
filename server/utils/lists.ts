@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import type {
-  CollectionEntry,
+  OwnerEntry,
   CollectionLink,
   LibraryItem,
   ListDetail,
@@ -14,6 +14,7 @@ import {
 } from '../../shared/utils/lists'
 import type { PlanLimits } from '../../shared/utils/plans'
 import { games as catalogGames, libraryItems, platforms } from '../db/schema'
+import { useDb } from './db'
 import {
   catalogJoin,
   customCollectionsOf,
@@ -79,9 +80,10 @@ export async function getList(
     ),
     platformNames(rows.flatMap(({ item }) => platformIdsOf(item))),
   ])
-  const items: CollectionEntry[] = rows.map(({ item, game }) => ({
+  const items: OwnerEntry[] = rows.map(({ item, game }) => ({
     ...toLibraryItem(item, game),
     addedAt: item.createdAt.toISOString(),
+    wanted: item.wishlisted,
     inCollections: inCollections.get(item.id) ?? [],
     platforms: platformIdsOf(item).flatMap((id) => names.get(id) ?? []),
   }))
@@ -130,11 +132,36 @@ async function assertPlatformsOf(
   }
 }
 
+/** An integer[] value in SQL, for comparing with an array column. */
+const intArray = (ids: number[]) =>
+  ids.length
+    ? sql`ARRAY[${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::integer[]`
+    : sql`'{}'::integer[]`
+
+/** Rows still in the state that was read, so a stale change matches none. */
+const stillIn = (id: string, ownerId: string, read: ListState) =>
+  and(
+    eq(libraryItems.id, id),
+    eq(libraryItems.ownerId, ownerId),
+    eq(libraryItems.owned, read.owned),
+    eq(libraryItems.wishlisted, read.wishlisted),
+    sql`${libraryItems.ownedOn} = ${intArray(read.ownedOn)}`,
+    sql`${libraryItems.wantedOn} = ${intArray(read.wantedOn)}`,
+  )
+
 /**
  * Changes a game's place on the lists, one action after another, and
  * saves the result once. A game left on neither list is deleted with its
  * values and collection links, and the answer is null. The Wishlist's room
  * is checked when the game joins it.
+ *
+ * The write only happens if the game is still in the state it was read in,
+ * so a change made from a stale page can't undo another one (or delete a
+ * game that has since moved to the other list). On a mismatch it reads
+ * again and retries once, then answers 409.
  */
 export async function changeItemLists(
   ownerId: string,
@@ -142,39 +169,47 @@ export async function changeItemLists(
   actions: ListAction[],
   limits: PlanLimits,
 ): Promise<LibraryItem | null> {
-  const row = await getOwnedItem(ownerId, itemId)
-  const before = listStateOf(row)
-  let state: ListState | null = before
-  for (const action of actions) {
-    if (!state) break
-    if (action.type === 'setOwnedOn' || action.type === 'setWantedOn') {
-      await assertPlatformsOf(row, action.platforms)
-    }
-    state = applyListAction(state, action)
-  }
   const db = useDb()
-  if (!state) {
-    await db.delete(libraryItems).where(eq(libraryItems.id, row.id))
-    return null
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const row = await getOwnedItem(ownerId, itemId)
+    const before = listStateOf(row)
+    let state: ListState | null = before
+    for (const action of actions) {
+      if (!state) break
+      if (action.type === 'setOwnedOn' || action.type === 'setWantedOn') {
+        await assertPlatformsOf(row, action.platforms)
+      }
+      state = applyListAction(state, action)
+    }
+    if (!state) {
+      const deleted = await db
+        .delete(libraryItems)
+        .where(stillIn(row.id, ownerId, before))
+        .returning({ id: libraryItems.id })
+      if (deleted.length) return null
+      continue
+    }
+    if (state.wishlisted && !before.wishlisted) {
+      await assertListRoom(ownerId, 'wishlist', 1, limits)
+    }
+    const [updated] = await db
+      .update(libraryItems)
+      .set(state)
+      .where(stillIn(row.id, ownerId, before))
+      .returning()
+    if (!updated) continue
+    const [game] = row.igdbId
+      ? await db
+          .select()
+          .from(catalogGames)
+          .where(
+            and(
+              eq(catalogGames.igdbId, row.igdbId),
+              isNotNull(catalogGames.fetchedAt),
+            ),
+          )
+      : []
+    return toLibraryItem(updated, game ?? null)
   }
-  if (state.wishlisted && !before.wishlisted) {
-    await assertListRoom(ownerId, 'wishlist', 1, limits)
-  }
-  const [updated] = await db
-    .update(libraryItems)
-    .set(state)
-    .where(and(eq(libraryItems.id, row.id), eq(libraryItems.ownerId, ownerId)))
-    .returning()
-  const [game] = row.igdbId
-    ? await db
-        .select()
-        .from(catalogGames)
-        .where(
-          and(
-            eq(catalogGames.igdbId, row.igdbId),
-            isNotNull(catalogGames.fetchedAt),
-          ),
-        )
-    : []
-  return toLibraryItem(updated!, game ?? null)
+  throw createError({ statusCode: 409, statusMessage: 'Game changed' })
 }

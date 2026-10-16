@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogRow } from './catalog'
-import { toLibraryItem } from './collections'
+import { toCollectionEntry, toLibraryItem } from './collections'
 
 const item = {
   id: '30000000-0000-4000-8000-000000000001',
@@ -87,5 +87,34 @@ describe('toLibraryItem', () => {
       name: 'Homebrew',
       coverId: null,
     })
+  })
+})
+
+describe('toCollectionEntry', () => {
+  const both = {
+    ...item,
+    owned: true,
+    wishlisted: true,
+    ownedOn: [12],
+    wantedOn: [48],
+  }
+
+  it('gives the owner the lists and platforms', () => {
+    expect(toCollectionEntry(both, game, new Date(0), true)).toMatchObject({
+      wanted: true,
+      owned: true,
+      wishlisted: true,
+      ownedOn: [12],
+      wantedOn: [48],
+    })
+  })
+
+  it('gives a visitor only whether the game is wanted', () => {
+    const entry = toCollectionEntry(both, game, new Date(0), false)
+    expect(entry.wanted).toBe(true)
+    for (const key of ['owned', 'wishlisted', 'ownedOn', 'wantedOn']) {
+      expect(entry).not.toHaveProperty(key)
+    }
+    expect(toCollectionEntry(item, game, new Date(0), false).wanted).toBe(false)
   })
 })

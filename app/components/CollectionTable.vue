@@ -91,7 +91,7 @@ const isList = computed(() => tableMode.value !== 'collection')
 
 /** Whether a collection has games the owner only wants. */
 const showWanted = computed(
-  () => !isList.value && props.items.some((item) => item.wishlisted),
+  () => !isList.value && props.items.some((item) => item.wanted),
 )
 const STATE_FILTER = '__state'
 
@@ -101,10 +101,10 @@ const showPlatforms = computed(() => isList.value)
 
 /** Whether a game is only wanted, so it's marked and faded. */
 const isWanted = (item: CollectionEntry) =>
-  !isList.value && item.wishlisted && !item.owned
+  !isList.value && item.wanted && item.owned === false
 
 const showGotIt = (item: CollectionEntry) =>
-  tableMode.value === 'wishlist' || (!isList.value && item.wishlisted)
+  tableMode.value === 'wishlist' || (!isList.value && item.wanted)
 const showToWishlist = (item: CollectionEntry) =>
   tableMode.value === 'owned' ||
   (!isList.value && item.owned && !item.wishlisted)
@@ -165,7 +165,7 @@ function matchesFilters(item: CollectionEntry) {
     state?.length &&
     !(
       (state.includes('owned') && item.owned) ||
-      (state.includes('wanted') && item.wishlisted)
+      (state.includes('wanted') && item.wanted)
     )
   ) {
     return false
@@ -590,7 +590,7 @@ const addedFormat = computed(
                   <span class="line-clamp-2">{{ item.name }}</span>
                 </component>
                 <Badge
-                  v-if="!isList && item.wishlisted"
+                  v-if="!isList && item.wanted"
                   variant="outline"
                   class="shrink-0 gap-1 text-muted-foreground"
                 >

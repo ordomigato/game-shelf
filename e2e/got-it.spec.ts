@@ -28,6 +28,7 @@ const base = {
   coverId: null,
   data: {},
   addedAt: '2026-01-01T00:00:00.000Z',
+  wanted: false,
   owned: true,
   wishlisted: false,
   ownedOn: [],
@@ -43,6 +44,7 @@ const items = [
     name: 'Chrono Trigger',
     owned: false,
     wishlisted: true,
+    wanted: true,
   },
   {
     ...base,
@@ -364,7 +366,13 @@ test.describe('Wanted games in a collection', () => {
     page,
   }) => {
     await openSnes(page, undefined, [
-      { ...items[1]!, wishlisted: true, ownedOn: [12], wantedOn: [48] },
+      {
+        ...items[1]!,
+        wanted: true,
+        wishlisted: true,
+        ownedOn: [12],
+        wantedOn: [48],
+      },
     ])
     const row = page.locator('table tbody tr').first()
     await expect(row).not.toHaveClass(/is-wanted/)

@@ -131,8 +131,22 @@ export interface LibraryItem {
   wantedOn: number[]
 }
 
-export interface CollectionEntry extends LibraryItem {
+/**
+ * A game in a collection. Its place on the lists is the owner's business:
+ * visitors get only `wanted` (for a badge), and the flags and platforms
+ * are left out.
+ */
+export interface CollectionEntry extends Omit<
+  LibraryItem,
+  'owned' | 'wishlisted' | 'ownedOn' | 'wantedOn'
+> {
   addedAt: string
+  /** Whether the game is on the owner's Wishlist. */
+  wanted: boolean
+  owned?: boolean
+  wishlisted?: boolean
+  ownedOn?: number[]
+  wantedOn?: number[]
   /** On Owned and the Wishlist: the custom collections the game is in. */
   inCollections?: CollectionLink[]
   /** On Owned and the Wishlist: short names of the platforms for that list. */
@@ -143,8 +157,14 @@ export interface CollectionEntry extends LibraryItem {
 export interface ListDetail {
   list: ListName
   itemCount: number
-  items: CollectionEntry[]
+  items: OwnerEntry[]
 }
+
+/** A game as its owner sees it: with its place on the lists. */
+export type OwnerEntry = CollectionEntry &
+  Required<
+    Pick<CollectionEntry, 'owned' | 'wishlisted' | 'ownedOn' | 'wantedOn'>
+  >
 
 /** A collection named next to a game, linking to it. */
 export interface CollectionLink {

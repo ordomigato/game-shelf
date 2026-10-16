@@ -38,7 +38,7 @@ import {
   games as catalogGames,
   libraryItems,
 } from '../db/schema'
-import { isUniqueViolation } from './db-errors'
+import { isForeignKeyViolation, isUniqueViolation } from './db-errors'
 import { positionBetween } from './positions'
 
 type CollectionRow = typeof collections.$inferSelect
@@ -121,6 +121,29 @@ export async function assertOwnsCollections(
       and(eq(collections.ownerId, ownerId), inArray(collections.id, asked)),
     )
   if (rows.length !== asked.length) throw notFound()
+}
+
+/**
+ * A game in a collection as the viewer may see it. Only the owner gets the
+ * flags and platforms. Visitors get `wanted`, so a public collection can
+ * mark the games its owner is missing without saying more.
+ */
+export function toCollectionEntry(
+  row: ItemRow,
+  game: CatalogGameRow | null,
+  addedAt: Date,
+  viewerIsOwner: boolean,
+): CollectionEntry {
+  const { owned, wishlisted, ownedOn, wantedOn, ...item } = toLibraryItem(
+    row,
+    game,
+  )
+  return {
+    ...item,
+    addedAt: addedAt.toISOString(),
+    wanted: wishlisted,
+    ...(viewerIsOwner && { owned, wishlisted, ownedOn, wantedOn }),
+  }
 }
 
 /** The last position in each of these collections, by collection id. */
@@ -230,8 +253,7 @@ export async function getCollectionBySlug(
       )
     : null
   const items: CollectionEntry[] = entries.map((entry) => ({
-    ...toLibraryItem(entry.item, entry.game),
-    addedAt: entry.addedAt.toISOString(),
+    ...toCollectionEntry(entry.item, entry.game, entry.addedAt, viewerIsOwner),
     ...(inCollections && {
       inCollections: inCollections.get(entry.item.id) ?? [],
     }),
@@ -637,16 +659,22 @@ export async function addItemToCollections(
   if (targets.length === 0) return
   await assertOwnsCollections(ownerId, targets)
   const lastPosition = await lastPositions(targets)
-  await useDb()
-    .insert(collectionItems)
-    .values(
-      targets.map((collectionId) => ({
-        collectionId,
-        itemId,
-        position: (lastPosition.get(collectionId) ?? 0) + 1,
-      })),
-    )
-    .onConflictDoNothing()
+  try {
+    await useDb()
+      .insert(collectionItems)
+      .values(
+        targets.map((collectionId) => ({
+          collectionId,
+          itemId,
+          position: (lastPosition.get(collectionId) ?? 0) + 1,
+        })),
+      )
+      .onConflictDoNothing()
+  } catch (error) {
+    // The game or a collection was deleted since the checks above.
+    if (isForeignKeyViolation(error)) throw notFound()
+    throw error
+  }
 }
 
 /**

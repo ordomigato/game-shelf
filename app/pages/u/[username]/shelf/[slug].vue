@@ -255,6 +255,7 @@ function applyLists(saved: LibraryItem) {
             ...entry,
             owned: saved.owned,
             wishlisted: saved.wishlisted,
+            wanted: saved.wishlisted,
             ownedOn: saved.ownedOn,
             wantedOn: saved.wantedOn,
           }
@@ -698,7 +699,7 @@ async function deleteCollection() {
             v-for="item in coverItems"
             :key="item.id"
             class="relative"
-            :class="{ 'is-wanted': item.wishlisted && !item.owned }"
+            :class="{ 'is-wanted': item.wanted && item.owned === false }"
           >
             <component
               :is="item.igdbId ? NuxtLink : 'div'"
@@ -714,7 +715,7 @@ async function deleteCollection() {
               </span>
             </component>
             <span
-              v-if="item.wishlisted"
+              v-if="item.wanted"
               class="pointer-events-none absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-card/95 text-primary shadow-md"
             >
               <Heart class="size-4 fill-current" aria-hidden="true" />

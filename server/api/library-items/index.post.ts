@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import type { LibraryItem } from '../../../shared/types/collection'
-import { newListState, type ListAction } from '../../../shared/utils/lists'
+import {
+  applyListAction,
+  newListState,
+  type ListAction,
+} from '../../../shared/utils/lists'
 
 const bodySchema = z
   .object({
@@ -33,7 +37,10 @@ export default defineEventHandler(
     const limits = userLimits(user)
     const existingId = await itemIdForIgdb(user.id, game.igdbId)
     await assertRoomToAdd(user.id, existingId, collectionIds, limits)
-    if (list === 'wishlist') await assertListRoom(user.id, list, 1, limits)
+    // A game already in the library is checked when it joins the Wishlist.
+    if (list === 'wishlist' && !existingId) {
+      await assertListRoom(user.id, list, 1, limits)
+    }
     // The catalog gets the game from IGDB, never the name and cover sent.
     const [catalogGame] =
       game.igdbId !== null ? await ensureCatalogGames([game.igdbId]) : []
@@ -48,11 +55,13 @@ export default defineEventHandler(
     await addItemToCollections(user.id, item.id, collectionIds)
     let saved: LibraryItem | null = toLibraryItem(item, catalogGame ?? null)
     if (list && existingId) {
-      const named = list === 'owned' ? item.ownedOn : item.wantedOn
-      const actions: ListAction[] = [
-        { type: list === 'owned' ? 'own' : 'want' },
-      ]
+      const first: ListAction = { type: list === 'owned' ? 'own' : 'want' }
+      const actions: ListAction[] = [first]
       if (platforms.length) {
+        // Built on the state after the first action, which may have moved
+        // platforms from the other list.
+        const after = applyListAction(listStateOf(item), first)!
+        const named = list === 'owned' ? after.ownedOn : after.wantedOn
         actions.push({
           type: list === 'owned' ? 'setOwnedOn' : 'setWantedOn',
           platforms: [...named, ...platforms],

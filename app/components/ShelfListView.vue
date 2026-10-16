@@ -3,6 +3,7 @@ import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type {
   CollectionEntry,
+  OwnerEntry,
   LibraryItem,
   ListName,
 } from '#shared/types/collection'
@@ -41,7 +42,7 @@ useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
 // The loaded list is held shallowly, so changes replace it rather than
 // editing it in place.
-function setItems(items: CollectionEntry[]) {
+function setItems(items: OwnerEntry[]) {
   if (!data.value) return
   data.value = { ...data.value, items, itemCount: items.length }
 }

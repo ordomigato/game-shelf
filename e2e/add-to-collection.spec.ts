@@ -180,7 +180,7 @@ test.describe('signed in', () => {
     await expect(box('Wishlist')).not.toBeChecked()
     await expect(box('NES Games')).not.toBeChecked()
     expect(calls).toEqual([
-      `PUT collections {"collectionIds":["${nes.id}"]}`,
+      `PUT collections {"add":["${nes.id}"],"remove":[]}`,
       'PUT lists {"type":"unwant"}',
     ])
 
@@ -245,17 +245,22 @@ test.describe('signed in', () => {
         json: { item: itemOf(), collectionIds: [nes.id], platforms: [] },
       }),
     )
-    const sent: string[][] = []
+    const sent: { add: string[]; remove: string[] }[] = []
+    let inside = [nes.id]
     let finish: (() => void) | undefined
     await page.route(
       `**/api/library-items/${itemId}/collections`,
       async (route) => {
-        const { collectionIds } = route.request().postDataJSON() as {
-          collectionIds: string[]
+        const change = route.request().postDataJSON() as {
+          add: string[]
+          remove: string[]
         }
-        sent.push(collectionIds)
+        sent.push(change)
         await new Promise<void>((resolve) => (finish = resolve))
-        return route.fulfill({ json: { collectionIds } })
+        inside = [...inside, ...change.add].filter(
+          (id) => !change.remove.includes(id),
+        )
+        return route.fulfill({ json: { collectionIds: inside } })
       },
     )
 
@@ -276,21 +281,21 @@ test.describe('signed in', () => {
     await expect(box('RPGs')).toBeDisabled()
     await expect(box('NES Games')).toBeDisabled()
     await expect(box('SNES Games')).toBeDisabled()
-    expect(sent).toEqual([[nes.id, snes.id]])
+    expect(sent).toEqual([{ add: [snes.id], remove: [] }])
     finish?.()
     await expect(box('SNES Games')).toBeEnabled()
     await expect(box('SNES Games')).toBeChecked()
     await expect(menu).toBeVisible()
     await expect(boxes).toHaveText(all)
 
-    // Unticking sends the new whole set and keeps the entry in the list.
+    // Unticking sends only that collection and keeps the entry in the list.
     await box('NES Games').click()
     await expect(box('NES Games')).toBeDisabled()
     finish?.()
     await expect(box('NES Games')).toBeEnabled()
     await expect(box('NES Games')).not.toBeChecked()
     await expect(box('SNES Games')).toBeChecked()
-    expect(sent[1]).toEqual([snes.id])
+    expect(sent[1]).toEqual({ add: [], remove: [nes.id] })
     await expect(menu).toBeVisible()
     await expect(boxes).toHaveText(all)
   })

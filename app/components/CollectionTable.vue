@@ -69,6 +69,8 @@ const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
   remove: [itemId: string]
   rename: [itemId: string]
+  /** A collection the user ticked was deleted: the page's data is stale. */
+  missing: []
   /** The collections a game is in were saved: all of them, as links. */
   collectionsChanged: [itemId: string, collections: CollectionLink[]]
   /** The owner has the game now: it moves from the Wishlist to Owned. */
@@ -111,30 +113,24 @@ const showToWishlist = (item: CollectionEntry) =>
   tableMode.value === 'owned' ||
   (!isList.value && item.owned && !item.wishlisted)
 
-// Setting the collections a game is in, from the row menu or the dialog.
-// The menu's ticks and the dialog both send the whole set.
-const { saving: savingItems, save: saveCollections } = useItemCollections()
+// Changing the collections a game is in, from the row menu or the dialog.
+// Only what was ticked or unticked is sent, so a stale row can't undo
+// changes made elsewhere.
+const { saving: savingItems, save: saveCollections } = useItemCollections(() =>
+  emit('missing'),
+)
 const targets = computed(() => props.addTargets ?? [])
 const isIn = (item: CollectionEntry, collectionId: string) =>
   item.inCollections?.some((collection) => collection.id === collectionId) ??
   false
 
-/**
- * Saves the game's collections as `ids` (among the targets). Collections
- * it's in that aren't targets, because the list hasn't loaded, stay.
- */
-async function setCollections(item: CollectionEntry, ids: string[]) {
-  const kept = (item.inCollections ?? []).filter(
-    (collection) =>
-      !targets.value.some((target) => target.id === collection.id),
-  )
-  const links = await saveCollections(
-    item.id,
-    [...kept.map((collection) => collection.id), ...ids],
-    targets.value,
-  )
+async function changeCollections(
+  item: CollectionEntry,
+  change: { add: string[]; remove: string[] },
+) {
+  const links = await saveCollections(item.id, change, targets.value)
   if (!links) return false
-  emit('collectionsChanged', item.id, [...kept, ...links])
+  emit('collectionsChanged', item.id, links)
   return true
 }
 
@@ -143,14 +139,10 @@ function toggleTarget(
   collectionId: string,
   on: boolean,
 ) {
-  return setCollections(
-    item,
-    targets.value
-      .filter((target) =>
-        target.id === collectionId ? on : isIn(item, target.id),
-      )
-      .map((target) => target.id),
-  )
+  return changeCollections(item, {
+    add: on ? [collectionId] : [],
+    remove: on ? [] : [collectionId],
+  })
 }
 
 const editingItem = ref<CollectionEntry | null>(null)
@@ -161,8 +153,11 @@ function editCollections(item: CollectionEntry) {
   editingOpen.value = true
 }
 
-async function saveEditing(ids: string[]) {
-  if (editingItem.value && (await setCollections(editingItem.value, ids))) {
+async function saveEditing(change: { add: string[]; remove: string[] }) {
+  if (
+    editingItem.value &&
+    (await changeCollections(editingItem.value, change))
+  ) {
     editingOpen.value = false
   }
 }

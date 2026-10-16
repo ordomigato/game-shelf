@@ -6,24 +6,28 @@ import type {
 
 /**
  * Pick which of the user's collections a game from Owned or the Wishlist
- * is in: a checklist of all of them, applied on Save. Emits the ticked ids.
- * The parent closes the dialog once they're saved.
+ * is in: a checklist of all of them, applied on Save. Emits only what
+ * changed since it opened. The parent closes the dialog once it's saved.
  */
 const props = defineProps<{
   item: CollectionEntry | null
   collections: CollectionSummary[]
   saving: boolean
 }>()
-const emit = defineEmits<{ save: [collectionIds: string[]] }>()
+const emit = defineEmits<{
+  save: [change: { add: string[]; remove: string[] }]
+}>()
 const open = defineModel<boolean>('open', { default: false })
 
 const selected = ref(new Set<string>())
+const started = ref(new Set<string>())
 
 watch(open, (isOpen) => {
   if (!isOpen) return
-  selected.value = new Set(
+  started.value = new Set(
     props.item?.inCollections?.map((collection) => collection.id),
   )
+  selected.value = new Set(started.value)
 })
 
 function toggle(id: string, on: boolean) {
@@ -34,12 +38,15 @@ function toggle(id: string, on: boolean) {
 }
 
 function save() {
-  emit(
-    'save',
-    props.collections
-      .filter((collection) => selected.value.has(collection.id))
-      .map((collection) => collection.id),
+  const ids = props.collections.map((collection) => collection.id)
+  const add = ids.filter(
+    (id) => selected.value.has(id) && !started.value.has(id),
   )
+  const remove = ids.filter(
+    (id) => !selected.value.has(id) && started.value.has(id),
+  )
+  if (!add.length && !remove.length) open.value = false
+  else emit('save', { add, remove })
 }
 </script>
 

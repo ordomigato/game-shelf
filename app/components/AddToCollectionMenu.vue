@@ -14,7 +14,7 @@ import type {
  * however many places it's in, so the first tick creates the item and later ticks only change it.
  * Ticking a collection for a new game makes it owned, and ticking one for
  * a game already there leaves its lists alone. When the catalog knows the
- * game's platforms, "Owned on" and "Wanted on" let the user say which
+ * game's platforms, "Owned on" and "Wishlisted on" let the user say which
  * version they have or want. The collections come from the sidebar's list
  * and the game's state is remembered, so opening the menu again doesn't
  * ask the server again.
@@ -107,6 +107,11 @@ async function save(key: string, change: () => Promise<void>) {
     await change()
   } catch (error) {
     toast.error(limitMessage(error, t) ?? t('addToCollection.saveFailed'))
+    // A collection deleted elsewhere: show the ones that are left.
+    if (isNotFound(error)) {
+      await myCollections.refresh()
+      await load()
+    }
   } finally {
     const done = new Set(saving.value)
     done.delete(key)
@@ -162,10 +167,10 @@ function toggleCollection(collection: CollectionSummary, checked: boolean) {
       show(added.item, added.collectionIds)
       return
     }
-    const next = new Set(selected.value)
-    if (checked) next.add(collection.id)
-    else next.delete(collection.id)
-    const saved = await collections.setItemCollections(item.value.id, [...next])
+    const saved = await collections.setItemCollections(item.value.id, {
+      add: checked ? [collection.id] : [],
+      remove: checked ? [] : [collection.id],
+    })
     show(item.value, saved.collectionIds)
   })
 }

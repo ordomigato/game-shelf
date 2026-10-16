@@ -289,15 +289,18 @@ export function useCollections() {
       ),
 
     /**
-     * Sets which of the user's collections a game is in: the whole set, so
-     * any left out are left. Resolves with the collections it's in.
+     * Puts a game in the collections `add` and takes it out of `remove`,
+     * leaving its others alone. Resolves with every collection it's in.
      */
-    setItemCollections: (itemId: string, collectionIds: string[]) =>
+    setItemCollections: (
+      itemId: string,
+      change: { add: string[]; remove: string[] },
+    ) =>
       refreshing(
         remembering(
           auth.apiFetch<{ collectionIds: string[] }>(
             `/api/library-items/${itemId}/collections`,
-            { method: 'PUT', body: { collectionIds } },
+            { method: 'PUT', body: change },
           ),
           (saved) => memberships.setCollections(itemId, saved.collectionIds),
           () => memberships.forgetItem(itemId),

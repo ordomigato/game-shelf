@@ -235,6 +235,7 @@ function onRenamed(saved: LibraryItem) {
         @remove="removeItem"
         @rename="startRenaming"
         @collections-changed="collectionsChanged"
+        @missing="refresh()"
         @got-it="gotIt"
         @to-wishlist="toWishlist"
       />
@@ -251,6 +252,7 @@ function onRenamed(saved: LibraryItem) {
         :item-name="gotItItem?.name ?? ''"
         :collections="mine"
         :already-in="gotItItem?.inCollections?.map(({ id }) => id)"
+        @missing="refresh()"
       />
       <RenameItemDialog
         v-model:open="renaming"

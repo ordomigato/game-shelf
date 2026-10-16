@@ -231,7 +231,7 @@ tr:has([aria-expanded='true']) > .pinned-cell {
 }
 
 /* In a collection, games that are only wanted fade like a gap in a set.
-   The Wanted badge and the row menu stay clear. */
+   The Wishlist badge and the row menu stay clear. */
 .wanted-fade {
   transition: opacity 150ms;
 }

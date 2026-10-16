@@ -4,8 +4,7 @@ import type { CollectionSummary } from '#shared/types/collection'
 
 /**
  * Offered after "Got it" moves a game to Owned: tick some of the user's
- * collections to add it to as well. They're saved along with the ones the
- * game is already in. If that's refused (a plan limit, say), the dialog
+ * collections to add it to as well. Only the ticked ones are sent. If that's refused (a plan limit, say), the dialog
  * stays open.
  */
 const props = defineProps<{
@@ -16,9 +15,14 @@ const props = defineProps<{
   alreadyIn?: string[]
 }>()
 const open = defineModel<boolean>('open', { default: false })
+const emit = defineEmits<{
+  /** A collection that was ticked has been deleted. */
+  missing: []
+}>()
 
 const { t } = useI18n()
 const library = useCollections()
+const sidebar = useMyCollections()
 const route = useRoute()
 
 const selected = ref(new Set<string>())
@@ -49,11 +53,15 @@ async function add() {
   )
   const names = joined.map((collection) => collection.title).join(', ')
   try {
-    await library.setItemCollections(props.itemId, [
-      ...(props.alreadyIn ?? []),
-      ...joined.map(({ id }) => id),
-    ])
+    await library.setItemCollections(props.itemId, {
+      add: joined.map(({ id }) => id),
+      remove: [],
+    })
   } catch (error) {
+    if (isNotFound(error)) {
+      void sidebar.refresh()
+      emit('missing')
+    }
     toast.error(
       limitMessage(error, t) ?? t('table.addToFailed', { collection: names }),
     )

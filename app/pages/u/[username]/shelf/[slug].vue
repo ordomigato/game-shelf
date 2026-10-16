@@ -640,6 +640,7 @@ async function deleteCollection() {
           @move="moveItem"
           @rename="startRenaming"
           @collections-changed="collectionsChanged"
+          @missing="refresh()"
           @got-it="gotIt"
           @to-wishlist="toWishlist"
         />
@@ -724,6 +725,7 @@ async function deleteCollection() {
         :item-name="gotItItem?.name ?? ''"
         :collections="mine"
         :already-in="gotItItem?.inCollections?.map(({ id }) => id)"
+        @missing="refresh()"
       />
       <RenameItemDialog
         v-if="data.isOwner"

@@ -144,19 +144,31 @@ async function openLists(page: Page, listDelay = 0) {
 }
 
 /**
- * Stubs setting a game's collections. Collects what was sent, as
- * "<item id> <collection ids>", and answers with the same set.
+ * Stubs changing a game's collections. Collects what was sent, as
+ * "<item id> +<added ids> -<removed ids>", and answers with the collections
+ * the game is in after the change.
  */
 async function stubAdds(page: Page) {
   const adds: string[] = []
+  const inside = new Map<string, string[]>(
+    [linkToThePast, homebrew, gtaV, chrono].map((item) => [
+      item.id,
+      item.inCollections.map(({ id }) => id),
+    ]),
+  )
   await page.route('**/api/library-items/*/collections', (route) => {
-    const { collectionIds } = route.request().postDataJSON() as {
-      collectionIds: string[]
+    const { add, remove } = route.request().postDataJSON() as {
+      add: string[]
+      remove: string[]
     }
-    adds.push(
-      `${route.request().url().split('/').at(-2)} ${collectionIds.join(',')}`,
+    const id = route.request().url().split('/').at(-2)!
+    adds.push(`${id} +${add.join(',')} -${remove.join(',')}`)
+    const now = [...(inside.get(id) ?? []), ...add].filter(
+      (collectionId, i, all) =>
+        !remove.includes(collectionId) && all.indexOf(collectionId) === i,
     )
-    return route.fulfill({ json: { collectionIds } })
+    inside.set(id, now)
+    return route.fulfill({ json: { collectionIds: now } })
   })
   return adds
 }
@@ -388,7 +400,7 @@ test('Owned: "Add to" ticks and unticks collections, and leaves its lists alone'
   await expect(boxes).toHaveText(['Zelda Games', 'SNES'])
   await pick(page, 'Zelda Games')
   await expect(row.locator('a', { hasText: 'Zelda Games' })).toBeVisible()
-  expect(adds).toEqual([`${homebrew.id} ${zelda.id}`])
+  expect(adds).toEqual([`${homebrew.id} +${zelda.id} -`])
 
   // The menu stays open with every collection in place, ticked or not.
   await expect(boxes).toHaveText(['Zelda Games', 'SNES'])
@@ -397,10 +409,10 @@ test('Owned: "Add to" ticks and unticks collections, and leaves its lists alone'
   ).toBeChecked()
   await pick(page, 'SNES')
   await expect(row.locator('a', { hasText: 'SNES' })).toBeVisible()
-  expect(adds.at(-1)).toBe(`${homebrew.id} ${zelda.id},${snes.id}`)
+  expect(adds.at(-1)).toBe(`${homebrew.id} +${snes.id} -`)
   await pick(page, 'Zelda Games')
   await expect(row.locator('a', { hasText: 'Zelda Games' })).toHaveCount(0)
-  expect(adds.at(-1)).toBe(`${homebrew.id} ${snes.id}`)
+  expect(adds.at(-1)).toBe(`${homebrew.id} + -${zelda.id}`)
   await expect(boxes).toHaveText(['Zelda Games', 'SNES'])
 
   // Still on Owned, and no list change was sent.
@@ -424,7 +436,7 @@ test('Wishlist: "Add to" keeps the game wanted', async ({ page }) => {
   await pick(page, 'SNES')
   await expect(row.locator('a', { hasText: 'SNES' })).toBeVisible()
   await expect(row.locator('a', { hasText: 'Zelda Games' })).toBeVisible()
-  expect(adds).toEqual([`${chrono.id} ${zelda.id},${snes.id}`])
+  expect(adds).toEqual([`${chrono.id} +${snes.id} -`])
   await expect(page.locator('tbody tr')).toHaveCount(2)
   expect(calls).toEqual([])
 })
@@ -449,7 +461,7 @@ test('Owned: the + beside a game’s collections opens a dialog to change them',
   expect(adds).toEqual([])
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(dialog).toBeHidden()
-  expect(adds).toEqual([`${homebrew.id} ${zelda.id}`])
+  expect(adds).toEqual([`${homebrew.id} +${zelda.id} -`])
   await expect(row.locator('a', { hasText: 'Zelda Games' })).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(3)
   expect(calls).toEqual([])
@@ -473,8 +485,44 @@ test('Wishlist: the + dialog starts from the game’s collections and can leave 
   await dialog.getByRole('checkbox', { name: 'SNES' }).click()
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(dialog).toBeHidden()
-  expect(adds).toEqual([`${chrono.id} ${snes.id}`])
+  expect(adds).toEqual([`${chrono.id} +${snes.id} -${zelda.id}`])
   await expect(row.locator('a', { hasText: 'SNES' })).toBeVisible()
   await expect(row.locator('a', { hasText: 'Zelda Games' })).toHaveCount(0)
   await expect(page.locator('tbody tr')).toHaveCount(2)
+})
+
+test('a collection deleted elsewhere reloads the page and the collections', async ({
+  page,
+}) => {
+  await openLists(page)
+  await page.route('**/api/library-items/*/collections', (route) =>
+    route.fulfill({ status: 404, json: { statusCode: 404 } }),
+  )
+  await page.goto('/u/retro_fan/shelf/owned')
+  await expect(page.locator('tbody tr')).toHaveCount(3)
+  const reloads: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (request.method() === 'GET') reloads.push(path)
+  })
+  const row = page.locator('tbody tr', { hasText: 'Homebrew Cart' })
+  await row
+    .getByRole('button', { name: 'Choose collections for Homebrew Cart' })
+    .click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox', { name: 'Zelda Games' }).click()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(
+    page.getByText("Couldn't save the collections. Try again."),
+  ).toBeVisible()
+  await expect
+    .poll(() => reloads.filter((path) => path === '/api/collections').length)
+    .toBeGreaterThan(0)
+  await expect
+    .poll(
+      () =>
+        reloads.filter((path) => path === '/api/u/retro_fan/lists/owned')
+          .length,
+    )
+    .toBeGreaterThan(0)
 })

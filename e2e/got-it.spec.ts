@@ -121,16 +121,23 @@ async function openCollection(
       },
     })
   })
-  // What was sent to set a game's collections, as "<item id> <ids>".
+  // What was sent to change a game's collections, as
+  // "<item id> +<added ids> -<removed ids>".
   const adds: string[] = []
+  const inside = new Map<string, string[]>(
+    (rows as { id: string; inCollections?: { id: string }[] }[]).map((row) => [
+      row.id,
+      row.inCollections?.map(({ id }) => id) ?? [],
+    ]),
+  )
   await page.route('**/api/library-items/*/collections', (route) => {
-    const { collectionIds } = route.request().postDataJSON() as {
-      collectionIds: string[]
+    const { add, remove } = route.request().postDataJSON() as {
+      add: string[]
+      remove: string[]
     }
-    adds.push(
-      `${route.request().url().split('/').at(-2)} ${collectionIds.join(',')}`,
-    )
-    if (full.some((id) => collectionIds.includes(id))) {
+    const id = route.request().url().split('/').at(-2)!
+    adds.push(`${id} +${add.join(',')} -${remove.join(',')}`)
+    if (full.some((fullId) => add.includes(fullId))) {
       return route.fulfill({
         status: 403,
         json: {
@@ -142,7 +149,12 @@ async function openCollection(
         },
       })
     }
-    return route.fulfill({ json: { collectionIds } })
+    const now = [...(inside.get(id) ?? []), ...add].filter(
+      (collectionId, i, all) =>
+        !remove.includes(collectionId) && all.indexOf(collectionId) === i,
+    )
+    inside.set(id, now)
+    return route.fulfill({ json: { collectionIds: now } })
   })
   await page.goto(`/u/retro_fan/shelf/${collection.slug}`)
   await expect(page.getByRole('table')).toBeVisible()
@@ -188,7 +200,7 @@ test('"Got it" flips a wanted game at once and offers the collections', async ({
   await dialog.getByRole('checkbox', { name: 'RPGs' }).click()
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(dialog).toBeHidden()
-  expect(adds).toEqual([`${items[0]!.id} ${snes.id},${rpg.id}`])
+  expect(adds).toEqual([`${items[0]!.id} +${rpg.id} -`])
   await expect(page.getByText('Added to RPGs')).toBeVisible()
 })
 
@@ -254,8 +266,8 @@ test('a collection that is full is named, and nothing is added until it is untic
   await expect(page.getByText('Added to SNES Games')).toBeVisible()
   await expect(dialog).toBeHidden()
   expect(adds).toEqual([
-    `${items[0]!.id} ${snes.id},${rpg.id}`,
-    `${items[0]!.id} ${snes.id}`,
+    `${items[0]!.id} +${snes.id},${rpg.id} -`,
+    `${items[0]!.id} +${snes.id} -`,
   ])
 })
 
@@ -345,11 +357,11 @@ test.describe('Add to', () => {
     ).toBeVisible()
     // Its lists are left alone, and the whole set was sent.
     expect(changes).toEqual([])
-    expect(adds).toEqual([`${items[0]!.id} ${snes.id},${rpg.id}`])
+    expect(adds).toEqual([`${items[0]!.id} +${rpg.id} -`])
 
     await page.keyboard.press('Enter')
     await expect(boxes.nth(1)).not.toBeChecked()
-    expect(adds.at(-1)).toBe(`${items[0]!.id} ${snes.id}`)
+    expect(adds.at(-1)).toBe(`${items[0]!.id} + -${rpg.id}`)
   })
 
   test('unticking this collection takes the game off the page', async ({
@@ -363,7 +375,7 @@ test.describe('Add to', () => {
     await expect(
       page.getByRole('link', { name: 'Chrono Trigger' }),
     ).toHaveCount(0)
-    expect(adds).toEqual([`${items[0]!.id} `])
+    expect(adds).toEqual([`${items[0]!.id} + -${snes.id}`])
   })
 
   test('shows every collection, ticked where the game is', async ({ page }) => {

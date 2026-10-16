@@ -17,7 +17,7 @@ describe('starterFields', () => {
   })
 
   it('has a select field with options wherever a select is used', () => {
-    for (const starter of [...STARTER_BLUEPRINTS, 'wishlist'] as const) {
+    for (const starter of STARTER_BLUEPRINTS) {
       for (const field of starterFields(starter)) {
         if (field.type === 'select')
           expect(field.options?.length).toBeGreaterThan(0)
@@ -27,10 +27,5 @@ describe('starterFields', () => {
 
   it('starts blank collections with no fields', () => {
     expect(starterFields('blank')).toEqual([])
-  })
-
-  it('starts the Wishlist and Owned with no fields', () => {
-    expect(starterFields('wishlist')).toEqual([])
-    expect(starterFields('owned')).toEqual([])
   })
 })

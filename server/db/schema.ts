@@ -17,11 +17,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import type { CustomLimits } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
-import type {
-  CollectionKind,
-  FieldDefinition,
-  ItemData,
-} from '../../shared/types/collection'
+import type { FieldDefinition, ItemData } from '../../shared/types/collection'
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -102,12 +98,6 @@ export const collections = pgTable(
     /** A hex code like `#7c3aed`. Null means a colour from the title. */
     color: text('color'),
     visibility: visibility('visibility').notNull().default('private'),
-    /**
-     * `custom`, or one of the two lists every user has: `wishlist` and
-     * `owned`. Text with a check rather than an enum, so a migration can add
-     * a kind and use it in the same transaction.
-     */
-    kind: text('kind').$type<CollectionKind>().notNull().default('custom'),
     /** The charts on the collection's dashboard, in order. */
     dashboard: jsonb('dashboard').$type<ChartWidget[]>().notNull().default([]),
     ...timestamps,
@@ -115,16 +105,6 @@ export const collections = pgTable(
   (table) => [
     index('collections_owner_id_idx').on(table.ownerId),
     uniqueIndex('collections_owner_slug_idx').on(table.ownerId, table.slug),
-    uniqueIndex('collections_one_wishlist_idx')
-      .on(table.ownerId)
-      .where(sql`${table.kind} = 'wishlist'`),
-    uniqueIndex('collections_one_owned_idx')
-      .on(table.ownerId)
-      .where(sql`${table.kind} = 'owned'`),
-    check(
-      'collections_kind',
-      sql`${table.kind} in ('custom', 'wishlist', 'owned')`,
-    ),
   ],
 )
 
@@ -165,6 +145,12 @@ export const games = pgTable('games', {
  * A game a user is tracking, once per game per user, however many
  * collections it's in. `data` holds its values for every blueprint field,
  * keyed by field id.
+ *
+ * Owned and the Wishlist are the `owned` and `wishlisted` flags, not
+ * collections. `owned_on` and `wanted_on` name catalog platforms (versions)
+ * for each, and the checks keep the two lists from overlapping: only a
+ * different version of an owned game can also be wanted. See
+ * `shared/utils/lists.ts`.
  */
 export const libraryItems = pgTable(
   'library_items',
@@ -178,10 +164,42 @@ export const libraryItems = pgTable(
     name: text('name').notNull(),
     coverId: text('cover_id'),
     data: jsonb('data').$type<ItemData>().notNull().default({}),
+    owned: boolean('owned').notNull().default(true),
+    wishlisted: boolean('wishlisted').notNull().default(false),
+    /** Platform ids (`platforms.igdb_id`) the game is owned on. */
+    ownedOn: integer('owned_on')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    /** Platform ids the game is wanted on. */
+    wantedOn: integer('wanted_on')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
     ...timestamps,
   },
   (table) => [
     index('library_items_owner_id_idx').on(table.ownerId),
+    check(
+      'library_items_platforms_apart',
+      sql`not (${table.ownedOn} && ${table.wantedOn})`,
+    ),
+    check(
+      'library_items_owned_on',
+      sql`cardinality(${table.ownedOn}) = 0 or ${table.owned}`,
+    ),
+    check(
+      'library_items_wanted_on',
+      sql`cardinality(${table.wantedOn}) = 0 or ${table.wishlisted}`,
+    ),
+    check(
+      'library_items_both_versions',
+      sql`not (${table.owned} and ${table.wishlisted}) or cardinality(${table.wantedOn}) > 0`,
+    ),
+    check(
+      'library_items_on_a_list',
+      sql`${table.owned} or ${table.wishlisted}`,
+    ),
     index('library_items_igdb_id_idx').on(table.igdbId),
     uniqueIndex('library_items_owner_igdb_idx')
       .on(table.ownerId, table.igdbId)

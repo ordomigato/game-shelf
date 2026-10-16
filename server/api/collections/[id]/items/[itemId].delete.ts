@@ -3,9 +3,9 @@ import { z } from 'zod'
 const paramsSchema = z.object({ id: z.uuid(), itemId: z.uuid() })
 
 /**
- * Takes an item out of one collection. It stays in the user's library and
- * their other collections, except that out of Owned it also leaves every
- * custom collection. Answers with the collections it's still in.
+ * Takes an item out of one collection. It stays in the user's library, on
+ * its lists and in their other collections. Answers with the collections
+ * it's still in.
  */
 export default defineEventHandler(
   async (event): Promise<{ collectionIds: string[] }> => {

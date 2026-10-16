@@ -210,37 +210,25 @@ export async function importIntoCollection(
     typeof entry === 'string' ? entry : inserted[entry.pending]!.id,
   )
 
-  // Games imported into a custom collection go into the Owned list too, in
-  // the same batch.
-  const targets = [collection.id]
-  if (collection.kind === 'custom') targets.push(await ownedListId(ownerId))
-  const ends = await db
-    .select({
-      id: collectionItems.collectionId,
-      last: max(collectionItems.position),
-    })
+  // New games are owned (the column's default). Games the user already
+  // has keep their place on the lists.
+  const [end] = await db
+    .select({ last: max(collectionItems.position) })
     .from(collectionItems)
-    .where(inArray(collectionItems.collectionId, targets))
-    .groupBy(collectionItems.collectionId)
-  const insertInto = (collectionId: string) => {
-    const last = ends.find((end) => end.id === collectionId)?.last ?? 0
-    return db
-      .insert(collectionItems)
-      .values(
-        itemIds.map((itemId, index) => ({
-          collectionId,
-          itemId,
-          position: last + index + 1,
-        })),
-      )
-      .onConflictDoNothing()
-      .returning({ itemId: collectionItems.itemId })
-  }
-  const [added = []] = itemIds.length
-    ? await db.batch([
-        insertInto(collection.id),
-        ...targets.slice(1).map(insertInto),
-      ])
+    .where(eq(collectionItems.collectionId, collection.id))
+  const last = end?.last ?? 0
+  const added = itemIds.length
+    ? await db
+        .insert(collectionItems)
+        .values(
+          itemIds.map((itemId, index) => ({
+            collectionId: collection.id,
+            itemId,
+            position: last + index + 1,
+          })),
+        )
+        .onConflictDoNothing()
+        .returning({ itemId: collectionItems.itemId })
     : []
 
   await db

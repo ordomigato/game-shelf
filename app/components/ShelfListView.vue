@@ -72,10 +72,29 @@ async function gotIt(itemId: string) {
   if (!(await moves.gotIt(itemId)) || !item) return
   setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
   const alreadyIn = item.inCollections?.map(({ id }) => id) ?? []
-  if (mine.value.some(({ id }) => !alreadyIn.includes(id))) {
+  // The list may still be loading, or have failed to when the page opened.
+  const owned = await sidebar.load().catch(() => mine.value)
+  if (owned.some(({ id }) => !alreadyIn.includes(id))) {
     gotItItem.value = item
     offeringCollections.value = true
   }
+}
+
+const addToTarget = useAddToCollection(shelfPath)
+
+/** Adds a game to a collection. It stays on this list. */
+async function addToCollection(itemId: string, collectionId: string) {
+  const target = mine.value.find((collection) => collection.id === collectionId)
+  if (!target) return
+  const link = await addToTarget(itemId, target)
+  if (!link) return
+  setItems(
+    (data.value?.items ?? []).map((entry) =>
+      entry.id === itemId
+        ? { ...entry, inCollections: [...(entry.inCollections ?? []), link] }
+        : entry,
+    ),
+  )
 }
 
 /** Moves an owned game to the Wishlist. It leaves Owned. */
@@ -217,10 +236,12 @@ function onRenamed(saved: LibraryItem) {
         :fields="[]"
         :items="data.items"
         :mode="list"
+        :add-targets="mine"
         editable
         :shelf-path="shelfPath"
         @remove="removeItem"
         @rename="startRenaming"
+        @add-to="addToCollection"
         @got-it="gotIt"
         @to-wishlist="toWishlist"
       />

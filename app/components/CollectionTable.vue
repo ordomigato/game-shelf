@@ -666,7 +666,7 @@ const addedFormat = computed(
                   >
                     <Heart /> {{ $t('table.moveToWishlist') }}
                   </DropdownMenuItem>
-                  <DropdownMenuSub v-if="!isList && addTargets">
+                  <DropdownMenuSub v-if="addTargets">
                     <DropdownMenuSubTrigger>
                       <FolderPlus /> {{ $t('table.addTo') }}
                     </DropdownMenuSubTrigger>
@@ -687,11 +687,7 @@ const addedFormat = computed(
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   <DropdownMenuSeparator
-                    v-if="
-                      showGotIt(item) ||
-                      showToWishlist(item) ||
-                      (!isList && addTargets)
-                    "
+                    v-if="showGotIt(item) || showToWishlist(item) || addTargets"
                   />
                   <template v-if="reorderable">
                     <DropdownMenuItem

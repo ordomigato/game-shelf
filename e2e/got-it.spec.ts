@@ -73,13 +73,18 @@ async function openCollection(
     full?: string[]
     owner?: boolean
     visibility?: 'private' | 'public'
+    /** Milliseconds the user's collections take to arrive. */
+    listDelay?: number
   } = {},
 ) {
   const { listStatus = 200, full = [], owner = true } = options
   if (owner) await signInAs(page, { username: 'retro_fan' })
-  await page.route('**/api/collections', (route) =>
-    route.fulfill({ json: lists }),
-  )
+  await page.route('**/api/collections', async (route) => {
+    if (options.listDelay) {
+      await new Promise((resolve) => setTimeout(resolve, options.listDelay))
+    }
+    await route.fulfill({ json: lists })
+  })
   await page.route('**/api/lists', (route) =>
     route.fulfill({ json: { owned: 1, wishlist: 1 } }),
   )
@@ -180,6 +185,15 @@ test('"Got it" flips a wanted game at once and offers the collections', async ({
   await expect(dialog).toBeHidden()
   expect(adds).toEqual([`PUT collections/${rpg.id}/items/${items[0]!.id}`])
   await expect(page.getByText('Added to RPGs')).toBeVisible()
+})
+
+test('"Got it" offers the collections even when they were slow to load', async ({
+  page,
+}) => {
+  await openSnes(page, undefined, undefined, { listDelay: 1500 })
+  await gotIt(page, 'Chrono Trigger')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('checkbox', { name: 'RPGs' })).toBeVisible()
 })
 
 test('skipping the popup adds nothing', async ({ page }) => {

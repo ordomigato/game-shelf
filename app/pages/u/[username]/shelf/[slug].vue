@@ -200,47 +200,24 @@ const addTargets = computed(() =>
   mine.value.filter((collection) => collection.id !== data.value?.id),
 )
 
+const addToTarget = useAddToCollection(shelfPath)
+
 /** Adds a game to another collection. It stays in this one. */
 async function addToCollection(itemId: string, collectionId: string) {
   const target = mine.value.find((collection) => collection.id === collectionId)
   if (!data.value || !target) return
   const pageId = data.value.id
-  try {
-    await collections.addItem(collectionId, itemId)
-  } catch (error) {
-    toast.error(
-      limitMessage(error, t) ??
-        t('table.addToFailed', { collection: target.title }),
-    )
-    return
-  }
+  const link = await addToTarget(itemId, target)
   // The page may have moved on to another collection while this saved.
-  if (data.value?.id === pageId) {
+  if (link && data.value?.id === pageId) {
     setItems(
       data.value.items.map((entry) =>
         entry.id === itemId && entry.inCollections
-          ? {
-              ...entry,
-              inCollections: [
-                ...entry.inCollections,
-                {
-                  id: target.id,
-                  title: target.title,
-                  slug: target.slug,
-                  color: target.color,
-                },
-              ],
-            }
+          ? { ...entry, inCollections: [...entry.inCollections, link] }
           : entry,
       ),
     )
   }
-  toast.success(t('table.addedTo', { collection: target.title }), {
-    action: {
-      label: t('table.view'),
-      onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
-    },
-  })
 }
 
 const gotItItem = ref<CollectionEntry | null>(null)
@@ -276,7 +253,9 @@ async function gotIt(itemId: string) {
   if (!saved || !item) return
   applyLists(saved)
   const alreadyIn = item.inCollections?.map(({ id }) => id) ?? []
-  if (mine.value.some(({ id }) => !alreadyIn.includes(id))) {
+  // The list may still be loading, or have failed to when the page opened.
+  const owned = await sidebar.load().catch(() => mine.value)
+  if (owned.some(({ id }) => !alreadyIn.includes(id))) {
     gotItItem.value = item
     offeringCollections.value = true
   }

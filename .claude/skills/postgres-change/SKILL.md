@@ -50,23 +50,29 @@ values for other blueprints untouched.
   (left join with `catalogJoin`, then `itemName` / `itemCoverId` or
   `toLibraryItem`). A game added by hand has no `igdb_id` and keeps its own
   `name`.
+- Owned and the Wishlist are not collections. They are the `owned` and
+  `wishlisted` flags on `library_items`, with `owned_on` and `wanted_on`
+  (catalog platform ids, the versions). Check constraints make "both"
+  impossible except across versions: a platform is never in both lists,
+  a non-empty `owned_on` needs `owned` (likewise `wanted_on` and
+  `wishlisted`), a game on both lists needs a non-empty `wanted_on`, and a
+  game is on at least one list. `shared/utils/lists.ts` holds the same
+  rules and the actions on them (`applyListAction`: got it, move to
+  Wishlist, tick, untick, set the platforms), which
+  `changeItemLists` in `server/utils/lists.ts` applies. A game left on
+  neither list is deleted with its values and collection links.
+  `getList` reads a list (owner only, 404 for anyone else) with the custom
+  collections each game is in. A new game is owned unless it's added to
+  the Wishlist, and adding a game to a custom collection never touches its
+  flags. Custom collections hold owned and wanted games alike.
 - `collection_items`: the junction table (composite primary key), with
-  `position` and `added_at`.
+  `position` and `added_at`. Custom collections only.
 - `collections`: owner, `blueprint_id`, title, `slug` (unique per owner),
-  visibility, and `kind`: `custom`, or one of the two built-in lists every
-  user has, `owned` and `wishlist` (one of each per user, enforced by
-  partial unique indexes). `ensureBuiltInLists` creates both, private and
-  pinned with Owned first. Their titles and slugs are fixed (`owned` and
-  `wishlist` are reserved slugs), they can't be deleted, and they don't
-  count toward the plan's collection limit.
-- Everything in a custom collection is also in Owned: every write that
-  puts a game into a custom collection (`addItemToCollections`,
-  `moveItemToCollections`, `importIntoCollection`) puts it into Owned in
-  the same statement or batch. A game can be in Owned alone, and on the
-  Wishlist and in Owned at once. Removing a game from Owned
-  (`removeItemFromCollection`) also takes it out of every custom
-  collection, but not the Wishlist. Owned has no per-collection game
-  limit (the library's applies).
+  visibility. All custom. `owned` and `wishlist` are reserved slugs, since
+  the list pages live at `/u/<username>/shelf/owned` and `.../wishlist`.
+  Only collections count toward the plan's collection limit. The Wishlist
+  is capped at the per-collection game limit (`assertListRoom`), and Owned
+  only by the library's.
 - `blueprints`: shared (named) or private to one collection. A blueprint in
   use can't be deleted (`restrict`).
 
@@ -95,18 +101,17 @@ querying in routes, and keep the owner filter in every new one.
 7. **The composable and UI** in `app/`. See `ui-conventions` and
    `plain-language`.
 
-## Kinds are text with a check, not enums
+## Fixed sets of values are text with a check, not enums
 
 Postgres can't use an enum value in the transaction that added it.
 drizzle-kit runs all pending migrations in one transaction, and a release
 often bundles many migrations, so a new enum value and the first thing
 that uses it would land in the same transaction and fail. So a column with
 a fixed set of values is `text` with a check constraint (like
-`collections.kind`: `kind in ('custom', 'wishlist', 'owned')`, and
-`users.plan`), narrowed in Drizzle with `.$type<...>()`. Adding a value
-means changing the check in the same migration that starts using it.
-Don't add new `pgEnum`s. `visibility` is the one left, and it doesn't
-change.
+`users.plan`: `plan in ('free', 'pro', 'max')`), narrowed in Drizzle with
+`.$type<...>()`. Adding a value means changing the check in the same
+migration that starts using it. Don't add new `pgEnum`s. `visibility` is
+the one left, and it doesn't change.
 
 ## Correlated subqueries
 

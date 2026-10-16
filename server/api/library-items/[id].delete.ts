@@ -4,7 +4,7 @@ import { libraryItems } from '../../db/schema'
 
 const paramsSchema = z.object({ id: z.uuid() })
 
-/** Removes a game from the user's library and every collection it's in. */
+/** Removes a game from the user's library: both lists and every collection. */
 export default defineEventHandler(async (event) => {
   const { sub } = await requireAuth(event)
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)

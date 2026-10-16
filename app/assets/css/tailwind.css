@@ -230,15 +230,15 @@ tr:has([aria-expanded='true']) > .pinned-cell {
   background: color-mix(in oklab, var(--card), var(--muted) 50%);
 }
 
-/* In a collection, games that are also on the Wishlist fade like a gap in
-   a set. The heart and the row menu stay clear. */
-.wishlist-fade {
+/* In a collection, games that are only wanted fade like a gap in a set.
+   The Wanted badge and the row menu stay clear. */
+.wanted-fade {
   transition: opacity 150ms;
 }
-.is-wishlisted .wishlist-fade {
+.is-wanted .wanted-fade {
   opacity: 0.5;
 }
-.is-wishlisted:hover .wishlist-fade {
+.is-wanted:hover .wanted-fade {
   opacity: 0.8;
 }
 

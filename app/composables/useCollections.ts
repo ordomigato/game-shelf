@@ -11,7 +11,11 @@ import type {
   BlueprintSummary,
   FieldValue,
   LibraryItem,
+  ListDetail,
+  ListName,
+  CollectionLink,
 } from '#shared/types/collection'
+import type { ListAction } from '#shared/utils/lists'
 import type { PublicProfile } from '#shared/types/user'
 import type { GameMembership } from '~/composables/useGameMemberships'
 import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
@@ -81,6 +85,12 @@ export function useCollections() {
     get: (username: string, slug: string) =>
       viewerFetch<CollectionDetail>(
         `${userPath(username)}/${encodeURIComponent(slug)}`,
+      ),
+
+    /** Owned or the Wishlist. Only its owner can read them (404). */
+    getList: (username: string, list: ListName) =>
+      viewerFetch<ListDetail>(
+        `/api/u/${encodeURIComponent(username)}/lists/${list}`,
       ),
 
     /** Starts from a copy of a starter's fields, or uses a blueprint. */
@@ -188,38 +198,50 @@ export function useCollections() {
       ),
 
     /**
-     * Of these IGDB games, the ones already in a collection (any of the
-     * user's, or only `collectionId`), with their item ids.
+     * Of these IGDB games, the ones the user already has, with their item
+     * ids: on a list, or only those in `collectionId` or on `list`.
      */
-    tracked: (igdbIds: number[], collectionId?: string) =>
+    tracked: (
+      igdbIds: number[],
+      only: { collectionId?: string; list?: ListName } = {},
+    ) =>
       auth.apiFetch<{ igdbId: number; itemId: string }[]>(
         '/api/library-items/igdb',
         {
           query: {
             ids: igdbIds.join(','),
-            collection: collectionId,
+            collection: only.collectionId,
+            list: only.list,
           },
         },
       ),
 
-    /** Adds an IGDB game to the library (once) and to these collections. */
+    /**
+     * Adds an IGDB game to the library (once) and to these collections. A
+     * new game is owned, or wishlisted with `list`, optionally on named
+     * platforms. A game already there keeps its lists unless `list` is set.
+     */
     addGame: (
       game: { igdbId: number; name: string; coverId: string | null },
       collectionIds: string[],
+      lists: { list?: ListName; platforms?: number[] } = {},
     ) =>
       refreshing(
         remembering(
           auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
             '/api/library-items',
-            { method: 'POST', body: { ...game, collectionIds } },
+            { method: 'POST', body: { ...game, collectionIds, ...lists } },
           ),
           (added) => memberships.set(game.igdbId, added),
           () => memberships.forgetGame(game.igdbId),
         ),
       ),
 
-    /** Adds a game IGDB doesn't have, by name, to one collection. */
-    addManualGame: (name: string, collectionId: string) =>
+    /** Adds a game IGDB doesn't have, by name, to a collection or a list. */
+    addManualGame: (
+      name: string,
+      target: { collectionId: string } | { list: ListName },
+    ) =>
       refreshing(
         remembering(
           auth.apiFetch<{ item: LibraryItem; collectionIds: string[] }>(
@@ -230,7 +252,9 @@ export function useCollections() {
                 igdbId: null,
                 name,
                 coverId: null,
-                collectionIds: [collectionId],
+                collectionIds:
+                  'collectionId' in target ? [target.collectionId] : [],
+                ...('list' in target && { list: target.list }),
               },
             },
           ),
@@ -239,9 +263,32 @@ export function useCollections() {
       ),
 
     /**
-     * Puts an item in a collection (and in Owned, for a custom collection).
-     * Resolves with the collections it's in.
+     * Changes a game's place on Owned and the Wishlist. Resolves with its
+     * new state (null when it was on neither list and got deleted).
      */
+    changeLists: (itemId: string, action: ListAction) =>
+      refreshing(
+        remembering(
+          auth.apiFetch<{ item: LibraryItem | null; collectionIds: string[] }>(
+            `/api/library-items/${itemId}/lists`,
+            { method: 'PUT', body: action },
+          ),
+          (saved) =>
+            memberships.setItem(itemId, saved.item, saved.collectionIds),
+          () => memberships.forgetItem(itemId),
+        ),
+      ),
+
+    /**
+     * The collections a game is in, from the server, for the question
+     * before taking it off its last list.
+     */
+    itemCollections: (itemId: string) =>
+      auth.apiFetch<CollectionLink[]>(
+        `/api/library-items/${itemId}/collections`,
+      ),
+
+    /** Puts an item in a collection. Resolves with the collections it's in. */
     addItem: (collectionId: string, itemId: string) =>
       refreshing(
         remembering(
@@ -305,26 +352,9 @@ export function useCollections() {
         { method: 'PUT', body: { afterItemId } },
       ),
 
-    /** Moves a game out of one collection into others, like "Got it". */
-    moveToCollections: (
-      fromCollectionId: string,
-      itemId: string,
-      toCollectionIds: string[],
-    ) =>
-      refreshing(
-        remembering(
-          auth.apiFetch(
-            `/api/collections/${fromCollectionId}/items/${itemId}/move`,
-            { method: 'POST', body: { toCollectionIds } },
-          ),
-          () => memberships.forgetItem(itemId),
-          () => memberships.forgetItem(itemId),
-        ),
-      ),
-
     /**
-     * Takes an item out of a collection. Out of Owned, it leaves every
-     * custom collection too. Resolves with the collections it's still in.
+     * Takes an item out of a collection. Resolves with the collections it's
+     * still in.
      */
     removeItem: (collectionId: string, itemId: string) =>
       refreshing(

@@ -46,6 +46,12 @@ user first.
   through the `collection_items` junction table. See `postgres-change`.
 - **Collection addresses are `/u/<username>/shelf/<slug>`**, the same for
   the owner and visitors. A private collection is a 404 for anyone else.
+- **Owned and the Wishlist are not collections.** They are two flags on a
+  game (`library_items.owned`, `wishlisted`), with the platforms (versions)
+  each is for, so a game is never on both lists except as different
+  versions. They are owner-only views at `/u/<username>/shelf/owned` and
+  `/wishlist`, fixed at the top of the sidebar, with the shared columns
+  only. Custom collections hold owned and wanted games alike.
 - **Not DynamoDB, not Aurora DSQL, not RDS.** DynamoDB was dropped because
   the social features are relational. DSQL has no JSONB. RDS and
   self-hosted Postgres cost more than the whole budget.

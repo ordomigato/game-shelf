@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Gamepad2, GripVertical, Heart, Pin, PinOff } from '@lucide/vue'
+import { GripVertical, Pin, PinOff } from '@lucide/vue'
 import type { CollectionSummary } from '#shared/types/collection'
 
 /**
@@ -14,9 +14,7 @@ const props = defineProps<{
   pinned: boolean
 }>()
 const emit = defineEmits<{ togglePin: []; move: [offset: -1 | 1] }>()
-
-const titleOf = useCollectionTitle()
-const title = computed(() => titleOf(props.collection))
+const title = computed(() => props.collection.title)
 // On pinned rows the grip takes the mark's place while hovered.
 const markClass = computed(() =>
   props.pinned
@@ -42,20 +40,7 @@ function onGripKey(event: KeyboardEvent) {
       :aria-current="current ? 'page' : undefined"
       class="flex h-8 items-center gap-2.5 rounded-md pr-9 pl-2.5 text-sm font-medium text-muted-foreground outline-none hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground"
     >
-      <Heart
-        v-if="collection.kind === 'wishlist'"
-        class="size-2.5 shrink-0 fill-current text-primary"
-        :class="markClass"
-        aria-hidden="true"
-      />
-      <Gamepad2
-        v-else-if="collection.kind === 'owned'"
-        class="size-3 shrink-0 text-primary"
-        :class="markClass"
-        aria-hidden="true"
-      />
       <span
-        v-else
         class="size-2.5 shrink-0 rounded-sm ring-1 ring-foreground/15 ring-inset"
         :class="markClass"
         :style="dotStyle"

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Compass,
   Gamepad2,
+  Heart,
   Library,
   Plus,
   Search,
@@ -14,8 +15,9 @@ import type { CollectionSummary } from '#shared/types/collection'
 const SHOWN_COLLECTIONS = 8
 
 /**
- * The signed-in navigation: the main sections, the collections the user
- * pinned (in their order), then the rest, most recently changed first.
+ * The signed-in navigation: the main sections (with Owned above the
+ * Wishlist, fixed), the collections the user pinned (in their order), then
+ * the rest, most recently changed first.
  * Shown in the sidebar on wide screens and in the drawer on phones.
  */
 const props = defineProps<{
@@ -32,7 +34,7 @@ const ids = {
   list: useId(),
 }
 const root = useTemplateRef<HTMLElement>('root')
-const { list, load, pinned, unpinned, pin, unpin } = useMyCollections()
+const { list, counts, load, pinned, unpinned, pin, unpin } = useMyCollections()
 
 onMounted(() => {
   // The page or the other copy of this list may be loading it already.
@@ -114,9 +116,17 @@ const sections = computed(() => [
   },
   {
     to: `${props.shelfPath}/owned`,
-    labelKey: 'header.owned',
+    labelKey: 'shelf.owned',
     icon: Gamepad2,
     current: route.path === `${props.shelfPath}/owned`,
+    count: counts.value?.owned,
+  },
+  {
+    to: `${props.shelfPath}/wishlist`,
+    labelKey: 'shelf.wishlist',
+    icon: Heart,
+    current: route.path === `${props.shelfPath}/wishlist`,
+    count: counts.value?.wishlist,
   },
 ])
 
@@ -139,7 +149,13 @@ const itemClass =
         :aria-current="item.current ? 'page' : undefined"
       >
         <component :is="item.icon" class="size-4" aria-hidden="true" />
-        {{ $t(item.labelKey) }}
+        <span class="min-w-0 flex-1 truncate">{{ $t(item.labelKey) }}</span>
+        <span
+          v-if="item.count !== undefined"
+          class="text-xs text-muted-foreground tabular-nums"
+        >
+          {{ item.count }}
+        </span>
       </NuxtLink>
     </nav>
 

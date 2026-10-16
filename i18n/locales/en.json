@@ -7,7 +7,6 @@
     "account": "Account",
     "signOut": "Sign out",
     "myShelf": "My shelf",
-    "owned": "Owned games",
     "blueprints": "Blueprints",
     "explore": "Explore",
     "search": "Search",
@@ -143,7 +142,7 @@
     "reached": {
       "collections": "You've reached {limit} collections, the most your plan allows. Owned and the Wishlist don't count.",
       "fieldsPerCollection": "A collection can have up to {limit} fields on your plan.",
-      "gamesPerCollection": "A collection can hold up to {limit} games on your plan.",
+      "gamesPerCollection": "A collection or your Wishlist can hold up to {limit} games on your plan.",
       "games": "Your shelf can hold up to {limit} games on your plan.",
       "textLength": "Text fields can hold up to {limit} characters on your plan.",
       "chartsPerCollection": "A collection can have up to {limit} charts on your plan.",
@@ -354,7 +353,7 @@
       "appearanceTitle": "Appearance",
       "appearanceDescription": "Choose how ThisPlayShelf looks on this device.",
       "exportTitle": "Your data",
-      "exportDescription": "Download every collection, your Wishlist included, as CSV files you can open in any spreadsheet. Your games are yours to take anywhere.",
+      "exportDescription": "Download every collection, plus your Owned and Wishlist games, as CSV files you can open in any spreadsheet. Your games are yours to take anywhere.",
       "exportButton": "Export all your data",
       "exporting": "Preparing your download…",
       "exportFailed": "Couldn't prepare your download. Try again.",
@@ -506,7 +505,9 @@
     "change": "Change",
     "done": "Done",
     "addTo": "Add {name} to {collection}",
-    "removeFrom": "Remove {name} from {collection}"
+    "removeFrom": "Remove {name} from {collection}",
+    "ownedOn": "Owned on",
+    "wantedOn": "Wanted on"
   },
   "table": {
     "name": "Name",
@@ -555,19 +556,19 @@
     "addTo": "Add to",
     "noOtherCollections": "No other collections to add to",
     "addedTo": "Added to {collection}",
-    "movedTo": "Moved to {collection}",
     "view": "View",
     "moveToFailed": "Couldn't move that game. Try again.",
     "addToFailed": "Couldn't add it to {collection}. Try again.",
-    "onWishlist": "On your Wishlist: {name}",
-    "addToWishlist": "Add to your Wishlist",
-    "removeFromWishlist": "Take off your Wishlist",
-    "wishlisted": "On the Wishlist",
-    "wishlist": "Wishlist",
-    "onYourWishlist": "On your Wishlist",
-    "notOnYourWishlist": "Not on your Wishlist",
-    "wishlistFailed": "Couldn't update your Wishlist. Try again.",
-    "inCollections": "Collections"
+    "removeFromWishlist": "Remove from Wishlist",
+    "inCollections": "Collections",
+    "owned": "Owned",
+    "wanted": "Wanted",
+    "state": "Owned or wanted",
+    "platforms": "Platforms",
+    "moveToWishlist": "Move to Wishlist",
+    "removeFromOwned": "Remove from Owned",
+    "markedOwned": "Moved to Owned",
+    "movedToWishlist": "Moved to Wishlist"
   },
   "fieldEditor": {
     "title": "Fields",
@@ -710,7 +711,6 @@
     "label": "Who can see this: {current}",
     "privateHint": "Only you can see it.",
     "publicHint": "Anyone with the link can see it, and it's listed on your shelf.",
-    "publicWishlistHint": "Anyone with the link can see it. Your other public collections also show which games are on it.",
     "nowPublic": "Collection is now public",
     "nowPrivate": "Collection is now private",
     "failed": "Couldn't change who can see it. Try again."
@@ -901,8 +901,17 @@
     }
   },
   "unown": {
-    "title": "Remove {name} from Owned?",
-    "body": "This also removes it from {collections}.",
+    "titleOwned": "Remove {name} from Owned?",
+    "titleWishlist": "Remove {name} from your Wishlist?",
+    "body": "It's on no other list, so it's deleted from your shelf along with any values you entered. It also leaves {collections}.",
     "confirm": "Remove"
+  },
+  "lists": {
+    "loadFailed": "Couldn't load this list. Try again.",
+    "onlyYou": "Only you can see it",
+    "ownedHint": "Every game you own. Collections can hold games you only want too.",
+    "wishlistHint": "Games you want. They can also be in your collections, so you can see what's missing.",
+    "ownedEmptyHint": "Search for a game and add it to Owned.",
+    "wishlistEmptyHint": "Search for a game and add it to your Wishlist."
   }
 }

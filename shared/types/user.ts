@@ -18,7 +18,7 @@ export interface PlanUsage {
   plan: Plan
   /** Collections, not counting Owned and the Wishlist. */
   collections: number
-  /** Games across all collections, each counted once. */
+  /** Games owned or wishlisted, each counted once. */
   games: number
 }
 

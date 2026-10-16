@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * The question `useUnownConfirm` asks before a game leaves Owned and the
- * collections it's in. One for the whole app, in the layout.
+ * The question `useUnownConfirm` asks before a game leaves its last list
+ * and the collections it's in. One for the whole app, in the layout.
  */
 const { locale } = useI18n()
 const { question, answer } = useUnownConfirm()
@@ -23,7 +23,9 @@ function onOpenChange(open: boolean) {
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{
-          $t('unown.title', { name: question?.name ?? '' })
+          question?.list === 'wishlist'
+            ? $t('unown.titleWishlist', { name: question?.name ?? '' })
+            : $t('unown.titleOwned', { name: question?.name ?? '' })
         }}</AlertDialogTitle>
         <AlertDialogDescription>{{
           $t('unown.body', { collections })

@@ -19,7 +19,6 @@ const open = defineModel<boolean>('open', { default: false })
 
 const { t } = useI18n()
 const library = useCollections()
-const titleOf = useCollectionTitle()
 const route = useRoute()
 
 const selected = ref(new Set<string>())
@@ -64,7 +63,7 @@ async function add() {
     toast.error(
       limitMessage(error, t) ??
         t('table.addToFailed', {
-          collection: failed ? titleOf(failed) : '',
+          collection: failed ? failed.title : '',
         }),
     )
   } finally {
@@ -78,7 +77,7 @@ async function add() {
       const only = done.length === 1 ? done[0] : undefined
       toast.success(
         t('table.addedTo', {
-          collection: done.map((collection) => titleOf(collection)).join(', '),
+          collection: done.map((collection) => collection.title).join(', '),
         }),
         only && {
           action: {
@@ -113,9 +112,7 @@ async function add() {
             :model-value="selected.has(collection.id)"
             @update:model-value="toggle(collection.id, $event === true)"
           />
-          <Label :for="`got-it-${collection.id}`">{{
-            titleOf(collection)
-          }}</Label>
+          <Label :for="`got-it-${collection.id}`">{{ collection.title }}</Label>
         </li>
       </ul>
       <DialogFooter>

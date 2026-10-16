@@ -3,8 +3,6 @@ import type { ExploreCollection } from '#shared/types/collection'
 
 /** A public collection on Explore: a strip of its first covers, its name and owner. */
 const props = defineProps<{ collection: ExploreCollection }>()
-
-const titleOf = useCollectionTitle()
 const owner = computed(
   () => props.collection.owner.displayName || props.collection.owner.username,
 )
@@ -32,7 +30,7 @@ const slots = computed(() =>
     </div>
     <div class="flex flex-col gap-0.5 px-1">
       <h2 class="font-heading text-lg font-semibold group-hover:underline">
-        {{ titleOf(collection) }}
+        {{ collection.title }}
       </h2>
       <p class="text-sm text-muted-foreground">
         {{ $t('explore.by', { owner }) }} ·

@@ -37,7 +37,6 @@ const detail = (blueprintFields: unknown[]) => ({
   slug: 'snes-games',
   description: null,
   visibility: 'private',
-  kind: 'custom',
   itemCount: items.length,
   updatedAt: '2026-01-01T00:00:00.000Z',
   isOwner: true,

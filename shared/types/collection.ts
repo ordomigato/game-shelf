@@ -47,11 +47,11 @@ export type ItemData = Record<string, FieldValue>
 export type CollectionVisibility = 'private' | 'public'
 
 /**
- * `wishlist` and `owned` are the two lists every user has, one of each.
- * Everything else is `custom`. Every game in a custom collection is also in
- * Owned.
+ * The two lists every user has. They aren't collections: each is a filter
+ * on the user's games (`owned`, `wishlisted`), so a game is never in both
+ * at once, except as different versions (see `shared/utils/lists.ts`).
  */
-export type CollectionKind = 'custom' | 'wishlist' | 'owned'
+export type ListName = 'owned' | 'wishlist'
 
 export interface Blueprint {
   id: string
@@ -80,7 +80,6 @@ export interface BlueprintCollection {
   id: string
   title: string
   slug: string
-  kind: CollectionKind
   itemCount: number
 }
 
@@ -103,7 +102,6 @@ export interface CollectionSummary {
   /** A hex code like `#7c3aed`, or null for a colour from the title. */
   color: string | null
   visibility: CollectionVisibility
-  kind: CollectionKind
   itemCount: number
   updatedAt: string
   /**
@@ -124,23 +122,49 @@ export interface LibraryItem {
   /** The IGDB game's genres. Empty when unknown or added by hand. */
   genres: string[]
   data: ItemData
+  /** Which of the two lists the game is on. At least one is true. */
+  owned: boolean
+  wishlisted: boolean
+  /** Catalog platform ids the game is owned on. Empty when none named. */
+  ownedOn: number[]
+  /** Catalog platform ids the game is wanted on. Empty when none named. */
+  wantedOn: number[]
 }
 
-export interface CollectionEntry extends LibraryItem {
+/**
+ * A game in a collection. Its place on the lists is the owner's business:
+ * visitors get only `wanted` (for a badge), and the flags and platforms
+ * are left out.
+ */
+export interface CollectionEntry extends Omit<
+  LibraryItem,
+  'owned' | 'wishlisted' | 'ownedOn' | 'wantedOn'
+> {
   addedAt: string
-  /**
-   * Whether the game is also on the owner's Wishlist, in other collections.
-   * Left out on the Wishlist itself, and for visitors when the Wishlist is
-   * private.
-   */
+  /** Whether the game is on the owner's Wishlist. */
+  wanted: boolean
+  owned?: boolean
   wishlisted?: boolean
-  /**
-   * For the owner on any list: the custom collections the game is in.
-   * Visitors to Owned see only the public ones, and visitors to other
-   * lists get none.
-   */
+  ownedOn?: number[]
+  wantedOn?: number[]
+  /** On Owned and the Wishlist: the custom collections the game is in. */
   inCollections?: CollectionLink[]
+  /** On Owned and the Wishlist: short names of the platforms for that list. */
+  platforms?: string[]
 }
+
+/** Owned or the Wishlist, as its owner sees it. */
+export interface ListDetail {
+  list: ListName
+  itemCount: number
+  items: OwnerEntry[]
+}
+
+/** A game as its owner sees it: with its place on the lists. */
+export type OwnerEntry = CollectionEntry &
+  Required<
+    Pick<CollectionEntry, 'owned' | 'wishlisted' | 'ownedOn' | 'wantedOn'>
+  >
 
 /** A collection named next to a game, linking to it. */
 export interface CollectionLink {
@@ -165,7 +189,6 @@ export interface ExploreCollection {
   id: string
   title: string
   slug: string
-  kind: CollectionKind
   description: string | null
   itemCount: number
   /** When it last changed or had a game added, as an ISO timestamp. */

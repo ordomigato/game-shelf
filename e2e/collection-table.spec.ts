@@ -29,7 +29,6 @@ const detail = (isOwner: boolean, list: object[] = items) => ({
   slug: 'snes-games',
   description: null,
   visibility: 'public',
-  kind: 'custom',
   itemCount: list.length,
   updatedAt: '2026-01-01T00:00:00.000Z',
   isOwner,

@@ -1,9 +1,14 @@
 import type { LibraryItem } from '#shared/types/collection'
 
-/** The user's item for an IGDB game, if any, and the collections it's in. */
+/**
+ * The user's item for an IGDB game, if any (with its place on Owned and the
+ * Wishlist), the collections it's in, and the catalog platforms to pick
+ * from, when the server had them.
+ */
 export interface GameMembership {
   item: LibraryItem | null
   collectionIds: string[]
+  platforms?: { id: number; name: string }[]
 }
 
 // Browser only: these are only filled by signed-in requests.
@@ -57,7 +62,34 @@ export function useGameMemberships() {
   }
 
   function set(igdbId: number, membership: GameMembership) {
-    change({ ...entries.value, [igdbId]: membership })
+    change({
+      ...entries.value,
+      [igdbId]: {
+        platforms: entries.value[igdbId]?.platforms,
+        ...membership,
+      },
+    })
+  }
+
+  /**
+   * Records an item after a change to its lists: its new state (null when
+   * it was deleted) and the collections it's still in.
+   */
+  function setItem(
+    itemId: string,
+    item: LibraryItem | null,
+    collectionIds: string[],
+  ) {
+    change(
+      Object.fromEntries(
+        Object.entries(entries.value).map(([igdbId, membership]) => [
+          igdbId,
+          membership.item?.id === itemId
+            ? { ...membership, item, collectionIds }
+            : membership,
+        ]),
+      ),
+    )
   }
 
   /** Records the collections an item is in after a change. */
@@ -93,5 +125,5 @@ export function useGameMemberships() {
     change({})
   }
 
-  return { get, set, setCollections, forgetGame, forgetItem, clear }
+  return { get, set, setItem, setCollections, forgetGame, forgetItem, clear }
 }

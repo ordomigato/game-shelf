@@ -3,6 +3,7 @@ import { Search } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { LibraryItem } from '#shared/types/collection'
 import type { GameSummary } from '#shared/types/game'
+import type { SearchTarget } from '~/composables/useTrackedGames'
 
 const {
   input,
@@ -48,9 +49,18 @@ const myCollections = useMyCollections()
 const targetSlug = computed(() =>
   typeof route.query.to === 'string' ? route.query.to : null,
 )
-const mine = computed(() => myCollections.list.value ?? [])
+// Owned and the Wishlist first, then the user's collections.
+const targets = computed<SearchTarget[]>(() => [
+  { slug: 'owned', title: t('shelf.owned'), list: 'owned' },
+  { slug: 'wishlist', title: t('shelf.wishlist'), list: 'wishlist' },
+  ...(myCollections.list.value ?? []).map((collection) => ({
+    slug: collection.slug,
+    title: collection.title,
+    collectionId: collection.id,
+  })),
+])
 const target = computed(
-  () => mine.value.find((c) => c.slug === targetSlug.value) ?? null,
+  () => targets.value.find((c) => c.slug === targetSlug.value) ?? null,
 )
 
 async function loadTarget() {
@@ -60,6 +70,7 @@ async function loadTarget() {
     await navigateTo({ path: '/login', query: { redirect: route.fullPath } })
     return
   }
+  if (targetSlug.value === 'owned' || targetSlug.value === 'wishlist') return
   try {
     await myCollections.load()
   } catch {
@@ -85,14 +96,13 @@ function onAddedByHand(item: LibraryItem) {
   if (!collection || !auth.me.value?.username) return
   const path = `/u/${auth.me.value.username}/shelf/${collection.slug}`
   toast.success(
-    t('byHand.added', { name: item.name, collection: titleOf(collection) }),
+    t('byHand.added', { name: item.name, collection: collection.title }),
     { action: { label: t('table.view'), onClick: () => navigateTo(path) } },
   )
 }
-const titleOf = useCollectionTitle()
 
 function toggleLabel(game: GameSummary) {
-  const values = { name: game.name, collection: titleOf(target.value!) }
+  const values = { name: game.name, collection: target.value!.title }
   return tracked.items.value.has(game.id)
     ? t('addToCollection.removeFrom', values)
     : t('addToCollection.addTo', values)
@@ -154,7 +164,7 @@ const resultsLabel = computed(() => {
     >
       <AddingToBar
         :target="target"
-        :collections="mine"
+        :targets="targets"
         :username="auth.me.value.username"
         @change="changeTarget"
       />
@@ -289,7 +299,12 @@ const resultsLabel = computed(() => {
       </p>
       <AddByHandDialog
         v-model:open="addingByHand"
-        :collection="target"
+        :title="target.title"
+        :target="
+          target.list
+            ? { list: target.list }
+            : { collectionId: target.collectionId! }
+        "
         :initial-name="term"
         @added="onAddedByHand"
       />

@@ -17,14 +17,12 @@ const using = [
     id: '10000000-0000-4000-8000-000000000011',
     title: 'NES Games',
     slug: 'nes-games',
-    kind: 'custom',
     itemCount: 12,
   },
   {
     id: '10000000-0000-4000-8000-000000000012',
     title: 'SNES Games',
     slug: 'snes-games',
-    kind: 'custom',
     itemCount: 4,
   },
 ]

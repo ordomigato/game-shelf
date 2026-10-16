@@ -32,7 +32,6 @@ async function open(
         slug: 'snes-games',
         description: null,
         visibility: 'public',
-        kind: 'custom',
         itemCount: items.length,
         updatedAt: '2026-01-01T00:00:00.000Z',
         isOwner: owner,

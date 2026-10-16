@@ -48,7 +48,6 @@ async function openCollection(page: Page, matches: unknown[] = []) {
         slug: 'nes-games',
         description: null,
         visibility: 'private',
-        kind: 'custom',
         itemCount: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
         isOwner: true,

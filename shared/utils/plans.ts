@@ -19,8 +19,9 @@ export interface PlanLimits {
   /** Collections, not counting Owned and the Wishlist. */
   collections: number
   fieldsPerCollection: number
+  /** Games in one collection, and on the Wishlist. */
   gamesPerCollection: number
-  /** Games across every collection (each game once). */
+  /** Games owned or wishlisted (each game once). */
   games: number
   /** Characters in one text field. */
   textLength: number

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogRow } from './catalog'
-import { listedCollections, toLibraryItem } from './collections'
+import { toCollectionEntry, toLibraryItem } from './collections'
 
 const item = {
   id: '30000000-0000-4000-8000-000000000001',
@@ -9,6 +9,10 @@ const item = {
   name: 'Zelda 3',
   coverId: 'old',
   data: { hours: 12 },
+  owned: true,
+  wishlisted: false,
+  ownedOn: [],
+  wantedOn: [],
   createdAt: new Date(0),
   updatedAt: new Date(0),
 }
@@ -35,6 +39,26 @@ describe('toLibraryItem', () => {
       year: 1991,
       genres: ['Adventure', 'Role-playing (RPG)'],
       data: { hours: 12 },
+      owned: true,
+      wishlisted: false,
+      ownedOn: [],
+      wantedOn: [],
+    })
+  })
+
+  it('carries the lists and the platforms for each', () => {
+    const both = {
+      ...item,
+      owned: true,
+      wishlisted: true,
+      ownedOn: [12],
+      wantedOn: [48],
+    }
+    expect(toLibraryItem(both, game)).toMatchObject({
+      owned: true,
+      wishlisted: true,
+      ownedOn: [12],
+      wantedOn: [48],
     })
   })
 
@@ -66,19 +90,31 @@ describe('toLibraryItem', () => {
   })
 })
 
-describe('listedCollections', () => {
-  it('shows the owner every collection, private ones too, on any list', () => {
-    for (const kind of ['owned', 'wishlist', 'custom'] as const) {
-      expect(listedCollections(kind, true)).toBe('all')
+describe('toCollectionEntry', () => {
+  const both = {
+    ...item,
+    owned: true,
+    wishlisted: true,
+    ownedOn: [12],
+    wantedOn: [48],
+  }
+
+  it('gives the owner the lists and platforms', () => {
+    expect(toCollectionEntry(both, game, new Date(0), true)).toMatchObject({
+      wanted: true,
+      owned: true,
+      wishlisted: true,
+      ownedOn: [12],
+      wantedOn: [48],
+    })
+  })
+
+  it('gives a visitor only whether the game is wanted', () => {
+    const entry = toCollectionEntry(both, game, new Date(0), false)
+    expect(entry.wanted).toBe(true)
+    for (const key of ['owned', 'wishlisted', 'ownedOn', 'wantedOn']) {
+      expect(entry).not.toHaveProperty(key)
     }
-  })
-
-  it('shows a visitor to Owned only the public collections', () => {
-    expect(listedCollections('owned', false)).toBe('public')
-  })
-
-  it('shows a visitor to anything else none', () => {
-    expect(listedCollections('custom', false)).toBeNull()
-    expect(listedCollections('wishlist', false)).toBeNull()
+    expect(toCollectionEntry(item, game, new Date(0), false).wanted).toBe(false)
   })
 })

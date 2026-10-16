@@ -3,8 +3,8 @@ import { z } from 'zod'
 const paramsSchema = z.object({ id: z.uuid(), itemId: z.uuid() })
 
 /**
- * Adds one of the user's library items to one of their collections (and to
- * Owned, for a custom collection). Answers with the collections it's in.
+ * Adds one of the user's library items to one of their collections. Its
+ * lists stay as they are. Answers with the collections it's in.
  */
 export default defineEventHandler(
   async (event): Promise<{ collectionIds: string[] }> => {

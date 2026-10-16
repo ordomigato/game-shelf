@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner'
-import type { CollectionSummary } from '#shared/types/collection'
+import type { CollectionSummary, ListName } from '#shared/types/collection'
 
 // Browser only. The newest request for the list until it's answered, so
 // `load` can wait for it instead of asking again.
@@ -7,10 +7,11 @@ let latest: Promise<CollectionSummary[]> | undefined
 
 /**
  * The signed-in user's collections for the sidebar, shared by every
- * component. `null` until the first load. Anything that adds, removes or
- * renames collections, or changes what's in them, calls `refresh`. Anything
- * that only needs the list calls `load`, which asks the server only when
- * nothing has loaded it yet.
+ * component, and how many games are on Owned and the Wishlist (`counts`,
+ * null until known). `null` until the first load. Anything that adds,
+ * removes or renames collections, or changes what's in them or on the
+ * lists, calls `refresh`. Anything that only needs the list calls `load`,
+ * which asks the server only when nothing has loaded it yet.
  *
  * Pins change here first and are saved after, so the sidebar responds at
  * once. A pin that fails to save is put back, with a message.
@@ -19,16 +20,26 @@ export function useMyCollections() {
   const auth = useAuth()
   // Not useI18n: this also runs outside components, via useCollections.
   const { $i18n } = useNuxtApp()
-  const titleOf = (collection: CollectionSummary) =>
-    collection.kind === 'wishlist'
-      ? $i18n.t('shelf.wishlist')
-      : collection.kind === 'owned'
-        ? $i18n.t('shelf.owned')
-        : collection.title
   const list = useState<CollectionSummary[] | null>(
     'my-collections',
     () => null,
   )
+  const counts = useState<Record<ListName, number> | null>(
+    'list-counts',
+    () => null,
+  )
+  // Whether the list is from the server, not the empty one kept after a
+  // failed try.
+  const fromServer = useState('my-collections-loaded', () => false)
+
+  /** Only a number in the sidebar, so a failed try just keeps the old one. */
+  async function refreshCounts() {
+    try {
+      counts.value = await auth.apiFetch<Record<ListName, number>>('/api/lists')
+    } catch {
+      // The sidebar shows no number.
+    }
+  }
 
   function request(): Promise<CollectionSummary[]> {
     const asked: Promise<CollectionSummary[]> = auth
@@ -36,7 +47,10 @@ export function useMyCollections() {
       .then(
         (collections) => {
           // An older answer arriving late doesn't replace a newer one.
-          if (latest === asked) list.value = collections
+          if (latest === asked) {
+            list.value = collections
+            fromServer.value = true
+          }
           return collections
         },
         (error: unknown) => {
@@ -53,16 +67,16 @@ export function useMyCollections() {
   }
 
   async function refresh() {
-    await request().catch(() => {})
+    await Promise.all([request().catch(() => {}), refreshCounts()])
   }
 
   /**
-   * The list, asking the server only if it isn't loaded. Everyone has
-   * Owned and a Wishlist, so an empty list means the last try failed.
-   * Throws if this one does too.
+   * The list, asking the server only if it isn't loaded (or the last try
+   * failed). Throws if this one fails too.
    */
   async function load(): Promise<CollectionSummary[]> {
-    if (list.value?.length) return list.value
+    if (fromServer.value && list.value) return list.value
+    void refreshCounts()
     return latest ?? request()
   }
 
@@ -128,8 +142,8 @@ export function useMyCollections() {
       setPosition(collection.id, previous)
       toast.error(
         previous === null
-          ? $i18n.t('sidebar.pinFailed', { name: titleOf(collection) })
-          : $i18n.t('sidebar.moveFailed', { name: titleOf(collection) }),
+          ? $i18n.t('sidebar.pinFailed', { name: collection.title })
+          : $i18n.t('sidebar.moveFailed', { name: collection.title }),
       )
     }
   }
@@ -143,9 +157,9 @@ export function useMyCollections() {
       })
     } catch {
       setPosition(collection.id, previous)
-      toast.error($i18n.t('sidebar.unpinFailed', { name: titleOf(collection) }))
+      toast.error($i18n.t('sidebar.unpinFailed', { name: collection.title }))
     }
   }
 
-  return { list, refresh, load, pinned, unpinned, pin, unpin }
+  return { list, counts, refresh, load, pinned, unpinned, pin, unpin }
 }

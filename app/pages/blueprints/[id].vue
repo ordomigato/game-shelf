@@ -16,7 +16,6 @@ const route = useRoute()
 const { t } = useI18n()
 const auth = useAuth()
 const collections = useCollections()
-const titleOf = useCollectionTitle()
 
 const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = useAsyncData(
@@ -250,7 +249,7 @@ async function deleteBlueprint() {
                 :to="`${shelfPath}/${collection.slug}`"
                 class="font-medium text-primary underline-offset-4 hover:underline"
               >
-                {{ titleOf(collection) }}
+                {{ collection.title }}
               </NuxtLink>
               <span class="text-sm text-muted-foreground">
                 {{ $t('shelf.gameCount', collection.itemCount) }}
@@ -323,7 +322,7 @@ async function deleteBlueprint() {
           </AlertDialogHeader>
           <ul class="list-disc pl-5 text-sm text-muted-foreground">
             <li v-for="collection in impact.collections" :key="collection.id">
-              {{ titleOf(collection) }} ·
+              {{ collection.title }} ·
               {{ $t('shelf.gameCount', collection.itemCount) }}
             </li>
           </ul>

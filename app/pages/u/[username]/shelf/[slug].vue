@@ -35,7 +35,6 @@ const route = useRoute()
 const { t } = useI18n()
 const { limits } = usePlan()
 const collections = useCollections()
-const titleOf = useCollectionTitle()
 
 const username = computed(() => String(route.params.username).toLowerCase())
 const slug = computed(() => String(route.params.slug))
@@ -56,7 +55,7 @@ const shelfName = computed(() =>
 
 useHead(() => ({
   title: data.value
-    ? t('app.title', { page: titleOf(data.value) })
+    ? t('app.title', { page: data.value.title })
     : t('app.title', { page: shelfName.value }),
 }))
 
@@ -196,133 +195,80 @@ watch(
   },
   { immediate: true },
 )
-// The owner's custom collections, and those other than this one, which is
-// where "Add to" puts a game.
-const customCollections = computed(() =>
-  mine.value.filter((collection) => collection.kind === 'custom'),
-)
+// Where "Add to" puts a game: the owner's other collections.
 const addTargets = computed(() =>
-  customCollections.value.filter(
-    (collection) => collection.id !== data.value?.id,
-  ),
+  mine.value.filter((collection) => collection.id !== data.value?.id),
 )
+
+const addToTarget = useAddToCollection(shelfPath)
 
 /** Adds a game to another collection. It stays in this one. */
 async function addToCollection(itemId: string, collectionId: string) {
   const target = mine.value.find((collection) => collection.id === collectionId)
   if (!data.value || !target) return
   const pageId = data.value.id
-  try {
-    await collections.addItem(collectionId, itemId)
-  } catch (error) {
-    toast.error(
-      limitMessage(error, t) ??
-        t('table.addToFailed', { collection: titleOf(target) }),
-    )
-    return
-  }
+  const link = await addToTarget(itemId, target)
   // The page may have moved on to another collection while this saved.
-  if (data.value?.id === pageId) {
+  if (link && data.value?.id === pageId) {
     setItems(
       data.value.items.map((entry) =>
         entry.id === itemId && entry.inCollections
-          ? {
-              ...entry,
-              inCollections: [
-                ...entry.inCollections,
-                {
-                  id: target.id,
-                  title: target.title,
-                  slug: target.slug,
-                  color: target.color,
-                },
-              ],
-            }
+          ? { ...entry, inCollections: [...entry.inCollections, link] }
           : entry,
       ),
     )
   }
-  toast.success(t('table.addedTo', { collection: titleOf(target) }), {
-    action: {
-      label: t('table.view'),
-      onClick: () => navigateTo(`${shelfPath.value}/${target.slug}`),
-    },
-  })
 }
 
 const gotItItem = ref<CollectionEntry | null>(null)
 const offeringCollections = ref(false)
 
+/** Puts a game's new place on the lists into the table. */
+function applyLists(saved: LibraryItem) {
+  setItems(
+    (data.value?.items ?? []).map((entry) =>
+      entry.id === saved.id
+        ? {
+            ...entry,
+            owned: saved.owned,
+            wishlisted: saved.wishlisted,
+            wanted: saved.wishlisted,
+            ownedOn: saved.ownedOn,
+            wantedOn: saved.wantedOn,
+          }
+        : entry,
+    ),
+  )
+}
+
+const moves = useListMoves(shelfPath)
+
 /**
- * Moves a game from the Wishlist to Owned. Then, if the user has
- * collections of their own, offers to add it to some of them.
+ * The owner has a wanted game now. Then, if there are collections it isn't
+ * in yet, offers to add it to some of them.
  */
 async function gotIt(itemId: string) {
-  const owned = mine.value.find((collection) => collection.kind === 'owned')
   const item = data.value?.items.find((entry) => entry.id === itemId)
-  if (!data.value || !owned || !item) return
-  const pageId = data.value.id
-  const before = data.value.items
-  setItems(before.filter((entry) => entry.id !== itemId))
-  try {
-    await collections.moveToCollections(pageId, itemId, [owned.id])
-  } catch (error) {
-    if (data.value?.id === pageId) setItems(before)
-    toast.error(limitMessage(error, t) ?? t('table.moveToFailed'))
-    return
-  }
-  toast.success(t('table.movedTo', { collection: titleOf(owned) }), {
-    action: {
-      label: t('table.view'),
-      onClick: () => navigateTo(`${shelfPath.value}/${owned.slug}`),
-    },
-  })
-  if (customCollections.value.length) {
+  const saved = await moves.gotIt(itemId)
+  if (!saved || !item) return
+  applyLists(saved)
+  const alreadyIn = item.inCollections?.map(({ id }) => id) ?? []
+  // The list may still be loading, or have failed to when the page opened.
+  const owned = await sidebar.load().catch(() => mine.value)
+  if (owned.some(({ id }) => !alreadyIn.includes(id))) {
     gotItItem.value = item
     offeringCollections.value = true
   }
 }
 
-/** Puts a game on the Wishlist or takes it off, from another collection. */
-async function toggleWishlist(itemId: string, on: boolean) {
-  const wishlist = mine.value.find(
-    (collection) => collection.kind === 'wishlist',
-  )
-  if (!data.value || !wishlist) return
-  const mark = (wishlisted: boolean) =>
-    setItems(
-      (data.value?.items ?? []).map((entry) =>
-        entry.id === itemId ? { ...entry, wishlisted } : entry,
-      ),
-    )
-  mark(on)
-  try {
-    if (on) await collections.addItem(wishlist.id, itemId)
-    else await collections.removeItem(wishlist.id, itemId)
-  } catch {
-    mark(!on)
-    toast.error(t('table.wishlistFailed'))
-  }
+/** Moves a game the owner no longer has to the Wishlist. */
+async function toWishlist(itemId: string) {
+  const saved = await moves.toWishlist(itemId)
+  if (saved) applyLists(saved)
 }
 
-const unown = useUnownConfirm()
-
-/**
- * Takes a game out of this collection. Out of Owned it leaves the custom
- * collections too, so that's confirmed first.
- */
+/** Takes a game out of this collection. It stays on its lists. */
 async function removeItem(itemId: string) {
-  const item = data.value?.items.find((entry) => entry.id === itemId)
-  if (
-    data.value?.kind === 'owned' &&
-    item &&
-    !(await unown.confirm(
-      item.name,
-      (item.inCollections ?? []).map((collection) => collection.title),
-    ))
-  ) {
-    return
-  }
   if (!data.value) return
   const collectionId = data.value.id
   const before = data.value.items
@@ -493,11 +439,11 @@ async function deleteCollection() {
     <template v-else-if="data">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex flex-col gap-2">
-          <h1 class="text-3xl font-bold">{{ titleOf(data) }}</h1>
+          <h1 class="text-3xl font-bold">{{ data.title }}</h1>
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span v-if="data.isOwner && data.kind !== 'owned'">{{
+            <span v-if="data.isOwner">{{
               $t('limits.gamesUsed', {
                 used: data.itemCount,
                 limit: limits.gamesPerCollection,
@@ -507,7 +453,6 @@ async function deleteCollection() {
             <VisibilityMenu
               v-if="data.isOwner"
               :visibility="data.visibility"
-              :is-wishlist="data.kind === 'wishlist'"
               :disabled="changingVisibility"
               @change="setVisibility"
             />
@@ -555,7 +500,7 @@ async function deleteCollection() {
           <ShareButton
             v-if="data.isOwner || data.visibility === 'public'"
             :path="`${shelfPath}/${data.slug}`"
-            :title="titleOf(data)"
+            :title="data.title"
             :is-public="data.visibility === 'public'"
             :make-public="() => setVisibility('public')"
           />
@@ -620,7 +565,6 @@ async function deleteCollection() {
                   <BookmarkPlus /> {{ $t('blueprints.saveAsBlueprint') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="!isBuiltIn(data.kind)"
                   class="text-destructive focus:text-destructive"
                   @select="confirmingDelete = true"
                 >
@@ -699,8 +643,6 @@ async function deleteCollection() {
           :items="data.items"
           :editable="data.isOwner"
           :add-targets="addTargets"
-          :is-wishlist="data.kind === 'wishlist'"
-          :is-owned="data.kind === 'owned'"
           :shelf-path="shelfPath"
           @save="saveValue"
           @remove="removeItem"
@@ -708,7 +650,7 @@ async function deleteCollection() {
           @rename="startRenaming"
           @add-to="addToCollection"
           @got-it="gotIt"
-          @wishlist="toggleWishlist"
+          @to-wishlist="toWishlist"
         />
 
         <ChartsDashboard
@@ -736,12 +678,12 @@ async function deleteCollection() {
             v-for="item in coverItems"
             :key="item.id"
             class="relative"
-            :class="{ 'is-wishlisted': item.wishlisted }"
+            :class="{ 'is-wanted': item.wanted && item.owned === false }"
           >
             <component
               :is="item.igdbId ? NuxtLink : 'div'"
               :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
-              class="wishlist-fade group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="wanted-fade group flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <GameCover :name="item.name" :cover-id="item.coverId" />
               <span
@@ -752,11 +694,11 @@ async function deleteCollection() {
               </span>
             </component>
             <span
-              v-if="item.wishlisted"
+              v-if="item.wanted"
               class="pointer-events-none absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-card/95 text-primary shadow-md"
             >
               <Heart class="size-4 fill-current" aria-hidden="true" />
-              <span class="sr-only">{{ $t('table.wishlisted') }}</span>
+              <span class="sr-only">{{ $t('table.wanted') }}</span>
             </span>
           </li>
         </VueDraggable>
@@ -780,7 +722,8 @@ async function deleteCollection() {
       <AddByHandDialog
         v-if="data.isOwner"
         v-model:open="addingByHand"
-        :collection="data"
+        :title="data.title"
+        :target="{ collectionId: data.id }"
         @added="refresh()"
       />
       <GotItDialog
@@ -788,7 +731,7 @@ async function deleteCollection() {
         v-model:open="offeringCollections"
         :item-id="gotItItem?.id ?? null"
         :item-name="gotItItem?.name ?? ''"
-        :collections="customCollections"
+        :collections="mine"
         :already-in="gotItItem?.inCollections?.map(({ id }) => id)"
       />
       <RenameItemDialog
@@ -824,7 +767,7 @@ async function deleteCollection() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{{
-              $t('collection.deleteTitle', { title: titleOf(data) })
+              $t('collection.deleteTitle', { title: data.title })
             }}</AlertDialogTitle>
             <AlertDialogDescription>{{
               $t('collection.deleteBody')

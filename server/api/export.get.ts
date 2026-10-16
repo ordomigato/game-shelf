@@ -1,6 +1,6 @@
 /**
- * Downloads everything the user has: every collection, Wishlist included,
- * as CSV files in one zip.
+ * Downloads everything the user has: every collection, plus Owned and the
+ * Wishlist, as CSV files in one zip.
  */
 export default defineEventHandler(async (event) => {
   const { sub } = await requireAuth(event)

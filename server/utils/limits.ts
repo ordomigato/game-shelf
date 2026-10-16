@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, ne } from 'drizzle-orm'
+import { and, count, eq, inArray } from 'drizzle-orm'
 import { createError } from 'h3'
 import {
   type CustomLimits,
@@ -6,7 +6,9 @@ import {
   type Plan,
   type PlanLimits,
 } from '../../shared/utils/plans'
+import type { ListName } from '../../shared/types/collection'
 import { collectionItems, collections, libraryItems } from '../db/schema'
+import { assertOwnsCollections, collectionIdsForItem } from './collections'
 
 /** The plan a user has right now: a paid plan that ended counts as free. */
 export function effectivePlan(user: {
@@ -39,7 +41,7 @@ export function limitReached(limit: keyof PlanLimits, value: number): never {
   })
 }
 
-/** Room for one more collection (Owned and the Wishlist don't count). */
+/** Room for one more collection (Owned and the Wishlist aren't collections). */
 export async function assertCollectionRoom(
   ownerId: string,
   limits: PlanLimits,
@@ -47,9 +49,7 @@ export async function assertCollectionRoom(
   const [row] = await useDb()
     .select({ n: count() })
     .from(collections)
-    .where(
-      and(eq(collections.ownerId, ownerId), eq(collections.kind, 'custom')),
-    )
+    .where(eq(collections.ownerId, ownerId))
   if ((row?.n ?? 0) >= limits.collections) {
     limitReached('collections', limits.collections)
   }
@@ -57,8 +57,7 @@ export async function assertCollectionRoom(
 
 /**
  * Room for `adding` more games in each of these collections. Games already
- * in a collection don't need room, so pass only the ones being added. The
- * Owned list has no limit of its own (the library's applies).
+ * in a collection don't need room, so pass only the ones being added.
  */
 export async function assertCollectionsRoom(
   collectionIds: string[],
@@ -70,14 +69,32 @@ export async function assertCollectionsRoom(
     .select({ id: collections.id, n: count(collectionItems.itemId) })
     .from(collections)
     .leftJoin(collectionItems, eq(collectionItems.collectionId, collections.id))
-    .where(
-      and(
-        inArray(collections.id, collectionIds),
-        ne(collections.kind, 'owned'),
-      ),
-    )
+    .where(inArray(collections.id, collectionIds))
     .groupBy(collections.id)
   if (rows.some((row) => row.n + adding > limits.gamesPerCollection)) {
+    limitReached('gamesPerCollection', limits.gamesPerCollection)
+  }
+}
+
+/**
+ * Room for `adding` more games on the Wishlist. It holds as many as a
+ * collection does. Owned has no cap of its own: it can grow to the
+ * library's.
+ */
+export async function assertListRoom(
+  ownerId: string,
+  list: ListName,
+  adding: number,
+  limits: PlanLimits,
+): Promise<void> {
+  if (list !== 'wishlist' || adding <= 0) return
+  const [row] = await useDb()
+    .select({ n: count() })
+    .from(libraryItems)
+    .where(
+      and(eq(libraryItems.ownerId, ownerId), eq(libraryItems.wishlisted, true)),
+    )
+  if ((row?.n ?? 0) + adding > limits.gamesPerCollection) {
     limitReached('gamesPerCollection', limits.gamesPerCollection)
   }
 }
@@ -117,9 +134,7 @@ export async function usage(ownerId: string) {
     db
       .select({ n: count() })
       .from(collections)
-      .where(
-        and(eq(collections.ownerId, ownerId), eq(collections.kind, 'custom')),
-      ),
+      .where(eq(collections.ownerId, ownerId)),
     db
       .select({ n: count() })
       .from(libraryItems)
@@ -131,6 +146,8 @@ export async function usage(ownerId: string) {
 /**
  * Room to put a game into these collections: in each collection it isn't
  * already in, and in the library when it's a new game (no `itemId` yet).
+ * The collections must be the user's (404), which is checked first so a
+ * stranger's collection never answers with a limit.
  */
 export async function assertRoomToAdd(
   ownerId: string,
@@ -138,6 +155,7 @@ export async function assertRoomToAdd(
   collectionIds: string[],
   limits: PlanLimits,
 ): Promise<void> {
+  await assertOwnsCollections(ownerId, collectionIds)
   if (!itemId) await assertLibraryRoom(ownerId, 1, limits)
   const already = itemId ? await collectionIdsForItem(itemId) : []
   await assertCollectionsRoom(

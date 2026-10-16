@@ -9,11 +9,13 @@ import {
   libraryItems,
 } from '../db/schema'
 import { catalogJoin, itemName } from './collections'
+import { getList } from './lists'
 
 /**
- * Everything the user has: every collection, Owned and the Wishlist
- * included, as CSV files in one zip, each built the same way as a single
- * collection's export in the browser.
+ * Everything the user has as CSV files in one zip: every collection, built
+ * the same way as a single collection's export in the browser, plus
+ * `owned.csv` and `wishlist.csv` with the shared columns only (name, IGDB
+ * id, date added).
  */
 export async function exportEverything(ownerId: string): Promise<Buffer> {
   const db = useDb()
@@ -22,13 +24,28 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
     string,
     string,
   ]
-  const owned = await db
+  const mine = await db
     .select()
     .from(collections)
     .where(eq(collections.ownerId, ownerId))
     .orderBy(asc(collections.createdAt))
   const files: Record<string, Uint8Array> = {}
-  for (const collection of owned) {
+  for (const list of ['owned', 'wishlist'] as const) {
+    const { items } = await getList(ownerId, list)
+    files[`${list}.csv`] = strToU8(
+      collectionCsv(
+        [],
+        items.map((item) => ({
+          name: item.name,
+          igdbId: item.igdbId,
+          addedAt: item.addedAt,
+          data: {},
+        })),
+        columns,
+      ),
+    )
+  }
+  for (const collection of mine) {
     const [[blueprint], entries] = await Promise.all([
       db
         .select({ fields: blueprints.fields })

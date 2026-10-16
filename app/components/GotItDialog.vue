@@ -4,9 +4,9 @@ import type { CollectionSummary } from '#shared/types/collection'
 
 /**
  * Offered after "Got it" moves a game to Owned: tick some of the user's
- * collections to add it to as well. Games are added one collection at a
- * time. If one is refused (a plan limit, say), the ones already added drop
- * off the list and the dialog stays open.
+ * collections to add it to as well. They're saved along with the ones the
+ * game is already in. If that's refused (a plan limit, say), the dialog
+ * stays open.
  */
 const props = defineProps<{
   itemId: string | null
@@ -22,21 +22,16 @@ const library = useCollections()
 const route = useRoute()
 
 const selected = ref(new Set<string>())
-const added = ref(new Set<string>())
 const saving = ref(false)
 
 const choices = computed(() =>
   props.collections.filter(
-    (collection) =>
-      !added.value.has(collection.id) &&
-      !props.alreadyIn?.includes(collection.id),
+    (collection) => !props.alreadyIn?.includes(collection.id),
   ),
 )
 
 watch(open, (isOpen) => {
-  if (!isOpen) return
-  selected.value = new Set()
-  added.value = new Set()
+  if (isOpen) selected.value = new Set()
 })
 
 function toggle(id: string, on: boolean) {
@@ -49,48 +44,35 @@ function toggle(id: string, on: boolean) {
 async function add() {
   if (!props.itemId || saving.value || !selected.value.size) return
   saving.value = true
-  const done: CollectionSummary[] = []
-  let failed: CollectionSummary | undefined
+  const joined = choices.value.filter((collection) =>
+    selected.value.has(collection.id),
+  )
+  const names = joined.map((collection) => collection.title).join(', ')
   try {
-    for (const collection of choices.value) {
-      if (!selected.value.has(collection.id)) continue
-      failed = collection
-      await library.addItem(collection.id, props.itemId)
-      done.push(collection)
-    }
-    open.value = false
+    await library.setItemCollections(props.itemId, [
+      ...(props.alreadyIn ?? []),
+      ...joined.map(({ id }) => id),
+    ])
   } catch (error) {
     toast.error(
-      limitMessage(error, t) ??
-        t('table.addToFailed', {
-          collection: failed ? failed.title : '',
-        }),
+      limitMessage(error, t) ?? t('table.addToFailed', { collection: names }),
     )
+    return
   } finally {
     saving.value = false
-    const doneIds = done.map(({ id }) => id)
-    added.value = new Set([...added.value, ...doneIds])
-    selected.value = new Set(
-      [...selected.value].filter((id) => !doneIds.includes(id)),
-    )
-    if (done.length) {
-      const only = done.length === 1 ? done[0] : undefined
-      toast.success(
-        t('table.addedTo', {
-          collection: done.map((collection) => collection.title).join(', '),
-        }),
-        only && {
-          action: {
-            label: t('table.view'),
-            onClick: () =>
-              navigateTo(
-                `/u/${String(route.params.username)}/shelf/${only.slug}`,
-              ),
-          },
-        },
-      )
-    }
   }
+  open.value = false
+  const only = joined.length === 1 ? joined[0] : undefined
+  toast.success(
+    t('table.addedTo', { collection: names }),
+    only && {
+      action: {
+        label: t('table.view'),
+        onClick: () =>
+          navigateTo(`/u/${String(route.params.username)}/shelf/${only.slug}`),
+      },
+    },
+  )
 }
 </script>
 

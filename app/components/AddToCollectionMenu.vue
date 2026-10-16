@@ -9,9 +9,9 @@ import type {
 
 /**
  * The "Add to collection" menu for an IGDB game: Owned and the Wishlist
- * first (the heart), then the user's collections as checkboxes. Each tick
- * saves straight away. A game is one library item however many places it's
- * in, so the first tick creates the item and later ticks only change it.
+ * first, then every one of the user's collections as checkboxes. Each tick
+ * saves straight away and the menu stays open. A game is one library item
+ * however many places it's in, so the first tick creates the item and later ticks only change it.
  * Ticking a collection for a new game makes it owned, and ticking one for
  * a game already there leaves its lists alone. When the catalog knows the
  * game's platforms, "Owned on" and "Wanted on" let the user say which
@@ -46,6 +46,11 @@ const platforms = ref<{ id: number; name: string }[]>([])
 const selected = ref(new Set<string>())
 const saving = ref(new Set<string>())
 const creating = ref(false)
+// Each save sends the whole set of collections, so none can change while one
+// is being saved.
+const collectionsBusy = computed(() =>
+  customCollections.value.some((collection) => saving.value.has(collection.id)),
+)
 
 const label = computed(() =>
   tracked.value
@@ -151,16 +156,17 @@ function togglePlatform(list: ListName, id: number, checked: boolean) {
 
 function toggleCollection(collection: CollectionSummary, checked: boolean) {
   return save(collection.id, async () => {
-    if (checked && !item.value) {
+    if (!item.value) {
+      if (!checked) return
       const added = await collections.addGame(props.game, [collection.id])
       show(added.item, added.collectionIds)
-    } else if (checked) {
-      const saved = await collections.addItem(collection.id, item.value!.id)
-      show(item.value, saved.collectionIds)
-    } else {
-      const saved = await collections.removeItem(collection.id, item.value!.id)
-      show(item.value, saved.collectionIds)
+      return
     }
+    const next = new Set(selected.value)
+    if (checked) next.add(collection.id)
+    else next.delete(collection.id)
+    const saved = await collections.setItemCollections(item.value.id, [...next])
+    show(item.value, saved.collectionIds)
   })
 }
 
@@ -245,7 +251,7 @@ async function onCreated(collection: CollectionSummary) {
           v-for="collection in customCollections"
           :key="collection.id"
           :model-value="selected.has(collection.id)"
-          :disabled="saving.has(collection.id)"
+          :disabled="collectionsBusy"
           @update:model-value="toggleCollection(collection, $event === true)"
           @select.prevent
         >

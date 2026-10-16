@@ -122,15 +122,13 @@ test.describe('signed in', () => {
       })
     })
     const calls: string[] = []
-    await page.route(`**/api/collections/*/items/${itemId}`, (route) => {
-      calls.push(
-        `${route.request().method()} ${route.request().url().split('/api/')[1]}`,
-      )
+    await page.route(`**/api/library-items/${itemId}/collections`, (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ json: [nesLink] })
+      }
+      calls.push(`PUT collections ${route.request().postData()}`)
       return route.fulfill({ json: { collectionIds: [nes.id] } })
     })
-    await page.route(`**/api/library-items/${itemId}/collections`, (route) =>
-      route.fulfill({ json: [nesLink] }),
-    )
     await page.route(`**/api/library-items/${itemId}/lists`, (route) => {
       calls.push(`PUT lists ${JSON.stringify(route.request().postDataJSON())}`)
       return route.fulfill({ json: { item: null, collectionIds: [] } })
@@ -182,7 +180,7 @@ test.describe('signed in', () => {
     await expect(box('Wishlist')).not.toBeChecked()
     await expect(box('NES Games')).not.toBeChecked()
     expect(calls).toEqual([
-      `PUT collections/${nes.id}/items/${itemId}`,
+      `PUT collections {"collectionIds":["${nes.id}"]}`,
       'PUT lists {"type":"unwant"}',
     ])
 
@@ -219,6 +217,82 @@ test.describe('signed in', () => {
     await expect(box('Owned')).toBeChecked()
     await expect(box('Wishlist')).not.toBeChecked()
     expect(sent).toEqual({ type: 'own' })
+  })
+
+  test('the checklist adds and removes without changing the list', async ({
+    page,
+  }) => {
+    const snes = {
+      ...nes,
+      id: '55555555-5555-4555-8555-555555555555',
+      title: 'SNES Games',
+      slug: 'snes-games',
+    }
+    const rpgs = {
+      ...nes,
+      id: '66666666-6666-4666-8666-666666666666',
+      title: 'RPGs',
+      slug: 'rpgs',
+    }
+    await page.route('**/api/collections', (route) =>
+      route.fulfill({ json: [nes, snes, rpgs] }),
+    )
+    await page.route('**/api/library-items/igdb?**', (route) =>
+      route.fulfill({ json: [{ igdbId: 1, itemId }] }),
+    )
+    await page.route('**/api/library-items/igdb/1', (route) =>
+      route.fulfill({
+        json: { item: itemOf(), collectionIds: [nes.id], platforms: [] },
+      }),
+    )
+    const sent: string[][] = []
+    let finish: (() => void) | undefined
+    await page.route(
+      `**/api/library-items/${itemId}/collections`,
+      async (route) => {
+        const { collectionIds } = route.request().postDataJSON() as {
+          collectionIds: string[]
+        }
+        sent.push(collectionIds)
+        await new Promise<void>((resolve) => (finish = resolve))
+        return route.fulfill({ json: { collectionIds } })
+      },
+    )
+
+    await searchZelda(page)
+    await page
+      .getByRole('button', { name: 'In your collections: Zelda Game 1' })
+      .click()
+    const menu = page.getByRole('menu')
+    const boxes = menu.getByRole('menuitemcheckbox')
+    const box = (name: string) =>
+      menu.getByRole('menuitemcheckbox', { name, exact: true })
+    const all = ['Owned', 'Wishlist', 'NES Games', 'SNES Games', 'RPGs']
+    await expect(boxes).toHaveText(all)
+    await expect(box('NES Games')).toBeChecked()
+
+    // While it saves, the collections can't be changed.
+    await box('SNES Games').click()
+    await expect(box('RPGs')).toBeDisabled()
+    await expect(box('NES Games')).toBeDisabled()
+    await expect(box('SNES Games')).toBeDisabled()
+    expect(sent).toEqual([[nes.id, snes.id]])
+    finish?.()
+    await expect(box('SNES Games')).toBeEnabled()
+    await expect(box('SNES Games')).toBeChecked()
+    await expect(menu).toBeVisible()
+    await expect(boxes).toHaveText(all)
+
+    // Unticking sends the new whole set and keeps the entry in the list.
+    await box('NES Games').click()
+    await expect(box('NES Games')).toBeDisabled()
+    finish?.()
+    await expect(box('NES Games')).toBeEnabled()
+    await expect(box('NES Games')).not.toBeChecked()
+    await expect(box('SNES Games')).toBeChecked()
+    expect(sent[1]).toEqual([snes.id])
+    await expect(menu).toBeVisible()
+    await expect(boxes).toHaveText(all)
   })
 
   test('a new game ticked into a collection is created owned', async ({
@@ -398,7 +472,7 @@ test.describe('signed in', () => {
     await page
       .getByRole('button', { name: 'In your collections: Zelda Game 1' })
       .click()
-    await page.getByRole('menuitem', { name: 'Wanted on' }).click()
+    await page.getByRole('menuitem', { name: 'Wishlisted on' }).click()
     await page.getByRole('menuitemcheckbox', { name: 'PS4' }).click()
     await expect(
       page.getByRole('menuitemcheckbox', { name: 'PS4' }),
@@ -425,7 +499,7 @@ test.describe('signed in', () => {
         json: { item: itemOf(wantedOnly), collectionIds: [], platforms: [] },
       }),
     )
-    await page.route(`**/api/collections/${nes.id}/items/${itemId}`, (route) =>
+    await page.route(`**/api/library-items/${itemId}/collections`, (route) =>
       route.fulfill({ json: { collectionIds: [nes.id] } }),
     )
 

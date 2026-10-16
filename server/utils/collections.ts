@@ -46,7 +46,7 @@ type BlueprintRow = typeof blueprints.$inferSelect
 type ItemRow = typeof libraryItems.$inferSelect
 type CatalogGameRow = typeof catalogGames.$inferSelect
 
-const notFound = () =>
+export const notFound = () =>
   createError({ statusCode: 404, statusMessage: 'Not found' })
 
 function toSummary(row: CollectionRow, itemCount: number): CollectionSummary {
@@ -147,7 +147,7 @@ export function toCollectionEntry(
 }
 
 /** The last position in each of these collections, by collection id. */
-async function lastPositions(
+export async function lastPositions(
   collectionIds: string[],
 ): Promise<Map<string, number>> {
   const ends = await useDb()

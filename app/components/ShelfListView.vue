@@ -3,6 +3,7 @@ import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type {
   CollectionEntry,
+  CollectionLink,
   OwnerEntry,
   LibraryItem,
   ListName,
@@ -80,19 +81,11 @@ async function gotIt(itemId: string) {
   }
 }
 
-const addToTarget = useAddToCollection(shelfPath)
-
-/** Adds a game to a collection. It stays on this list. */
-async function addToCollection(itemId: string, collectionId: string) {
-  const target = mine.value.find((collection) => collection.id === collectionId)
-  if (!target) return
-  const link = await addToTarget(itemId, target)
-  if (!link) return
+/** Shows the collections a game is in after they were saved. */
+function collectionsChanged(itemId: string, links: CollectionLink[]) {
   setItems(
     (data.value?.items ?? []).map((entry) =>
-      entry.id === itemId
-        ? { ...entry, inCollections: [...(entry.inCollections ?? []), link] }
-        : entry,
+      entry.id === itemId ? { ...entry, inCollections: links } : entry,
     ),
   )
 }
@@ -241,7 +234,7 @@ function onRenamed(saved: LibraryItem) {
         :shelf-path="shelfPath"
         @remove="removeItem"
         @rename="startRenaming"
-        @add-to="addToCollection"
+        @collections-changed="collectionsChanged"
         @got-it="gotIt"
         @to-wishlist="toWishlist"
       />

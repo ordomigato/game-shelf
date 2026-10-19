@@ -26,16 +26,19 @@ description: >
 Fixed facts that every row has, that the app filters or joins on, or that
 other tables point at, are real columns: owner, title, visibility,
 timestamps, foreign keys. Only the **user-defined** part lives in JSONB:
-`blueprints.fields` holds the field definitions, `library_items.data` the
-values keyed by `FieldDefinition.id` (across every blueprint the item's
-collections use). Don't push ordinary columns into JSONB to skip a
+`users.fields` holds the account's field definitions (one set for all the
+user's games, capped by the plan's `fields` limit), `library_items.data`
+the values keyed by `FieldDefinition.id`. Don't push ordinary columns into JSONB to skip a
 migration.
 
 Postgres doesn't validate JSONB contents. Values are written through
 `applyFieldValues` (`shared/utils/field-values.ts`), which accepts only the
-fields of the collection's blueprint, checks each value against its type
-(`select` must be one of `options`, rating 1 to 5, and so on), and leaves
-values for other blueprints untouched.
+user's fields, checks each value against its type (`select` must be one of
+`options`, rating 1 to 5, and so on), and leaves other keys untouched.
+Changing the fields goes through `updateUserFields`, which carries every
+game's values over in one batch, and `previewUserFields` says what a change
+would delete first. Field ids are never reused for another meaning, since
+values are matched by id.
 
 ## The collections model
 
@@ -67,14 +70,12 @@ values for other blueprints untouched.
   flags. Custom collections hold owned and Wishlist games alike.
 - `collection_items`: the junction table (composite primary key), with
   `position` and `added_at`. Custom collections only.
-- `collections`: owner, `blueprint_id`, title, `slug` (unique per owner),
-  visibility. All custom. `owned` and `wishlist` are reserved slugs, since
+- `collections`: owner, title, `slug` (unique per owner), visibility,
+  `dashboard` (chart widgets that point at the owner's field ids). All custom. `owned` and `wishlist` are reserved slugs, since
   the list pages live at `/u/<username>/shelf/owned` and `.../wishlist`.
   Only collections count toward the plan's collection limit. The Wishlist
   is capped at the per-collection game limit (`assertListRoom`), and Owned
   only by the library's.
-- `blueprints`: shared (named) or private to one collection. A blueprint in
-  use can't be deleted (`restrict`).
 
 Every query on these tables is scoped to the owner from `requireAuth`.
 Helpers live in `server/utils/collections.ts`. Use them rather than
@@ -115,12 +116,12 @@ the one left, and it doesn't change.
 
 ## Correlated subqueries
 
-Inside a `sql` template, Drizzle writes a column like `${blueprints.id}`
+Inside a `sql` template, Drizzle writes a column like `${libraryItems.id}`
 without its table name. In a subquery that can silently point at the
-inner table instead of the outer one (`where blueprint_id = id` compares
-a collection with itself), returning wrong counts with no error. Write
-subqueries with an alias and spelled-out names instead:
-`(select count(*)::int from collections as used where used.blueprint_id = blueprints.id)`.
+inner table instead of the outer one (`where item_id = id` compares a row
+with itself), returning wrong counts with no error. Write subqueries with
+an alias and spelled-out names instead:
+`(select count(*)::int from collection_items as entry where entry.item_id = library_items.id)`.
 Check a new subquery against the dev branch before trusting it, since e2e
 tests stub the API and won't catch it.
 

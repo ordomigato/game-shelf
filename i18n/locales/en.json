@@ -325,8 +325,8 @@
   "welcome": {
     "pageTitle": "Welcome",
     "title": "Pick a username",
-    "description": "Your username is how others find your profile. You can change it later.",
-    "usernameHint": "3 to 20 letters, numbers or underscores. Your profile will be at /u/{username}.",
+    "description": "Your username is how others find your collections. You can change it later.",
+    "usernameHint": "3 to 20 letters, numbers or underscores. Your collections will be at /u/{username}.",
     "usernamePlaceholder": "yourname",
     "submit": "Continue",
     "submitting": "Saving…"
@@ -345,7 +345,7 @@
       "pageTitle": "Profile",
       "title": "Profile",
       "description": "How you appear to others on ThisPlayShelf.",
-      "usernameHint": "Changing it changes your profile's address. Old links stop working.",
+      "usernameHint": "Changing it changes the address of your collections. Old links stop working.",
       "save": "Save profile",
       "saving": "Saving…",
       "saved": "Profile saved."
@@ -671,7 +671,7 @@
   "visibility": {
     "label": "Who can see this: {current}",
     "privateHint": "Only you can see it.",
-    "publicHint": "Anyone with the link can see it, and it's listed on your profile.",
+    "publicHint": "Anyone with the link can see it, and it's listed on your collections page.",
     "nowPublic": "Collection is now public",
     "nowPrivate": "Collection is now private",
     "failed": "Couldn't change who can see it. Try again."
@@ -681,7 +681,7 @@
     "copied": "Link copied",
     "copyFailed": "Couldn't copy the link. Here it is: {url}",
     "makePublicTitle": "Make it public to share?",
-    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your profile. You can make it private again at any time.",
+    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your collections page. You can make it private again at any time.",
     "makePublicConfirm": "Make public and share"
   },
   "preview": {
@@ -690,7 +690,7 @@
     "gameCount": "An empty collection on ThisPlayShelf | 1 game on ThisPlayShelf | {count} games on ThisPlayShelf",
     "shelfTitle": "{owner}'s collections",
     "collectionCount": "No public collections on ThisPlayShelf yet | 1 public collection on ThisPlayShelf | {count} public collections on ThisPlayShelf",
-    "site": "Search games, track your collection and share your profile.",
+    "site": "Search games, track your collection and share your collections.",
     "imageAlt": "The ThisPlayShelf logo, an S-shaped glass shelf, with the words “Your collection, on display.”"
   },
   "explore": {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { FileUp } from '@lucide/vue'
 import type { FieldDefinition, FieldType } from '#shared/types/collection'
+import type { PlanUsage } from '#shared/types/user'
 import {
   MATCH_BATCH_SIZE,
   MAX_MATCH_NAMES,
@@ -25,6 +26,10 @@ const props = defineProps<{
   collectionId: string
   /** The user's fields, which the file's columns can go to. */
   fields: FieldDefinition[]
+  /** How many more games the collection can take on the plan. */
+  room: number
+  /** IGDB ids of the games already in the collection. */
+  existingIgdbIds: number[]
 }>()
 const emit = defineEmits<{ imported: [] }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -34,6 +39,7 @@ const auth = useAuth()
 const sidebar = useMyCollections()
 const memberships = useGameMemberships()
 const { limits } = usePlan()
+const library = useCollections()
 
 type Step = 'file' | 'map' | 'match' | 'review' | 'importing' | 'done'
 const step = ref<Step>('file')
@@ -56,6 +62,8 @@ watch(open, (isOpen) => {
   fileError.value = ''
   importError.value = ''
   progress.value = 0
+  libraryUsed.value = null
+  libraryHas.value = new Set()
 })
 
 async function readFile(event: Event) {
@@ -262,6 +270,66 @@ const finalRows = computed(() =>
   }),
 )
 
+// Games the import would add to this collection. Games already in it only
+// get their values updated, so they need no room.
+const added = computed(() =>
+  newGamesIn(finalRows.value, new Set(props.existingIgdbIds)),
+)
+const newGames = computed(
+  () => added.value.unlinked + added.value.linkedIds.length,
+)
+const noRoom = computed(() => newGames.value > props.room)
+
+// The library has a limit too, and a game already in it needs no room. How
+// many games the account has is read once, and only when the import could
+// go past the limit are the linked games looked up.
+const libraryUsed = ref<number | null>(null)
+const libraryHas = ref(new Set<number>())
+const checkingLibrary = ref(false)
+const libraryNew = computed(
+  () =>
+    added.value.unlinked +
+    added.value.linkedIds.filter((id) => !libraryHas.value.has(id)).length,
+)
+const libraryRoom = computed(() =>
+  Math.max(0, limits.value.games - (libraryUsed.value ?? 0)),
+)
+const noLibraryRoom = computed(
+  () =>
+    libraryUsed.value !== null &&
+    !checkingLibrary.value &&
+    libraryNew.value > libraryRoom.value,
+)
+
+async function checkLibrary() {
+  checkingLibrary.value = true
+  try {
+    if (libraryUsed.value === null) {
+      libraryUsed.value = (
+        await auth.apiFetch<PlanUsage>('/api/me/usage')
+      ).games
+    }
+    // Only ask which games the library has when it could matter.
+    if (newGames.value <= libraryRoom.value) return
+    const ids = added.value.linkedIds.filter((id) => !libraryHas.value.has(id))
+    const found = new Set(libraryHas.value)
+    for (let start = 0; start < ids.length; start += 100) {
+      const tracked = await library.tracked(ids.slice(start, start + 100))
+      tracked.forEach(({ igdbId }) => found.add(igdbId))
+    }
+    libraryHas.value = found
+  } catch {
+    // Only a hint. The server still refuses what doesn't fit.
+    libraryUsed.value = null
+  } finally {
+    checkingLibrary.value = false
+  }
+}
+
+watch(step, (now) => {
+  if (now === 'review') void checkLibrary()
+})
+
 const linkedCount = computed(
   () => finalRows.value.filter((row) => row.igdbId !== null).length,
 )
@@ -307,8 +375,14 @@ async function runImport() {
     emit('imported')
   } catch (error) {
     // Chunks already sent are kept. Importing the file again updates them.
-    importError.value =
-      limitMessage(error, t) ?? t('import.failed', { done: progress.value })
+    const refused = limitMessage(error, t)
+    importError.value = refused
+      ? t('import.stoppedAtLimit', {
+          done: progress.value,
+          total: rows.length,
+          message: refused,
+        })
+      : t('import.failed', { done: progress.value })
     result.value = totals
     step.value = 'done'
     emit('imported')
@@ -336,6 +410,9 @@ async function runImport() {
           <span class="font-medium">{{ $t('import.choose') }}</span>
           <span class="text-sm text-muted-foreground">{{
             $t('import.chooseHint')
+          }}</span>
+          <span class="text-sm text-muted-foreground">{{
+            $t('import.room', { count: room }, room)
           }}</span>
           <input
             type="file"
@@ -568,6 +645,19 @@ async function runImport() {
         <p class="text-sm text-muted-foreground">
           {{ $t('import.updateNote') }}
         </p>
+        <FormMessage v-if="noRoom">
+          {{ $t('import.noRoom', { count: newGames, room }, newGames) }}
+          {{ $t('import.noRoomHelp') }}
+        </FormMessage>
+        <FormMessage v-else-if="noLibraryRoom">
+          {{
+            $t(
+              'import.noLibraryRoom',
+              { count: libraryNew, room: libraryRoom },
+              libraryNew,
+            )
+          }}
+        </FormMessage>
 
         <div v-if="plan.problems.length" class="flex flex-col gap-2">
           <p class="text-sm font-medium">
@@ -673,7 +763,12 @@ async function runImport() {
           >
             {{ $t('import.back') }}
           </Button>
-          <Button :disabled="!plan.rows.length" @click="runImport">
+          <Button
+            :disabled="
+              !plan.rows.length || noRoom || noLibraryRoom || checkingLibrary
+            "
+            @click="runImport"
+          >
             {{
               $t('import.start', { count: plan.rows.length }, plan.rows.length)
             }}

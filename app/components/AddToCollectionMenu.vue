@@ -33,6 +33,7 @@ const tracked = defineModel<boolean>('tracked', { default: false })
 const { t } = useI18n()
 const auth = useAuth()
 const route = useRoute()
+const { limits } = usePlan()
 const collections = useCollections()
 const myCollections = useMyCollections()
 const leaving = useUnownConfirm()
@@ -175,6 +176,20 @@ function toggleCollection(collection: CollectionSummary, checked: boolean) {
   })
 }
 
+/** A full collection can't take this game, though it can keep it. */
+const isFull = (collection: CollectionSummary) =>
+  collectionFullFor(
+    collection,
+    limits.value.gamesPerCollection,
+    selected.value.has(collection.id),
+  )
+
+const wishlistFull = computed(
+  () =>
+    item.value?.wishlisted !== true &&
+    (myCollections.counts.value?.wishlist ?? 0) >= limits.value.wishlist,
+)
+
 function startCreating() {
   open.value = false
   creating.value = true
@@ -215,11 +230,16 @@ async function onCreated(collection: CollectionSummary) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           :model-value="item?.wishlisted === true"
-          :disabled="saving.has('wishlist')"
+          :disabled="saving.has('wishlist') || wishlistFull"
           @update:model-value="toggleList('wishlist', $event === true)"
           @select.prevent
         >
           {{ $t('shelf.wishlist') }}
+          <span
+            v-if="wishlistFull"
+            class="ml-auto pl-2 text-xs text-muted-foreground"
+            >{{ $t('addToCollection.full') }}</span
+          >
         </DropdownMenuCheckboxItem>
         <template v-if="platforms.length">
           <DropdownMenuSub
@@ -256,11 +276,16 @@ async function onCreated(collection: CollectionSummary) {
           v-for="collection in customCollections"
           :key="collection.id"
           :model-value="selected.has(collection.id)"
-          :disabled="collectionsBusy"
+          :disabled="collectionsBusy || isFull(collection)"
           @update:model-value="toggleCollection(collection, $event === true)"
           @select.prevent
         >
           <span class="truncate">{{ collection.title }}</span>
+          <span
+            v-if="isFull(collection)"
+            class="ml-auto pl-2 text-xs text-muted-foreground"
+            >{{ $t('addToCollection.full') }}</span
+          >
         </DropdownMenuCheckboxItem>
       </template>
       <p v-if="error" role="alert" class="px-2 py-1.5 text-sm text-destructive">

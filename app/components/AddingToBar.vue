@@ -10,6 +10,8 @@ const props = defineProps<{
   target: SearchTarget
   targets: SearchTarget[]
   username: string
+  /** How many more games it can take, or null when unlimited or unknown. */
+  room?: number | null
 }>()
 const emit = defineEmits<{ change: [slug: string] }>()
 
@@ -33,6 +35,17 @@ function choose(slug: unknown) {
         <strong class="font-semibold">{{ target.title }}</strong>
       </template>
     </i18n-t>
+    <p
+      v-if="room !== null && room !== undefined"
+      class="w-full text-sm text-muted-foreground"
+      :class="{ 'font-medium text-destructive': room === 0 }"
+    >
+      {{
+        room === 0
+          ? $t('addToCollection.collectionFull')
+          : $t('addToCollection.roomLeft', { count: room }, room)
+      }}
+    </p>
     <div class="flex items-center gap-2">
       <DropdownMenu v-if="targets.length > 1">
         <DropdownMenuTrigger as-child>

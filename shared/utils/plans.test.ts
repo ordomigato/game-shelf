@@ -9,7 +9,7 @@ describe('limitsFor', () => {
   })
 
   it('applies custom limits on top, on any plan', () => {
-    expect(limitsFor('max', { games: 60_000 }).games).toBe(60_000)
+    expect(limitsFor('max', { games: 8000 }).games).toBe(8000)
     expect(limitsFor('free', { collections: 12 }).collections).toBe(12)
     expect(limitsFor('free', { collections: 12 }).games).toBe(3000)
   })
@@ -23,6 +23,29 @@ describe('limitsFor', () => {
     expect(limits.fields).toBe(30)
     expect(limits.chartsPerCollection).toBe(24)
     expect(limits.importRows).toBe(5000)
+  })
+
+  it('sizes games for one collection, the Wishlist and the library', () => {
+    const { free, pro } = PLAN_LIMITS
+    expect([free.gamesPerCollection, pro.gamesPerCollection]).toEqual([
+      100, 1000,
+    ])
+    expect([free.wishlist, pro.wishlist]).toEqual([200, 2000])
+    expect([free.games, pro.games]).toEqual([3000, 10_000])
+  })
+
+  it('keeps hand-set game limits within the app maximums', () => {
+    const limits = limitsFor('max', {
+      gamesPerCollection: 20_000,
+      wishlist: 50_000,
+      games: 25_000,
+    })
+    expect(limits.gamesPerCollection).toBe(1000)
+    expect(limits.wishlist).toBe(2000)
+    expect(limits.games).toBe(10_000)
+    expect(
+      limitsFor('max', { gamesPerCollection: 400 }).gamesPerCollection,
+    ).toBe(400)
   })
 
   it('ignores custom keys that are not limits', () => {

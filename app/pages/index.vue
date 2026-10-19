@@ -90,6 +90,22 @@ onMounted(() => {
 
 const tracked = useTrackedGames(games, target)
 
+// How many more games the target can take, null until its count is known.
+const { limits } = usePlan()
+const room = computed<number | null>(() => {
+  const goal = target.value
+  if (!goal || goal.list === 'owned') return null
+  const used = goal.list
+    ? myCollections.counts.value?.wishlist
+    : myCollections.list.value?.find((c) => c.id === goal.collectionId)
+        ?.itemCount
+  if (used === undefined) return null
+  const limit = goal.list
+    ? limits.value.wishlist
+    : limits.value.gamesPerCollection
+  return Math.max(0, limit - used)
+})
+
 const addingByHand = ref(false)
 function onAddedByHand(item: LibraryItem) {
   const collection = target.value
@@ -166,6 +182,7 @@ const resultsLabel = computed(() => {
         :target="target"
         :targets="targets"
         :username="auth.me.value.username"
+        :room="room"
         @change="changeTarget"
       />
     </div>
@@ -257,7 +274,10 @@ const resultsLabel = computed(() => {
                 v-if="target"
                 :state="tracked.items.value.has(game.id) ? 'remove' : 'add'"
                 :label="toggleLabel(game)"
-                :disabled="tracked.saving.value.has(game.id)"
+                :disabled="
+                  tracked.saving.value.has(game.id) ||
+                  (room === 0 && !tracked.items.value.has(game.id))
+                "
                 @click="tracked.toggle(game)"
               />
               <AddToCollectionMenu

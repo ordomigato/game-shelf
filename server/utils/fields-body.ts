@@ -17,6 +17,7 @@ export const fieldsBodySchema = z.object({
         scale: z
           .union([z.literal(5), z.literal(10), z.literal(100)])
           .optional(),
+        hidden: z.literal(true).optional(),
       }),
     )
     .max(MAX_FIELDS),

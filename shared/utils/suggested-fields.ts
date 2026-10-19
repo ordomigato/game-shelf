@@ -14,7 +14,7 @@ export const SUGGESTED_FIELDS: FieldTemplate[] = [
     type: 'select',
     options: ['Sealed', 'Complete in box', 'Game and box', 'Loose'],
   },
-  { name: 'Price paid', type: 'currency', currency: 'USD' },
+  { name: 'Price paid', type: 'currency', currency: 'USD', hidden: true },
   { name: 'Purchased on', type: 'date' },
   {
     name: 'Region',

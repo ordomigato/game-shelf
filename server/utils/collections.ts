@@ -19,7 +19,12 @@ import {
   valuesLost,
   type OptionRenames,
 } from '../../shared/utils/field-changes'
-import { applyFieldValues, fieldsFor } from '../../shared/utils/field-values'
+import {
+  applyFieldValues,
+  chartsFor,
+  dataFor,
+  fieldsFor,
+} from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import type { ListState } from '../../shared/utils/lists'
 import {
@@ -238,22 +243,27 @@ export async function getCollectionBySlug(
         entries.map((entry) => entry.item.id),
       )
     : null
-  const items: CollectionEntry[] = entries.map((entry) => ({
+  const dashboard = chartsFor(
+    viewerIsOwner,
+    found.fields,
+    found.collection.dashboard,
+  )
+  const rawItems: CollectionEntry[] = entries.map((entry) => ({
     ...toCollectionEntry(entry.item, entry.game, entry.addedAt, viewerIsOwner),
     ...(inCollections && {
       inCollections: inCollections.get(entry.item.id) ?? [],
     }),
   }))
+  const fields = fieldsFor(viewerIsOwner, found.fields, rawItems, dashboard)
+  const items = rawItems.map((item) => ({
+    ...item,
+    data: dataFor(viewerIsOwner, fields, item.data),
+  }))
   return {
     ...toSummary(found.collection, items.length),
-    fields: fieldsFor(
-      viewerIsOwner,
-      found.fields,
-      items,
-      found.collection.dashboard,
-    ),
+    fields,
     items,
-    dashboard: found.collection.dashboard,
+    dashboard,
     isOwner: viewerIsOwner,
   }
 }

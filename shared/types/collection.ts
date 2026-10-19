@@ -28,6 +28,11 @@ export interface FieldDefinition {
    * show "8/10". Missing means 5.
    */
   scale?: RatingScale
+  /**
+   * Kept from everyone but the owner: visitors never get this field, its
+   * values, or charts that use it. Missing means shown.
+   */
+  hidden?: true
 }
 
 export type RatingScale = 5 | 10 | 100

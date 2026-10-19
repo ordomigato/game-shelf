@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Ellipsis,
+  EyeOff,
   GripVertical,
   ListFilter,
   MoveDown,
@@ -567,6 +568,13 @@ const addedFormat = computed(
                 @click="header.column.toggleSorting()"
               >
                 {{ (header.column.columnDef.header as () => string)() }}
+                <EyeOff
+                  v-if="fieldOf(header.id)?.hidden"
+                  class="size-3.5 text-muted-foreground"
+                  role="img"
+                  :title="$t('table.hiddenFromVisitors')"
+                  :aria-label="$t('table.hiddenFromVisitors')"
+                />
                 <ArrowUp
                   v-if="header.column.getIsSorted() === 'asc'"
                   class="size-3.5"

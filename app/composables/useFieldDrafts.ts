@@ -28,6 +28,8 @@ export interface FieldDraft {
   options: OptionDraft[]
   currency: string
   scale: RatingScale
+  /** Kept from visitors. */
+  hidden: boolean
 }
 
 /**
@@ -53,6 +55,7 @@ export function useFieldDrafts() {
       })),
       currency: field.currency ?? DEFAULT_CURRENCY,
       scale: field.scale ?? 5,
+      hidden: field.hidden === true,
     }
   }
 
@@ -78,6 +81,7 @@ export function useFieldDrafts() {
         options: [],
         currency: DEFAULT_CURRENCY,
         scale: 5,
+        hidden: false,
       },
     ]
   }
@@ -126,6 +130,7 @@ export function useFieldDrafts() {
         options: draft.options.map((option) => option.value),
         currency: draft.currency,
         scale: draft.scale,
+        ...(draft.hidden && { hidden: true as const }),
       })),
     ),
   )

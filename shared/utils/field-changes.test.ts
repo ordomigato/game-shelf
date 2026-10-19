@@ -202,7 +202,7 @@ describe('migrateItemData', () => {
     ).toEqual({ s: 'Playing', other: 1 })
   })
 
-  it('renames options and leaves other blueprints alone', () => {
+  it('renames options and leaves other keys alone', () => {
     const after = [
       text,
       number,

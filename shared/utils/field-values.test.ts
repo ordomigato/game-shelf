@@ -87,14 +87,14 @@ describe('applyFieldValues', () => {
     { id: 'rating', name: 'Rating', type: 'rating' },
   ]
 
-  it('sets, clears and keeps other blueprints’ values', () => {
+  it('sets, clears and keeps values for other keys', () => {
     const result = applyFieldValues(
-      { price: 10, rating: 3, otherBlueprintField: 'keep me' },
+      { price: 10, rating: 3, otherField: 'keep me' },
       fields,
       { price: 12.5, rating: null },
     )
     expect(result).toEqual({
-      data: { price: 12.5, otherBlueprintField: 'keep me' },
+      data: { price: 12.5, otherField: 'keep me' },
     })
   })
 

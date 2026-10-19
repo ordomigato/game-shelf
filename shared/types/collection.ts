@@ -12,7 +12,7 @@ export type FieldType =
   | 'progress'
 
 /**
- * One user-defined column in a blueprint. `id` is stable and is the key used
+ * One extra field a user keeps for their games. `id` is stable and is the key used
  * in each item's `data`, so a field can be renamed without touching items.
  */
 export interface FieldDefinition {
@@ -41,7 +41,7 @@ export type RatingScale = 5 | 10 | 100
  */
 export type FieldValue = string | number | boolean | string[]
 
-/** An item's values, keyed by `FieldDefinition.id`, across all blueprints. */
+/** An item's values, keyed by `FieldDefinition.id`. */
 export type ItemData = Record<string, FieldValue>
 
 export type CollectionVisibility = 'private' | 'public'
@@ -53,43 +53,8 @@ export type CollectionVisibility = 'private' | 'public'
  */
 export type ListName = 'owned' | 'wishlist'
 
-export interface Blueprint {
-  id: string
-  /** Null for a private blueprint, which belongs to one collection. */
-  name: string | null
-  shared: boolean
-  fields: FieldDefinition[]
-  /**
-   * How many of the owner's collections use this blueprint. Sent to the
-   * owner only.
-   */
-  usedBy?: number
-}
-
-/** A shared blueprint as offered when creating a collection. */
-export interface BlueprintSummary {
-  id: string
-  name: string
-  fieldCount: number
-  /** How many of the owner's collections use it. */
-  usedBy: number
-}
-
-/** A collection using a blueprint, as listed on the blueprint's page. */
-export interface BlueprintCollection {
-  id: string
-  title: string
-  slug: string
-  itemCount: number
-}
-
-export interface BlueprintDetail extends Blueprint {
-  collections: BlueprintCollection[]
-}
-
-/** What saving a blueprint's new fields would change. */
-export interface BlueprintImpact {
-  collections: BlueprintCollection[]
+/** What saving new account fields would change. */
+export interface FieldsImpact {
   /** Per field (by its current name), how many games would lose a value. */
   lost: { name: string; count: number }[]
 }
@@ -176,7 +141,8 @@ export interface CollectionLink {
 }
 
 export interface CollectionDetail extends CollectionSummary {
-  blueprint: Blueprint
+  /** The owner's fields, the columns of every collection. */
+  fields: FieldDefinition[]
   items: CollectionEntry[]
   /** The charts on its dashboard, in order. */
   dashboard: ChartWidget[]

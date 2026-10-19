@@ -70,7 +70,7 @@ export function normalizeFieldValue(
  * Applies `changes` (field id to value, `null` to clear) to an item's data,
  * allowing only the given fields. Returns the new data, or the ids of the
  * fields whose values were rejected (unknown field or wrong type). Values
- * for fields outside `fields` (from other blueprints) are left untouched.
+ * for fields outside `fields` (deleted fields) are left untouched.
  */
 export function applyFieldValues(
   data: ItemData,

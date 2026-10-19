@@ -412,12 +412,19 @@ async function deleteCollection() {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span v-if="data.isOwner">{{
-              $t('limits.gamesUsed', {
-                used: data.itemCount,
-                limit: limits.gamesPerCollection,
-              })
-            }}</span>
+            <span
+              v-if="data.isOwner"
+              :class="{
+                'font-medium text-destructive':
+                  data.itemCount > limits.gamesPerCollection,
+              }"
+              >{{
+                $t('limits.gamesUsed', {
+                  used: data.itemCount,
+                  limit: limits.gamesPerCollection,
+                })
+              }}</span
+            >
             <span v-else>{{ $t('shelf.gameCount', data.itemCount) }}</span>
             <VisibilityMenu
               v-if="data.isOwner"
@@ -438,12 +445,18 @@ async function deleteCollection() {
                 : $t('collection.noColumns')
             }}
             <template v-if="data.isOwner">
-              <span>{{
-                $t('limits.fieldsUsed', {
-                  used: data.fields.length,
-                  limit: limits.fields,
-                })
-              }}</span>
+              <span
+                :class="{
+                  'font-medium text-destructive':
+                    data.fields.length > limits.fields,
+                }"
+                >{{
+                  $t('limits.fieldsUsed', {
+                    used: data.fields.length,
+                    limit: limits.fields,
+                  })
+                }}</span
+              >
               <button
                 type="button"
                 class="ml-1 font-medium text-primary underline-offset-4 hover:underline"

@@ -301,8 +301,10 @@ test('suggests common fields, one click each, while there is room', async ({
   await dialog.getByRole('button', { name: 'Add Rating' }).click()
   await expect(dialog.getByText('4 of 5 extra fields per game')).toBeVisible()
   await dialog.getByRole('button', { name: 'Add Progress' }).click()
-  // Full at 5 of 5: no more suggestions, and Add field is off.
-  await expect(dialog.getByText('Suggested fields')).toHaveCount(0)
+  // Full at 5 of 5: suggestions and Add field are off.
+  await expect(
+    dialog.getByRole('button', { name: 'Add Region' }),
+  ).toBeDisabled()
   await expect(dialog.getByRole('button', { name: 'Add field' })).toBeDisabled()
   await dialog.getByRole('button', { name: 'Save fields' }).click()
   await expect(dialog).toBeHidden()

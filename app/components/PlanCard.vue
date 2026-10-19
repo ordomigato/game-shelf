@@ -36,6 +36,11 @@ const meters = computed(() =>
       ]
     : [],
 )
+
+const overFields = computed(() => {
+  const meter = meters.value.find((m) => m.labelKey === 'limits.fields')
+  return meter && meter.used > meter.limit ? meter : null
+})
 </script>
 
 <template>
@@ -66,12 +71,20 @@ const meters = computed(() =>
       >
         <div class="flex justify-between text-sm">
           <span class="font-medium">{{ $t(meter.labelKey) }}</span>
-          <span class="text-muted-foreground tabular-nums">{{
-            $t('limits.usedOf', {
-              used: number(meter.used),
-              limit: number(meter.limit),
-            })
-          }}</span>
+          <span
+            class="tabular-nums"
+            :class="
+              meter.used > meter.limit
+                ? 'font-medium text-destructive'
+                : 'text-muted-foreground'
+            "
+            >{{
+              $t('limits.usedOf', {
+                used: number(meter.used),
+                limit: number(meter.limit),
+              })
+            }}</span
+          >
         </div>
         <div
           class="h-2 overflow-hidden rounded-full bg-muted"
@@ -90,6 +103,18 @@ const meters = computed(() =>
           />
         </div>
       </div>
+      <Alert v-if="overFields" variant="destructive">
+        <AlertTitle>{{
+          $t('limits.overFields', {
+            used: number(overFields.used),
+            limit: number(overFields.limit),
+          })
+        }}</AlertTitle>
+        <AlertDescription>
+          {{ $t('limits.overFieldsHelp', { limit: overFields.limit }) }}
+          <NuxtLink to="/pricing">{{ $t('limits.seePlans') }}</NuxtLink>
+        </AlertDescription>
+      </Alert>
       <ul class="flex flex-col gap-1 text-sm text-muted-foreground">
         <li>
           {{

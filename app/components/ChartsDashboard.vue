@@ -100,12 +100,19 @@ const span: Record<ChartSize, string> = {
       v-if="editable && widgets.length"
       class="flex flex-wrap items-center justify-end gap-2"
     >
-      <span class="mr-auto text-sm text-muted-foreground">{{
-        $t('limits.chartsUsed', {
-          used: widgets.length,
-          limit: limits.chartsPerCollection,
-        })
-      }}</span>
+      <span
+        class="mr-auto text-sm text-muted-foreground"
+        :class="{
+          'font-medium text-destructive':
+            widgets.length > limits.chartsPerCollection,
+        }"
+        >{{
+          $t('limits.chartsUsed', {
+            used: widgets.length,
+            limit: limits.chartsPerCollection,
+          })
+        }}</span
+      >
       <Button
         v-if="suggestions.length"
         variant="outline"

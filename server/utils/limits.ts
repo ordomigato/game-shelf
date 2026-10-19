@@ -77,8 +77,8 @@ export async function assertCollectionsRoom(
 }
 
 /**
- * Room for `adding` more games on the Wishlist. Owned has no cap of its own: it can grow to the
- * library's.
+ * Room for `adding` more games on the Wishlist. Owned has no cap of its
+ * own: it can grow to the library's.
  */
 export async function assertListRoom(
   ownerId: string,

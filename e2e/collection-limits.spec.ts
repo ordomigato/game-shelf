@@ -30,8 +30,25 @@ const entry = (i: number) => ({
 })
 
 /** Opens the collection page for a collection holding `count` games. */
-async function openCollection(page: Page, count: number) {
+async function openCollection(
+  page: Page,
+  count: number,
+  plan: 'free' | 'pro' = 'free',
+) {
   await signInAs(page, { username: 'retro_fan' })
+  if (plan === 'pro') {
+    await page.route('**/api/me', (route) =>
+      route.fulfill({
+        json: {
+          id: '00000000-0000-4000-8000-000000000002',
+          username: 'retro_fan',
+          displayName: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          plan,
+        },
+      }),
+    )
+  }
   await page.route('**/api/collections', (route) =>
     route.fulfill({ json: [collectionOf(count)] }),
   )
@@ -112,8 +129,12 @@ test('a full collection shows as Full in the Add to menu', async ({ page }) => {
 })
 
 /** Opens a collection of `count` games and its import dialog. */
-async function openImport(page: Page, count: number) {
-  await openCollection(page, count)
+async function openImport(
+  page: Page,
+  count: number,
+  plan: 'free' | 'pro' = 'free',
+) {
+  await openCollection(page, count, plan)
   await page.getByRole('button', { name: 'Collection actions' }).click()
   await page.getByRole('menuitem', { name: 'Import CSV' }).click()
 }
@@ -157,6 +178,108 @@ test('an import that adds more new games than the room left is blocked at the pr
     ),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: /^Import/ })).toBeDisabled()
+})
+
+/** Match step stub: no names are matched to IGDB games. */
+async function matchNothing(page: Page) {
+  await page.route('**/api/import/match', (route) =>
+    route.fulfill({
+      json: (route.request().postDataJSON() as { names: string[] }).names.map(
+        (name) => ({
+          name,
+          confidence: 'none',
+          suggestion: null,
+          candidates: [],
+        }),
+      ),
+    }),
+  )
+}
+
+async function toReview(page: Page) {
+  await page.getByRole('button', { name: 'Review', exact: true }).click()
+  await page.getByRole('button', { name: 'Skip matching' }).click()
+}
+
+test('rows with the same title each need room, so two fit no better than one', async ({
+  page,
+}) => {
+  await matchNothing(page)
+  await openImport(page, 99)
+  await page
+    .getByLabel('Choose a CSV file')
+    .setInputFiles(csvOf(['Same,', 'Same,']))
+  await toReview(page)
+  await expect(
+    page.getByText(
+      'This import adds 2 new games. This collection has room for 1.',
+    ),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Import/ })).toBeDisabled()
+})
+
+test('an import that would pass the library limit is blocked at the preview', async ({
+  page,
+}) => {
+  await matchNothing(page)
+  await page.route('**/api/me/usage', (route) =>
+    route.fulfill({
+      json: {
+        plan: 'free',
+        collections: 1,
+        games: 2990,
+        wishlist: 0,
+        fields: 0,
+      },
+    }),
+  )
+  await openImport(page, 0)
+  const rows = Array.from({ length: 50 }, (_, i) => `New ${i},`)
+  await page.getByLabel('Choose a CSV file').setInputFiles(csvOf(rows))
+  await toReview(page)
+  await expect(
+    page.getByText(
+      'This import adds 50 new games. Your library has room for 10 more.',
+    ),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Import/ })).toBeDisabled()
+})
+
+test('a refusal partway says how many rows were already imported', async ({
+  page,
+}) => {
+  await matchNothing(page)
+  await page.route('**/api/me/usage', (route) =>
+    route.fulfill({
+      json: { plan: 'pro', collections: 1, games: 0, wishlist: 0, fields: 0 },
+    }),
+  )
+  let calls = 0
+  await page.route(`**/api/collections/${collectionId}/import`, (route) => {
+    calls++
+    if (calls === 1) {
+      return route.fulfill({
+        json: { added: 250, updated: 0, linked: 0, handAdded: 250 },
+      })
+    }
+    return route.fulfill({
+      status: 403,
+      json: {
+        statusCode: 403,
+        data: { key: 'limits.reached.games', params: { limit: 10000 } },
+      },
+    })
+  })
+  await openImport(page, 0, 'pro')
+  const rows = Array.from({ length: 300 }, (_, i) => `New ${i},`)
+  await page.getByLabel('Choose a CSV file').setInputFiles(csvOf(rows))
+  await toReview(page)
+  await page.getByRole('button', { name: /^Import 300/ }).click()
+  await expect(
+    page.getByText(
+      'Imported 250 of 300 rows. Then: Your shelf can hold up to 10000 games on your plan.',
+    ),
+  ).toBeVisible()
 })
 
 test('a file that only updates games already there imports into a full collection', async ({

@@ -809,6 +809,8 @@
     "accountFields": "New fields are added to your account, so every game and collection gets them. You can have up to {limit} fields.",
     "room": "Room for {count} more game in this collection. | Room for {count} more games in this collection.",
     "noRoom": "This import adds {count} new game. This collection has room for {room}. | This import adds {count} new games. This collection has room for {room}.",
+    "noLibraryRoom": "This import adds {count} new game. Your library has room for {room} more. | This import adds {count} new games. Your library has room for {room} more.",
+    "stoppedAtLimit": "Imported {done} of {total} rows. Then: {message}",
     "noRoomHelp": "Remove some rows from the file or choose another collection. Games already in this collection don't need room.",
     "tooMany": "Only the first {max} rows will be imported.",
     "untitled": "(no heading)",

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { LIMIT_REACHED, PLAN_LIMITS, limitsFor } from '../../shared/utils/plans'
-import { assertFieldRoom } from './limits'
+import { assertFieldRoom, limitReached } from './limits'
 
 // Nitro auto-imports this in the server.
 vi.stubGlobal('LIMIT_REACHED', LIMIT_REACHED)
@@ -40,5 +40,23 @@ describe('assertFieldRoom', () => {
     expect(() =>
       assertFieldRoom(fields(5), [...fields(4), { id: 'new' }], free),
     ).not.toThrow()
+  })
+})
+
+describe('limitReached', () => {
+  it('names the Wishlist limit apart from a collection’s', () => {
+    expect(() => limitReached('wishlist', 200)).toThrow(
+      expect.objectContaining({
+        data: { key: 'limits.reached.wishlist', params: { limit: 200 } },
+      }),
+    )
+    expect(() => limitReached('gamesPerCollection', 100)).toThrow(
+      expect.objectContaining({
+        data: {
+          key: 'limits.reached.gamesPerCollection',
+          params: { limit: 100 },
+        },
+      }),
+    )
   })
 })

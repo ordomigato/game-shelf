@@ -30,6 +30,7 @@ const rows = computed(() =>
         t('pricing.gamesPerCollection', {
           count: number(limits.gamesPerCollection),
         }),
+        t('pricing.wishlist', { count: number(limits.wishlist) }),
         t('pricing.fields', { count: limits.fields }),
         t('pricing.charts', { count: limits.chartsPerCollection }),
         t('pricing.text', { count: number(limits.textLength) }),

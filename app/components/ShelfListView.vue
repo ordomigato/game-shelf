@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import { PLAN_LIMITS } from '#shared/utils/plans'
 import type {
   CollectionEntry,
   CollectionLink,
@@ -17,7 +18,8 @@ import type {
 const props = defineProps<{ list: ListName }>()
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const { limits } = usePlan()
 const collections = useCollections()
 const leaving = useUnownConfirm()
 
@@ -38,6 +40,18 @@ const { data, status, error, refresh } = useAsyncData(
   { watch: [username, () => props.list] },
 )
 const notFound = computed(() => error.value?.statusCode === 404)
+
+// Only the Wishlist has a cap of its own. Over it, games can be kept and
+// removed but not added.
+const capped = computed(() => props.list === 'wishlist')
+const count = computed(() => data.value?.itemCount ?? 0)
+const overCap = computed(
+  () => capped.value && count.value > limits.value.wishlist,
+)
+const fullCap = computed(
+  () => capped.value && count.value >= limits.value.wishlist,
+)
+const proWishlist = PLAN_LIMITS.pro.wishlist
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
@@ -185,13 +199,21 @@ function onRenamed(saved: LibraryItem) {
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <Button as-child>
+          <Button v-if="!fullCap" as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
               {{ $t('collection.addGames') }}
             </NuxtLink>
           </Button>
-          <Button variant="outline" @click="addingByHand = true">
+          <Button v-else disabled>
+            <Plus />
+            {{ $t('collection.addGames') }}
+          </Button>
+          <Button
+            variant="outline"
+            :disabled="fullCap"
+            @click="addingByHand = true"
+          >
             <PenLine />
             <span class="hidden sm:inline">{{
               $t('collection.addByHand')
@@ -202,6 +224,23 @@ function onRenamed(saved: LibraryItem) {
           </Button>
         </div>
       </div>
+
+      <Alert v-if="overCap" variant="destructive" data-testid="over-limit">
+        <AlertTitle>{{
+          $t('limits.overWishlist', {
+            used: data.itemCount,
+            limit: limits.wishlist,
+          })
+        }}</AlertTitle>
+        <AlertDescription>
+          {{ $t('limits.overGamesHelp', { limit: limits.wishlist }) }}
+          <NuxtLink v-if="proWishlist > limits.wishlist" to="/pricing">{{
+            $t('limits.proAllows', {
+              limit: new Intl.NumberFormat(locale).format(proWishlist),
+            })
+          }}</NuxtLink>
+        </AlertDescription>
+      </Alert>
 
       <div
         v-if="!data.items.length"

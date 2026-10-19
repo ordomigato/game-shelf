@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PlanUsage } from '#shared/types/user'
+import { PLAN_LIMITS } from '#shared/utils/plans'
 
 /** The account's plan and how much of it is used, in Settings. */
 const auth = useAuth()
@@ -29,6 +30,11 @@ const meters = computed(() =>
           limit: limits.value.games,
         },
         {
+          labelKey: 'limits.wishlist',
+          used: usage.value.wishlist ?? 0,
+          limit: limits.value.wishlist,
+        },
+        {
           labelKey: 'limits.fields',
           used: usage.value.fields,
           limit: limits.value.fields,
@@ -41,6 +47,14 @@ const overFields = computed(() => {
   const meter = meters.value.find((m) => m.labelKey === 'limits.fields')
   return meter && meter.used > meter.limit ? meter : null
 })
+
+const overOf = (labelKey: string) => {
+  const meter = meters.value.find((m) => m.labelKey === labelKey)
+  return meter && meter.used > meter.limit ? meter : null
+}
+const overGames = computed(() => overOf('limits.games'))
+const overWishlist = computed(() => overOf('limits.wishlist'))
+const pro = PLAN_LIMITS.pro
 </script>
 
 <template>
@@ -113,6 +127,36 @@ const overFields = computed(() => {
         <AlertDescription>
           {{ $t('limits.overFieldsHelp', { limit: overFields.limit }) }}
           <NuxtLink to="/pricing">{{ $t('limits.seePlans') }}</NuxtLink>
+        </AlertDescription>
+      </Alert>
+      <Alert v-if="overGames" variant="destructive">
+        <AlertTitle>{{
+          $t('limits.overLibrary', {
+            used: number(overGames.used),
+            limit: number(overGames.limit),
+          })
+        }}</AlertTitle>
+        <AlertDescription>
+          {{ $t('limits.overLibraryHelp', { limit: number(overGames.limit) }) }}
+          <NuxtLink v-if="pro.games > overGames.limit" to="/pricing">{{
+            $t('limits.proAllows', { limit: number(pro.games) })
+          }}</NuxtLink>
+        </AlertDescription>
+      </Alert>
+      <Alert v-if="overWishlist" variant="destructive">
+        <AlertTitle>{{
+          $t('limits.overWishlist', {
+            used: number(overWishlist.used),
+            limit: number(overWishlist.limit),
+          })
+        }}</AlertTitle>
+        <AlertDescription>
+          {{
+            $t('limits.overGamesHelp', { limit: number(overWishlist.limit) })
+          }}
+          <NuxtLink v-if="pro.wishlist > overWishlist.limit" to="/pricing">{{
+            $t('limits.proAllows', { limit: number(pro.wishlist) })
+          }}</NuxtLink>
         </AlertDescription>
       </Alert>
       <ul class="flex flex-col gap-1 text-sm text-muted-foreground">

@@ -20,6 +20,8 @@ export interface PlanUsage {
   collections: number
   /** Games owned or wishlisted, each counted once. */
   games: number
+  /** Games on the Wishlist. */
+  wishlist: number
   /** Extra fields kept for games. */
   fields: number
 }

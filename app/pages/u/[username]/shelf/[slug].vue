@@ -17,6 +17,7 @@ import {
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { collectionCsv, FIXED_COLUMNS } from '#shared/utils/csv'
+import { PLAN_LIMITS } from '#shared/utils/plans'
 import { toast } from 'vue-sonner'
 import type {
   CollectionEntry,
@@ -30,8 +31,19 @@ import type {
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { limits } = usePlan()
+const proGames = PLAN_LIMITS.pro.gamesPerCollection
+// Over the limit, games can be kept and removed but not added.
+const overGames = computed(
+  () => (data.value?.itemCount ?? 0) > limits.value.gamesPerCollection,
+)
+const fullGames = computed(
+  () => (data.value?.itemCount ?? 0) >= limits.value.gamesPerCollection,
+)
+const roomLeft = computed(() =>
+  Math.max(0, limits.value.gamesPerCollection - (data.value?.itemCount ?? 0)),
+)
 const collections = useCollections()
 
 const username = computed(() => String(route.params.username).toLowerCase())
@@ -477,15 +489,20 @@ async function deleteCollection() {
             :make-public="() => setVisibility('public')"
           />
           <template v-if="data.isOwner">
-            <Button v-if="data.items.length" as-child>
+            <Button v-if="data.items.length && !fullGames" as-child>
               <NuxtLink :to="{ path: '/', query: { to: data.slug } }">
                 <Plus />
                 {{ $t('collection.addGames') }}
               </NuxtLink>
             </Button>
+            <Button v-else-if="data.items.length" disabled>
+              <Plus />
+              {{ $t('collection.addGames') }}
+            </Button>
             <Button
               v-if="data.items.length"
               variant="outline"
+              :disabled="fullGames"
               @click="addingByHand = true"
             >
               <PenLine />
@@ -538,6 +555,27 @@ async function deleteCollection() {
           </template>
         </div>
       </div>
+
+      <Alert
+        v-if="data.isOwner && overGames"
+        variant="destructive"
+        data-testid="over-limit"
+      >
+        <AlertTitle>{{
+          $t('limits.overCollection', {
+            used: data.itemCount,
+            limit: limits.gamesPerCollection,
+          })
+        }}</AlertTitle>
+        <AlertDescription>
+          {{ $t('limits.overGamesHelp', { limit: limits.gamesPerCollection }) }}
+          <NuxtLink v-if="proGames > limits.gamesPerCollection" to="/pricing">{{
+            $t('limits.proAllows', {
+              limit: new Intl.NumberFormat(locale).format(proGames),
+            })
+          }}</NuxtLink>
+        </AlertDescription>
+      </Alert>
 
       <div
         v-if="!data.items.length"
@@ -681,6 +719,7 @@ async function deleteCollection() {
         v-model:open="importing"
         :collection-id="data.id"
         :fields="data.fields"
+        :room="roomLeft"
         @imported="refresh()"
       />
       <AddByHandDialog

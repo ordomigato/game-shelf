@@ -88,7 +88,7 @@ test('a refusal from the server says which limit', async ({ page }) => {
         statusCode: 403,
         data: {
           key: 'limits.reached.gamesPerCollection',
-          params: { limit: 1000 },
+          params: { limit: 100 },
         },
       },
     }),
@@ -98,9 +98,7 @@ test('a refusal from the server says which limit', async ({ page }) => {
   await page.getByRole('button', { name: 'Add to collection: Zelda' }).click()
   await page.getByRole('menuitemcheckbox', { name: 'NES Games' }).click()
   await expect(
-    page.getByText(
-      'A collection or your Wishlist can hold up to 1000 games on your plan.',
-    ),
+    page.getByText('A collection can hold up to 100 games on your plan.'),
   ).toBeVisible()
 })
 

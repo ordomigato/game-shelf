@@ -25,6 +25,8 @@ const props = defineProps<{
   collectionId: string
   /** The user's fields, which the file's columns can go to. */
   fields: FieldDefinition[]
+  /** How many more games the collection can take on the plan. */
+  room: number
 }>()
 const emit = defineEmits<{ imported: [] }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -75,6 +77,17 @@ async function readFile(event: Event) {
     const [header, ...body] = parsed.data
     if (!header?.length || !body.length) {
       fileError.value = t('import.empty')
+      return
+    }
+    // Better to say so now than after the matching step.
+    if (props.room <= 0) {
+      fileError.value = t('import.full', {
+        limit: limits.value.gamesPerCollection,
+      })
+      return
+    }
+    if (body.length > props.room) {
+      fileError.value = `${t('import.noRoom', { room: props.room, rows: body.length }, props.room)} ${t('import.noRoomHelp')}`
       return
     }
     fileName.value = file.name

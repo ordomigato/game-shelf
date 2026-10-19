@@ -77,8 +77,7 @@ export async function assertCollectionsRoom(
 }
 
 /**
- * Room for `adding` more games on the Wishlist. It holds as many as a
- * collection does. Owned has no cap of its own: it can grow to the
+ * Room for `adding` more games on the Wishlist. Owned has no cap of its own: it can grow to the
  * library's.
  */
 export async function assertListRoom(
@@ -94,8 +93,8 @@ export async function assertListRoom(
     .where(
       and(eq(libraryItems.ownerId, ownerId), eq(libraryItems.wishlisted, true)),
     )
-  if ((row?.n ?? 0) + adding > limits.gamesPerCollection) {
-    limitReached('gamesPerCollection', limits.gamesPerCollection)
+  if ((row?.n ?? 0) + adding > limits.wishlist) {
+    limitReached('wishlist', limits.wishlist)
   }
 }
 
@@ -141,7 +140,7 @@ export function assertChartCount(charts: number, limits: PlanLimits): void {
 /** The user's counts, for Settings. */
 export async function usage(ownerId: string) {
   const db = useDb()
-  const [[owned], [games], [account]] = await Promise.all([
+  const [[owned], [games], [wishlist], [account]] = await Promise.all([
     db
       .select({ n: count() })
       .from(collections)
@@ -151,6 +150,15 @@ export async function usage(ownerId: string) {
       .from(libraryItems)
       .where(eq(libraryItems.ownerId, ownerId)),
     db
+      .select({ n: count() })
+      .from(libraryItems)
+      .where(
+        and(
+          eq(libraryItems.ownerId, ownerId),
+          eq(libraryItems.wishlisted, true),
+        ),
+      ),
+    db
       .select({ fields: users.fields })
       .from(users)
       .where(eq(users.id, ownerId)),
@@ -158,6 +166,7 @@ export async function usage(ownerId: string) {
   return {
     collections: owned?.n ?? 0,
     games: games?.n ?? 0,
+    wishlist: wishlist?.n ?? 0,
     fields: account?.fields.length ?? 0,
   }
 }

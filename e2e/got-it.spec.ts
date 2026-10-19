@@ -458,3 +458,35 @@ test.describe('Wishlist games in a collection', () => {
     )
   })
 })
+
+const fullSnes = { ...snes, itemCount: 100 }
+const fullRpg = { ...rpg, itemCount: 100 }
+
+test('the popup shows a full collection as Full and leaves it unticked', async ({
+  page,
+}) => {
+  await openSnes(
+    page,
+    [fullSnes, fullRpg],
+    [...items.map((item) => ({ ...item, inCollections: [] }))],
+  )
+  await gotIt(page, 'Chrono Trigger')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('checkbox', { name: 'RPGs' })).toBeDisabled()
+  await expect(dialog.getByText('Full')).toHaveCount(2)
+})
+
+test("a row's Add to list shows a full collection as Full, but a game in it can leave", async ({
+  page,
+}) => {
+  await openSnes(page, [fullSnes, fullRpg])
+  await page.getByRole('button', { name: 'Actions for EarthBound' }).click()
+  await page.getByRole('menuitem', { name: 'Add to' }).click()
+  const rpgItem = page.getByRole('menuitemcheckbox', { name: /RPGs/ })
+  await expect(rpgItem).toBeDisabled()
+  await expect(rpgItem).toContainText('Full')
+  // EarthBound is in SNES Games, which is full: it can still be unticked.
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: /SNES Games/ }),
+  ).toBeEnabled()
+})

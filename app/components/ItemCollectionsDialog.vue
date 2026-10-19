@@ -19,6 +19,14 @@ const emit = defineEmits<{
 }>()
 const open = defineModel<boolean>('open', { default: false })
 
+const { limits } = usePlan()
+const isFull = (collection: CollectionSummary) =>
+  collectionFullFor(
+    collection,
+    limits.value.gamesPerCollection,
+    started.value.has(collection.id),
+  )
+
 const selected = ref(new Set<string>())
 const started = ref(new Set<string>())
 
@@ -73,12 +81,17 @@ function save() {
           <Checkbox
             :id="`item-collections-${collection.id}`"
             :model-value="selected.has(collection.id)"
-            :disabled="saving"
+            :disabled="saving || isFull(collection)"
             @update:model-value="toggle(collection.id, $event === true)"
           />
           <Label :for="`item-collections-${collection.id}`">{{
             collection.title
           }}</Label>
+          <span
+            v-if="isFull(collection)"
+            class="text-xs text-muted-foreground"
+            >{{ $t('addToCollection.full') }}</span
+          >
         </li>
       </ul>
       <DialogFooter>

@@ -27,6 +27,8 @@ const props = defineProps<{
   fields: FieldDefinition[]
   /** How many more games the collection can take on the plan. */
   room: number
+  /** IGDB ids of the games already in the collection. */
+  existingIgdbIds: number[]
 }>()
 const emit = defineEmits<{ imported: [] }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -77,17 +79,6 @@ async function readFile(event: Event) {
     const [header, ...body] = parsed.data
     if (!header?.length || !body.length) {
       fileError.value = t('import.empty')
-      return
-    }
-    // Better to say so now than after the matching step.
-    if (props.room <= 0) {
-      fileError.value = t('import.full', {
-        limit: limits.value.gamesPerCollection,
-      })
-      return
-    }
-    if (body.length > props.room) {
-      fileError.value = `${t('import.noRoom', { room: props.room, rows: body.length }, props.room)} ${t('import.noRoomHelp')}`
       return
     }
     fileName.value = file.name
@@ -275,6 +266,21 @@ const finalRows = computed(() =>
   }),
 )
 
+// Rows that would add a game this collection doesn't have. Games already in
+// it only get their values updated, so they need no room.
+const newGames = computed(() => {
+  const have = new Set(props.existingIgdbIds)
+  const seen = new Set<string>()
+  for (const row of finalRows.value) {
+    if (row.igdbId !== null && have.has(row.igdbId)) continue
+    seen.add(
+      row.igdbId !== null ? `id:${row.igdbId}` : normalizeTitle(row.name),
+    )
+  }
+  return seen.size
+})
+const noRoom = computed(() => newGames.value > props.room)
+
 const linkedCount = computed(
   () => finalRows.value.filter((row) => row.igdbId !== null).length,
 )
@@ -349,6 +355,9 @@ async function runImport() {
           <span class="font-medium">{{ $t('import.choose') }}</span>
           <span class="text-sm text-muted-foreground">{{
             $t('import.chooseHint')
+          }}</span>
+          <span class="text-sm text-muted-foreground">{{
+            $t('import.room', { count: room }, room)
           }}</span>
           <input
             type="file"
@@ -581,6 +590,10 @@ async function runImport() {
         <p class="text-sm text-muted-foreground">
           {{ $t('import.updateNote') }}
         </p>
+        <FormMessage v-if="noRoom">
+          {{ $t('import.noRoom', { count: newGames, room }, newGames) }}
+          {{ $t('import.noRoomHelp') }}
+        </FormMessage>
 
         <div v-if="plan.problems.length" class="flex flex-col gap-2">
           <p class="text-sm font-medium">
@@ -686,7 +699,7 @@ async function runImport() {
           >
             {{ $t('import.back') }}
           </Button>
-          <Button :disabled="!plan.rows.length" @click="runImport">
+          <Button :disabled="!plan.rows.length || noRoom" @click="runImport">
             {{
               $t('import.start', { count: plan.rows.length }, plan.rows.length)
             }}

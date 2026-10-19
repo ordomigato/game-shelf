@@ -111,25 +111,65 @@ test('a full collection shows as Full in the Add to menu', async ({ page }) => {
   ).toBeEnabled()
 })
 
-test('importing more rows than the room left stops at the file', async ({
-  page,
-}) => {
-  await openCollection(page, 90)
+/** Opens a collection of `count` games and its import dialog. */
+async function openImport(page: Page, count: number) {
+  await openCollection(page, count)
   await page.getByRole('button', { name: 'Collection actions' }).click()
   await page.getByRole('menuitem', { name: 'Import CSV' }).click()
-  const rows = Array.from({ length: 340 }, (_, i) => `Game ${i}`).join('\n')
-  await page.getByLabel('Choose a CSV file').setInputFiles({
-    name: 'games.csv',
-    mimeType: 'text/csv',
-    buffer: Buffer.from(`Name\n${rows}\n`),
-  })
+}
+
+const csvOf = (lines: string[]) => ({
+  name: 'games.csv',
+  mimeType: 'text/csv',
+  buffer: Buffer.from(`Name,IGDB ID\n${lines.join('\n')}\n`),
+})
+
+test('the import dialog says how much room is left', async ({ page }) => {
+  await openImport(page, 90)
+  await expect(
+    page.getByText('Room for 10 more games in this collection.'),
+  ).toBeVisible()
+})
+
+test('an import that adds more new games than the room left is blocked at the preview', async ({
+  page,
+}) => {
+  await page.route('**/api/import/match', (route) =>
+    route.fulfill({
+      json: (route.request().postDataJSON() as { names: string[] }).names.map(
+        (name) => ({
+          name,
+          confidence: 'none',
+          suggestion: null,
+          candidates: [],
+        }),
+      ),
+    }),
+  )
+  await openImport(page, 90)
+  const rows = Array.from({ length: 340 }, (_, i) => `New ${i},`)
+  await page.getByLabel('Choose a CSV file').setInputFiles(csvOf(rows))
+  await page.getByRole('button', { name: 'Review', exact: true }).click()
+  await page.getByRole('button', { name: 'Skip matching' }).click()
   await expect(
     page.getByText(
-      'This collection has room for 10 more games. Your file has 340.',
+      'This import adds 340 new games. This collection has room for 10.',
     ),
   ).toBeVisible()
-  await expect(page.getByLabel('Choose a CSV file')).toBeAttached()
-  await expect(page.getByText('Choose where each column goes')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Import/ })).toBeDisabled()
+})
+
+test('a file that only updates games already there imports into a full collection', async ({
+  page,
+}) => {
+  await openImport(page, 100)
+  // Game 0 to Game 4 are on the page, with IGDB ids 1000 to 1004.
+  await page
+    .getByLabel('Choose a CSV file')
+    .setInputFiles(csvOf(['Game 0,1000', 'Game 1,1001']))
+  await page.getByRole('button', { name: 'Review', exact: true }).click()
+  await expect(page.getByText('This import adds')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Import/ })).toBeEnabled()
 })
 
 test('the Wishlist over its cap warns and stops adding', async ({ page }) => {

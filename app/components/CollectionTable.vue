@@ -120,6 +120,13 @@ const { saving: savingItems, save: saveCollections } = useItemCollections(() =>
   emit('missing'),
 )
 const targets = computed(() => props.addTargets ?? [])
+const { limits } = usePlan()
+const isFull = (item: CollectionEntry, target: CollectionSummary) =>
+  collectionFullFor(
+    target,
+    limits.value.gamesPerCollection,
+    isIn(item, target.id),
+  )
 const isIn = (item: CollectionEntry, collectionId: string) =>
   item.inCollections?.some((collection) => collection.id === collectionId) ??
   false
@@ -731,13 +738,20 @@ const addedFormat = computed(
                         v-for="target in targets"
                         :key="target.id"
                         :model-value="isIn(item, target.id)"
-                        :disabled="savingItems.has(item.id)"
+                        :disabled="
+                          savingItems.has(item.id) || isFull(item, target)
+                        "
                         @update:model-value="
                           toggleTarget(item, target.id, $event === true)
                         "
                         @select.prevent
                       >
                         {{ target.title }}
+                        <span
+                          v-if="isFull(item, target)"
+                          class="ml-auto pl-2 text-xs text-muted-foreground"
+                          >{{ $t('addToCollection.full') }}</span
+                        >
                       </DropdownMenuCheckboxItem>
                       <DropdownMenuItem v-if="!targets.length" disabled>
                         {{ $t('table.noCollections') }}

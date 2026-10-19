@@ -178,8 +178,11 @@ function toggleCollection(collection: CollectionSummary, checked: boolean) {
 
 /** A full collection can't take this game, though it can keep it. */
 const isFull = (collection: CollectionSummary) =>
-  !selected.value.has(collection.id) &&
-  collection.itemCount >= limits.value.gamesPerCollection
+  collectionFullFor(
+    collection,
+    limits.value.gamesPerCollection,
+    selected.value.has(collection.id),
+  )
 
 const wishlistFull = computed(
   () =>

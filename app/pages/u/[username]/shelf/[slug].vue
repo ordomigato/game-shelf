@@ -41,6 +41,11 @@ const overGames = computed(
 const fullGames = computed(
   () => (data.value?.itemCount ?? 0) >= limits.value.gamesPerCollection,
 )
+const existingIgdbIds = computed(() =>
+  (data.value?.items ?? []).flatMap((item) =>
+    item.igdbId === null ? [] : [item.igdbId],
+  ),
+)
 const roomLeft = computed(() =>
   Math.max(0, limits.value.gamesPerCollection - (data.value?.itemCount ?? 0)),
 )
@@ -720,6 +725,7 @@ async function deleteCollection() {
         :collection-id="data.id"
         :fields="data.fields"
         :room="roomLeft"
+        :existing-igdb-ids="existingIgdbIds"
         @imported="refresh()"
       />
       <AddByHandDialog

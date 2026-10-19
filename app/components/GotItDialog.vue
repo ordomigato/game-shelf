@@ -25,6 +25,11 @@ const library = useCollections()
 const sidebar = useMyCollections()
 const route = useRoute()
 
+const { limits } = usePlan()
+// The game isn't in any of the choices, so a full one can't take it.
+const isFull = (collection: CollectionSummary) =>
+  collectionFullFor(collection, limits.value.gamesPerCollection, false)
+
 const selected = ref(new Set<string>())
 const saving = ref(false)
 
@@ -100,9 +105,15 @@ async function add() {
           <Checkbox
             :id="`got-it-${collection.id}`"
             :model-value="selected.has(collection.id)"
+            :disabled="isFull(collection)"
             @update:model-value="toggle(collection.id, $event === true)"
           />
           <Label :for="`got-it-${collection.id}`">{{ collection.title }}</Label>
+          <span
+            v-if="isFull(collection)"
+            class="text-xs text-muted-foreground"
+            >{{ $t('addToCollection.full') }}</span
+          >
         </li>
       </ul>
       <DialogFooter>

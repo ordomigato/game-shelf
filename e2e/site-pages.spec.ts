@@ -58,11 +58,22 @@ test('Privacy explains what is stored and links to Settings', async ({
   expect(html).toContain('Amazon Cognito')
 })
 
-test('Contact shows the address to copy or email', async ({
-  page,
-  context,
-}) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+test('Contact shows the address to copy or email', async ({ page }) => {
+  // The real clipboard is shared by every parallel worker and needs page
+  // focus, so record what the page writes instead of reading it back.
+  await page.addInitScript(() => {
+    const w = window as unknown as { copiedText: string[] }
+    w.copiedText = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          w.copiedText.push(text)
+          return Promise.resolve()
+        },
+      },
+    })
+  })
   await page.goto('/contact')
   await expect(
     page.getByRole('heading', { level: 1, name: 'Contact' }),
@@ -70,11 +81,18 @@ test('Contact shows the address to copy or email', async ({
   await expect(
     page.getByRole('link', { name: 'Send an email' }),
   ).toHaveAttribute('href', 'mailto:support@thisplayshelf.com')
-  await page.getByRole('button', { name: 'Copy' }).click()
-  await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible()
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-    'support@thisplayshelf.com',
-  )
+  // A click before the page hydrates does nothing, so click until it takes.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Copy' }).click({ timeout: 1000 })
+    await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible({
+      timeout: 1000,
+    })
+  }).toPass()
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { copiedText: string[] }).copiedText,
+    ),
+  ).toContain('support@thisplayshelf.com')
 })
 
 test('the footer credits IGDB, as their terms ask', async ({ page }) => {

@@ -345,7 +345,7 @@ test('hides a field from visitors and marks its column', async ({ page }) => {
   ).toHaveCount(0)
 
   await dialog
-    .getByRole('switch', { name: 'Hide Price paid from visitors' })
+    .getByRole('checkbox', { name: 'Hide Price paid from visitors' })
     .click()
   await dialog.getByRole('button', { name: 'Save fields' }).click()
 

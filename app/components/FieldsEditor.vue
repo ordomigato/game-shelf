@@ -283,26 +283,18 @@ const currencyNames = computed(() => {
         </div>
 
         <!-- Kept from visitors, apart from any column setting -->
-        <div class="flex items-start gap-3 pl-6">
-          <Switch
-            :id="`hidden-${draft.key}`"
-            v-model="draft.hidden"
-            :aria-label="
-              $t('fieldEditor.hideFor', {
-                name: draft.name || $t('fieldEditor.newField'),
-              })
-            "
-          />
-          <Label
-            :for="`hidden-${draft.key}`"
-            class="flex flex-col items-start gap-0.5 font-normal"
-          >
-            <span class="text-sm font-medium">{{
-              $t('fieldEditor.hide')
-            }}</span>
-            <span class="text-xs text-muted-foreground">{{
-              $t('fieldEditor.hideHint')
-            }}</span>
+        <div class="pl-6">
+          <Label class="flex items-center gap-2 font-normal">
+            <Checkbox
+              :model-value="draft.hidden === true"
+              :aria-label="
+                $t('fieldEditor.hideFor', {
+                  name: draft.name || $t('fieldEditor.newField'),
+                })
+              "
+              @update:model-value="draft.hidden = $event === true"
+            />
+            {{ $t('fieldEditor.hide') }}
           </Label>
         </div>
       </li>

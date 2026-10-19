@@ -19,9 +19,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Ellipsis,
-  EyeOff,
   GripVertical,
   ListFilter,
+  Lock,
   MoveDown,
   MoveUp,
   Pencil,
@@ -568,7 +568,7 @@ const addedFormat = computed(
                 @click="header.column.toggleSorting()"
               >
                 {{ (header.column.columnDef.header as () => string)() }}
-                <EyeOff
+                <Lock
                   v-if="fieldOf(header.id)?.hidden"
                   class="size-3.5 text-muted-foreground"
                   role="img"

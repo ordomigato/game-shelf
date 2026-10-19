@@ -58,14 +58,14 @@
     "data": "You can export everything as spreadsheet files whenever you like, and delete your account at any time. The {privacy} page explains what's stored.",
     "privacyLink": "privacy",
     "gamesTitle": "Where the game info comes from",
-    "games": "Game names, covers and details come from {igdb}. Anything you add to your shelf is your own copy, so change it however you like.",
+    "games": "Game names, covers and details come from {igdb}. Games from the catalog keep their name, cover and details, so those can't be renamed. Games you add by hand are yours to name and edit.",
     "contactTitle": "Get in touch",
     "contact": "Found a bug, have an idea, or just want to say hi? Send an email to {email}.",
     "pricingLink": "pricing"
   },
   "privacy": {
     "title": "Privacy",
-    "intro": "The short version: ThisPlayShelf keeps what it needs to run your shelf, sells nothing, and lets you take everything with you or delete it.",
+    "intro": "The short version: ThisPlayShelf keeps what it needs to run your account, sells nothing, and lets you take everything with you or delete it.",
     "accountTitle": "Your account",
     "account": "Your email address and password are handled by Amazon Cognito, Amazon's sign-in service. Your password never reaches ThisPlayShelf's servers: signing in proves you know it without sending it. If you continue with Google or Twitch, they tell Cognito your email address and whether it's verified. Nothing else from those accounts is kept, and an account with the same email is linked rather than duplicated.",
     "storedTitle": "What's stored",
@@ -122,7 +122,7 @@
     "why": "Although this is a hobby project, hosting anything isn't fully free and there are some costs involved. The database, sign-ins, domain and servers all cost a little something. The goal is to keep the free plan as generous as possible and provide as much value as we can without charging you anything. Hopefully it's all you'll ever need. But for any super user, the option is there to enhance your experience. Plus we may even add some time saving features in the future =).",
     "whyPro": "If you get real value out of the site and/or wish to support its development and continuation, the pro plan might be the best way to show your support.",
     "limitsTitle": "What happens at a limit",
-    "limits": "You'll see your usage as you go: on your shelf, in each collection and in Settings. At a limit, adding stops with a message saying which one. Nothing you've already added is ever deleted, whatever plan you're on."
+    "limits": "You'll see your usage as you go: on your collections page, in each collection and in Settings. At a limit, adding stops with a message saying which one. Nothing you've already added is ever deleted, whatever plan you're on."
   },
   "limits": {
     "collectionsUsed": "{used} of {limit} collections",
@@ -146,7 +146,7 @@
     "planFree": "Free plan",
     "planPro": "Pro plan",
     "planMax": "Max plan",
-    "planDescription": "What your shelf can hold. Owned and the Wishlist don't count as collections.",
+    "planDescription": "What your plan can hold. Owned and the Wishlist don't count as collections.",
     "perCollection": "Each collection: up to {games} games and {charts} charts.",
     "perValue": "Text fields up to {text} characters; CSV imports up to {rows} rows at a time.",
     "seePlans": "See plans and pricing",
@@ -155,7 +155,7 @@
       "fields": "You can have up to {limit} extra fields per game on your plan. Remove a field to add another.",
       "gamesPerCollection": "A collection can hold up to {limit} games on your plan.",
       "wishlist": "Your Wishlist can hold up to {limit} games on your plan.",
-      "games": "Your shelf can hold up to {limit} games on your plan.",
+      "games": "You can have up to {limit} games on your plan.",
       "textLength": "Text fields can hold up to {limit} characters on your plan.",
       "chartsPerCollection": "A collection can have up to {limit} charts on your plan.",
       "importRows": "Imports can take up to {limit} rows at a time on your plan."
@@ -163,14 +163,14 @@
   },
   "error": {
     "notFoundTitle": "Page not found",
-    "notFoundBody": "This page is not on the shelf.",
+    "notFoundBody": "We couldn't find this page.",
     "genericTitle": "Something went wrong",
     "genericBody": "Please try again in a moment.",
     "backHome": "Back to home"
   },
   "search": {
     "title": "Find any game",
-    "subtitle": "Search thousands of games, then add them to your shelf.",
+    "subtitle": "Search thousands of games, then add them to your library.",
     "label": "Search games",
     "placeholder": "Search games, like Zelda or Hades",
     "tooShort": "Type at least {count} characters.",
@@ -265,7 +265,7 @@
   "signUp": {
     "pageTitle": "Create an account",
     "title": "Create an account",
-    "description": "Save games to your shelf and build collections your way.",
+    "description": "Save games to your library and build collections your way.",
     "submit": "Create account",
     "submitting": "Creating account…",
     "haveAccount": "Already have an account?",
@@ -288,7 +288,7 @@
   "signIn": {
     "pageTitle": "Sign in",
     "title": "Sign in",
-    "description": "Welcome back to your shelf.",
+    "description": "Welcome back to your games.",
     "forgotPassword": "Forgot password?",
     "submit": "Sign in",
     "submitting": "Signing in…",
@@ -325,8 +325,8 @@
   "welcome": {
     "pageTitle": "Welcome",
     "title": "Pick a username",
-    "description": "Your username is how others find your shelf. You can change it later.",
-    "usernameHint": "3 to 20 letters, numbers or underscores. Your shelf will be at /u/{username}.",
+    "description": "Your username is how others find your profile. You can change it later.",
+    "usernameHint": "3 to 20 letters, numbers or underscores. Your profile will be at /u/{username}.",
     "usernamePlaceholder": "yourname",
     "submit": "Continue",
     "submitting": "Saving…"
@@ -345,7 +345,7 @@
       "pageTitle": "Profile",
       "title": "Profile",
       "description": "How you appear to others on ThisPlayShelf.",
-      "usernameHint": "Changing it changes your shelf's address. Old links stop working.",
+      "usernameHint": "Changing it changes your profile's address. Old links stop working.",
       "save": "Save profile",
       "saving": "Saving…",
       "saved": "Profile saved."
@@ -451,7 +451,7 @@
     "public": "Public",
     "emptyMine": "You don't have any collections yet. Create one to start tracking games.",
     "emptyVisitor": "{username} hasn't shared any collections yet.",
-    "loadFailed": "Couldn't load this shelf. Try again.",
+    "loadFailed": "Couldn't load these collections. Try again.",
     "retry": "Try again",
     "wishlist": "Wishlist",
     "owned": "Owned",
@@ -671,7 +671,7 @@
   "visibility": {
     "label": "Who can see this: {current}",
     "privateHint": "Only you can see it.",
-    "publicHint": "Anyone with the link can see it, and it's listed on your shelf.",
+    "publicHint": "Anyone with the link can see it, and it's listed on your profile.",
     "nowPublic": "Collection is now public",
     "nowPrivate": "Collection is now private",
     "failed": "Couldn't change who can see it. Try again."
@@ -681,7 +681,7 @@
     "copied": "Link copied",
     "copyFailed": "Couldn't copy the link. Here it is: {url}",
     "makePublicTitle": "Make it public to share?",
-    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your shelf. You can make it private again at any time.",
+    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your profile. You can make it private again at any time.",
     "makePublicConfirm": "Make public and share"
   },
   "preview": {
@@ -690,7 +690,7 @@
     "gameCount": "An empty collection on ThisPlayShelf | 1 game on ThisPlayShelf | {count} games on ThisPlayShelf",
     "shelfTitle": "{owner}'s collections",
     "collectionCount": "No public collections on ThisPlayShelf yet | 1 public collection on ThisPlayShelf | {count} public collections on ThisPlayShelf",
-    "site": "Search games, track your collection and share your shelf.",
+    "site": "Search games, track your collection and share your profile.",
     "imageAlt": "The ThisPlayShelf logo, an S-shaped glass shelf, with the words “Your collection, on display.”"
   },
   "explore": {
@@ -869,12 +869,12 @@
   "unown": {
     "titleOwned": "Remove {name} from Owned?",
     "titleWishlist": "Remove {name} from your Wishlist?",
-    "body": "It's on no other list, so it's deleted from your shelf along with any values you entered. It also leaves {collections}.",
+    "body": "It's on no other list, so it's deleted from your library along with any values you entered. It also leaves {collections}.",
     "confirm": "Remove"
   },
   "lists": {
     "loadFailed": "Couldn't load this list. Try again.",
-    "onlyYou": "Only you can see it",
+    "onlyYou": "Private",
     "ownedHint": "Every game you own. Collections can hold games you only want too.",
     "wishlistHint": "Games you want. They can also be in your collections, so you can see what's missing.",
     "ownedEmptyHint": "Search for a game and add it to Owned.",

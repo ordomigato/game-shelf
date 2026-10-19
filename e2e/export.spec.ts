@@ -18,12 +18,7 @@ test('exports a collection as CSV from its menu', async ({ page }) => {
         itemCount: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
         isOwner: true,
-        blueprint: {
-          id: '20000000-0000-4000-8000-000000000041',
-          name: null,
-          shared: false,
-          fields: [{ id: 'c', name: 'Condition', type: 'text' }],
-        },
+        fields: [{ id: 'c', name: 'Condition', type: 'text' }],
         items: [
           {
             id: '30000000-0000-4000-8000-000000000410',

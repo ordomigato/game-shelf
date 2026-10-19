@@ -11,6 +11,7 @@ import {
   fieldsProblem,
   type OptionRenames,
 } from '#shared/utils/field-changes'
+import { fieldFromSuggestion } from '#shared/utils/suggested-fields'
 
 export interface OptionDraft {
   key: string
@@ -30,8 +31,8 @@ export interface FieldDraft {
 }
 
 /**
- * The editable copy of a list of fields, shared by the collection's field
- * editor and the blueprint page. `nextFields` and `renames` are what gets
+ * The editable copy of the user's fields, used by the field editor on the
+ * account page and on a collection. `nextFields` and `renames` are what gets
  * saved, `problem` why it can't be yet.
  */
 export function useFieldDrafts() {
@@ -39,8 +40,8 @@ export function useFieldDrafts() {
   const drafts = ref<FieldDraft[]>([])
   const newKey = () => crypto.randomUUID()
 
-  function reset(fields: FieldDefinition[]) {
-    drafts.value = fields.map((field) => ({
+  function draftFrom(field: FieldDefinition): FieldDraft {
+    return {
       key: newKey(),
       id: field.id,
       name: field.name,
@@ -52,7 +53,18 @@ export function useFieldDrafts() {
       })),
       currency: field.currency ?? DEFAULT_CURRENCY,
       scale: field.scale ?? 5,
-    }))
+    }
+  }
+
+  function reset(fields: FieldDefinition[]) {
+    drafts.value = fields.map(draftFrom)
+  }
+
+  /** Adds a suggested field. Its choices are new, so none count as renames. */
+  function addSuggestion(suggestion: Omit<FieldDefinition, 'id'>) {
+    const draft = draftFrom(fieldFromSuggestion(suggestion))
+    draft.options = draft.options.map(({ key, value }) => ({ key, value }))
+    drafts.value = [...drafts.value, draft]
   }
 
   function addField() {
@@ -146,6 +158,7 @@ export function useFieldDrafts() {
     drafts,
     reset,
     addField,
+    addSuggestion,
     setOrder,
     removeField,
     isChoiceList,

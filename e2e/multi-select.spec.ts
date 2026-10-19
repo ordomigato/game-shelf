@@ -47,12 +47,7 @@ async function open(page: Page, fields: unknown[] = [genres, status]) {
         itemCount: items.length,
         updatedAt: '2026-01-01T00:00:00.000Z',
         isOwner: true,
-        blueprint: {
-          id: '20000000-0000-4000-8000-000000000006',
-          name: null,
-          shared: false,
-          fields,
-        },
+        fields,
         items,
       },
     }),
@@ -102,18 +97,14 @@ test('a choice list can allow more than one choice, and back', async ({
   page,
 }) => {
   const saved: { fields: { id: string; type: string }[] }[] = []
-  await page.route(`**/api/collections/${collectionId}/fields`, (route) => {
+  await page.route('**/api/me/fields', (route) => {
     const body = route.request().postDataJSON() as (typeof saved)[number]
     saved.push(body)
-    return route.fulfill({
-      json: {
-        id: '20000000-0000-4000-8000-000000000006',
-        name: null,
-        shared: false,
-        fields: body.fields,
-      },
-    })
+    return route.fulfill({ json: body.fields })
   })
+  await page.route('**/api/me/fields/preview', (route) =>
+    route.fulfill({ json: { lost: [{ name: 'Genres', count: 1 }] } }),
+  )
   await open(page)
   await page.getByRole('button', { name: 'Edit fields' }).click()
   const dialog = page.getByRole('dialog', { name: 'Fields' })

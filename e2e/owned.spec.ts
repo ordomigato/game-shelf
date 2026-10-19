@@ -177,7 +177,7 @@ test('the sidebar fixes Owned above the Wishlist, with counts', async ({
   page,
 }) => {
   await openLists(page)
-  await page.goto('/blueprints')
+  await page.goto('/account/settings')
   const sidebar = page.getByRole('complementary')
   await expect(
     sidebar.getByRole('link', { name: /^(Owned|Wishlist)/ }),

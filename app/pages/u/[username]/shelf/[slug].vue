@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
-  BookmarkPlus,
   ChartColumn,
   Columns3,
   Download,
@@ -14,17 +13,16 @@ import {
   Plus,
   Table2,
   Trash2,
-  Unlink,
   Upload,
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { collectionCsv, FIXED_COLUMNS } from '#shared/utils/csv'
 import { toast } from 'vue-sonner'
 import type {
-  Blueprint,
   CollectionEntry,
   CollectionLink,
   CollectionSummary,
+  FieldDefinition,
   FieldValue,
   ItemData,
   LibraryItem,
@@ -306,11 +304,10 @@ function onCoverDragged(event: { oldIndex?: number; newIndex?: number }) {
   coverItems.value = (data.value?.items ?? []).slice(0, coverLimit.value)
 }
 
-const savingBlueprint = ref(false)
-
-function setBlueprint(blueprint: Blueprint) {
-  if (!data.value) return
-  data.value = { ...data.value, blueprint }
+/** Takes the fields the editor saved, and reloads the games' values. */
+function onFieldsSaved(fields: FieldDefinition[]) {
+  if (data.value) data.value = { ...data.value, fields }
+  void refresh()
 }
 
 const sidebarEntry = computed(
@@ -330,7 +327,7 @@ function togglePin() {
 function exportCsv() {
   if (!data.value) return
   const [name, igdbId, added] = FIXED_COLUMNS.map((column) => t(column.key))
-  const csv = collectionCsv(data.value.blueprint.fields, data.value.items, [
+  const csv = collectionCsv(data.value.fields, data.value.items, [
     name!,
     igdbId!,
     added!,
@@ -361,25 +358,6 @@ async function setVisibility(visibility: CollectionVisibility) {
     return false
   } finally {
     changingVisibility.value = false
-  }
-}
-
-const detaching = ref(false)
-
-/**
- * Gives this collection its own copy of the blueprint's fields. The copy
- * has new field ids with the games' values copied over, so reload them.
- */
-async function detachFields() {
-  if (!data.value) return
-  detaching.value = true
-  try {
-    setBlueprint(await collections.detachBlueprint(data.value.id))
-    await refresh()
-  } catch {
-    toast.error(t('blueprints.detachFailed'))
-  } finally {
-    detaching.value = false
   }
 }
 
@@ -453,38 +431,28 @@ async function deleteCollection() {
           </p>
           <p class="text-sm text-muted-foreground">
             {{
-              data.blueprint.fields.length
+              data.fields.length
                 ? $t('collection.columns', {
-                    fields: data.blueprint.fields
-                      .map((field) => field.name)
-                      .join(', '),
+                    fields: data.fields.map((field) => field.name).join(', '),
                   })
                 : $t('collection.noColumns')
             }}
-            <button
-              v-if="data.isOwner"
-              type="button"
-              class="ml-1 font-medium text-primary underline-offset-4 hover:underline"
-              @click="editingFields = true"
-            >
-              {{ $t('collection.editFields') }}
-            </button>
-          </p>
-          <i18n-t
-            v-if="data.isOwner && data.blueprint.shared"
-            scope="global"
-            keypath="blueprints.fromBlueprint"
-            tag="p"
-            class="text-sm text-muted-foreground"
-          >
-            <template #name>
-              <NuxtLink
-                :to="`/blueprints/${data.blueprint.id}`"
-                class="font-medium text-primary underline-offset-4 hover:underline"
-                >{{ data.blueprint.name }}</NuxtLink
+            <template v-if="data.isOwner">
+              <span>{{
+                $t('limits.fieldsUsed', {
+                  used: data.fields.length,
+                  limit: limits.fields,
+                })
+              }}</span>
+              <button
+                type="button"
+                class="ml-1 font-medium text-primary underline-offset-4 hover:underline"
+                @click="editingFields = true"
               >
+                {{ $t('collection.editFields') }}
+              </button>
             </template>
-          </i18n-t>
+          </p>
         </div>
 
         <div class="flex items-center gap-2">
@@ -545,15 +513,6 @@ async function deleteCollection() {
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="exportCsv">
                   <Download /> {{ $t('collection.exportCsv') }}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  v-if="data.blueprint.shared"
-                  @select="detachFields"
-                >
-                  <Unlink /> {{ $t('blueprints.detach') }}
-                </DropdownMenuItem>
-                <DropdownMenuItem v-else @select="savingBlueprint = true">
-                  <BookmarkPlus /> {{ $t('blueprints.saveAsBlueprint') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   class="text-destructive focus:text-destructive"
@@ -630,7 +589,7 @@ async function deleteCollection() {
 
         <CollectionTable
           v-if="view === 'table'"
-          :fields="data.blueprint.fields"
+          :fields="data.fields"
           :items="data.items"
           :editable="data.isOwner"
           :add-targets="mine"
@@ -648,7 +607,7 @@ async function deleteCollection() {
         <ChartsDashboard
           v-else-if="view === 'charts'"
           :dashboard="data.dashboard"
-          :fields="data.blueprint.fields"
+          :fields="data.fields"
           :items="data.items"
           :editable="data.isOwner"
           @save="saveDashboard"
@@ -708,7 +667,7 @@ async function deleteCollection() {
         v-if="data.isOwner"
         v-model:open="importing"
         :collection-id="data.id"
-        :blueprint="data.blueprint"
+        :fields="data.fields"
         @imported="refresh()"
       />
       <AddByHandDialog
@@ -736,19 +695,8 @@ async function deleteCollection() {
       <FieldsEditorDialog
         v-if="data.isOwner"
         v-model:open="editingFields"
-        :collection-id="data.id"
-        :fields="data.blueprint.fields"
-        :items="data.items"
-        :blueprint="data.blueprint"
-        :detaching="detaching"
-        @saved="refresh()"
-        @detach="detachFields"
-      />
-      <SaveBlueprintDialog
-        v-if="data.isOwner"
-        v-model:open="savingBlueprint"
-        :collection-id="data.id"
-        @saved="setBlueprint"
+        :fields="data.fields"
+        @saved="onFieldsSaved"
       />
       <CollectionFormDialog
         v-if="data.isOwner"

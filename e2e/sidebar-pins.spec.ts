@@ -29,7 +29,6 @@ async function openSidebar(page: Page, { failPins = false } = {}) {
   await page.route('**/api/collections', (route) =>
     route.fulfill({ json: [snes, nes, atari] }),
   )
-  await page.route('**/api/blueprints', (route) => route.fulfill({ json: [] }))
   const requests: PinRequest[] = []
   await page.route('**/api/collections/*/pin', (route) => {
     const request = route.request()
@@ -44,7 +43,7 @@ async function openSidebar(page: Page, { failPins = false } = {}) {
     const first = request.postDataJSON()?.afterCollectionId === null
     return route.fulfill({ json: { position: first ? 0 : 9 } })
   })
-  await page.goto('/blueprints')
+  await page.goto('/account/settings')
   const sidebar = page.getByRole('complementary')
   return {
     requests,

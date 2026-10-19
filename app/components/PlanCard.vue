@@ -28,6 +28,11 @@ const meters = computed(() =>
           used: usage.value.games,
           limit: limits.value.games,
         },
+        {
+          labelKey: 'limits.fields',
+          used: usage.value.fields,
+          limit: limits.value.fields,
+        },
       ]
     : [],
 )
@@ -90,7 +95,6 @@ const meters = computed(() =>
           {{
             $t('limits.perCollection', {
               games: number(limits.gamesPerCollection),
-              fields: limits.fieldsPerCollection,
               charts: limits.chartsPerCollection,
             })
           }}

@@ -1,14 +1,9 @@
 import { ofetch } from 'ofetch'
 import type { ChartWidget } from '#shared/types/charts'
 import type {
-  Blueprint,
-  BlueprintDetail,
-  BlueprintImpact,
   CollectionDetail,
   CollectionSummary,
   CollectionVisibility,
-  FieldDefinition,
-  BlueprintSummary,
   FieldValue,
   LibraryItem,
   ListDetail,
@@ -18,7 +13,6 @@ import type {
 import type { ListAction } from '#shared/utils/lists'
 import type { PublicProfile } from '#shared/types/user'
 import type { GameMembership } from '~/composables/useGameMemberships'
-import type { StarterBlueprint } from '#shared/utils/starter-blueprints'
 
 /**
  * Reading and changing collections. Reads send the access token when signed
@@ -93,76 +87,17 @@ export function useCollections() {
         `/api/u/${encodeURIComponent(username)}/lists/${list}`,
       ),
 
-    /** Starts from a copy of a starter's fields, or uses a blueprint. */
-    create: (
-      input: {
-        title: string
-        description: string | null
-        color?: string | null
-      } & (
-        { starter: StarterBlueprint } | { blueprintId: string; copy?: boolean }
-      ),
-    ) =>
+    create: (input: {
+      title: string
+      description: string | null
+      color?: string | null
+    }) =>
       refreshing(
         auth.apiFetch<CollectionSummary>('/api/collections', {
           method: 'POST',
           body: input,
         }),
       ),
-
-    /** The signed-in user's blueprints. */
-    blueprints: () => auth.apiFetch<BlueprintSummary[]>('/api/blueprints'),
-
-    /** Saves a collection's fields as a named set. 409 if the name is taken. */
-    saveBlueprint: (collectionId: string, name: string) =>
-      auth.apiFetch<Blueprint>(
-        `/api/collections/${collectionId}/blueprint/share`,
-        { method: 'POST', body: { name } },
-      ),
-
-    /** Gives a collection its own copy of the set it uses. */
-    detachBlueprint: (collectionId: string) =>
-      auth.apiFetch<Blueprint>(
-        `/api/collections/${collectionId}/blueprint/detach`,
-        { method: 'POST' },
-      ),
-
-    /** One blueprint with the collections that use it. */
-    getBlueprint: (id: string) =>
-      auth.apiFetch<BlueprintDetail>(`/api/blueprints/${id}`),
-
-    /** Renames a blueprint. 409 if the name is taken. */
-    renameBlueprint: (id: string, name: string) =>
-      auth.apiFetch<Blueprint>(`/api/blueprints/${id}`, {
-        method: 'PATCH',
-        body: { name },
-      }),
-
-    /** Deletes a blueprint no collection uses. 409 while one does. */
-    deleteBlueprint: (id: string) =>
-      auth.apiFetch(`/api/blueprints/${id}`, { method: 'DELETE' }),
-
-    /** What saving these fields on a blueprint would change. */
-    previewBlueprintFields: (
-      id: string,
-      fields: FieldDefinition[],
-      optionRenames: Record<string, Record<string, string>>,
-    ) =>
-      auth.apiFetch<BlueprintImpact>(`/api/blueprints/${id}/preview`, {
-        method: 'POST',
-        body: { fields, optionRenames },
-      }),
-
-    /** Replaces a blueprint's fields, for every collection using it. */
-    updateBlueprintFields: (
-      id: string,
-      fields: FieldDefinition[],
-      optionRenames: Record<string, Record<string, string>>,
-    ) =>
-      auth.apiFetch<Blueprint>(`/api/blueprints/${id}/fields`, {
-        method: 'PUT',
-        body: { fields, optionRenames },
-      }),
 
     update: (
       id: string,
@@ -325,18 +260,7 @@ export function useCollections() {
         { method: 'PUT', body: { dashboard } },
       ),
 
-    /** Replaces a collection's fields. Stored values are carried over. */
-    updateFields: (
-      collectionId: string,
-      fields: FieldDefinition[],
-      optionRenames: Record<string, Record<string, string>>,
-    ) =>
-      auth.apiFetch<Blueprint>(`/api/collections/${collectionId}/fields`, {
-        method: 'PUT',
-        body: { fields, optionRenames },
-      }),
-
-    /** Sets an item's values for a collection's fields. `null` clears. */
+    /** Sets an item's values for the user's fields. `null` clears. */
     updateValues: (
       collectionId: string,
       itemId: string,

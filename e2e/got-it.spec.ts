@@ -54,13 +54,6 @@ const items = [
   },
 ]
 
-const blueprint = {
-  id: '20000000-0000-4000-8000-000000000007',
-  name: null,
-  shared: false,
-  fields: [],
-}
-
 /** Stubs the collection page. `lists` is the user's collections. */
 async function openCollection(
   page: Page,
@@ -97,7 +90,7 @@ async function openCollection(
           visibility: options.visibility ?? 'private',
           itemCount: rows.length,
           isOwner: owner,
-          blueprint,
+          fields: [],
           items: rows,
         },
       }),

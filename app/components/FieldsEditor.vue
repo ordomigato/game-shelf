@@ -3,13 +3,14 @@ import { GripVertical, Plus, Trash2, X } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { FieldType, RatingScale } from '#shared/types/collection'
 import { RATING_SCALES } from '#shared/utils/field-changes'
+import { availableSuggestions } from '#shared/utils/suggested-fields'
 import type { FieldDrafts } from '~/composables/useFieldDrafts'
 
 /**
  * The list of fields being edited: add, rename, reorder, remove, change
  * type, and a choice list's choices, an amount's currency or what a score
  * is out of. The state lives in `useFieldDrafts`, so the field editor
- * dialog and the blueprint page share it.
+ * dialog and the account page share it.
  */
 const props = defineProps<{ editor: FieldDrafts }>()
 const { limits } = usePlan()
@@ -24,6 +25,13 @@ function add() {
     inputs[inputs.length - 1]?.focus()
   })
 }
+
+/** Suggestions for fields the user doesn't have yet, while there's room. */
+const suggestions = computed(() =>
+  props.editor.drafts.value.length >= limits.value.fields
+    ? []
+    : availableSuggestions(props.editor.drafts.value),
+)
 
 const types: { type: FieldType; labelKey: string }[] = [
   { type: 'text', labelKey: 'fieldEditor.types.text' },
@@ -268,11 +276,30 @@ const currencyNames = computed(() => {
       </li>
     </VueDraggable>
 
+    <div v-if="suggestions.length" class="flex flex-col gap-2">
+      <p class="text-sm font-medium">{{ $t('fieldEditor.suggestedTitle') }}</p>
+      <ul class="flex flex-wrap gap-2">
+        <li v-for="suggestion in suggestions" :key="suggestion.name">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            :aria-label="
+              $t('fieldEditor.addSuggestion', { name: suggestion.name })
+            "
+            @click="editor.addSuggestion(suggestion)"
+          >
+            <Plus /> {{ suggestion.name }}
+          </Button>
+        </li>
+      </ul>
+    </div>
+
     <div class="flex flex-wrap items-center gap-3">
       <Button
         type="button"
         variant="outline"
-        :disabled="editor.drafts.value.length >= limits.fieldsPerCollection"
+        :disabled="editor.drafts.value.length >= limits.fields"
         @click="add"
       >
         <Plus /> {{ $t('fieldEditor.add') }}
@@ -280,7 +307,7 @@ const currencyNames = computed(() => {
       <span class="text-sm text-muted-foreground">{{
         $t('limits.fieldsUsed', {
           used: editor.drafts.value.length,
-          limit: limits.fieldsPerCollection,
+          limit: limits.fields,
         })
       }}</span>
     </div>

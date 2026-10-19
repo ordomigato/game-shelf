@@ -39,9 +39,6 @@ async function signOut() {
       <DropdownMenuItem v-if="shelfPath" as-child>
         <NuxtLink :to="shelfPath">{{ $t('header.myCollections') }}</NuxtLink>
       </DropdownMenuItem>
-      <DropdownMenuItem v-if="username" as-child>
-        <NuxtLink to="/blueprints">{{ $t('header.blueprints') }}</NuxtLink>
-      </DropdownMenuItem>
       <DropdownMenuItem as-child>
         <NuxtLink to="/account">{{ $t('header.account') }}</NuxtLink>
       </DropdownMenuItem>

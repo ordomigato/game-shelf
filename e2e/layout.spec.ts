@@ -27,7 +27,6 @@ async function signedInWith(page: Page, collections: unknown[]) {
   await page.route('**/api/collections', (route) =>
     route.fulfill({ json: collections }),
   )
-  await page.route('**/api/blueprints', (route) => route.fulfill({ json: [] }))
 }
 
 test.describe('visitors', () => {
@@ -75,7 +74,7 @@ test.describe('signed in', () => {
       summary('Atari', '2026-03-01T00:00:00.000Z'),
       summary('NES Games', '2026-05-01T00:00:00.000Z'),
     ])
-    await page.goto('/blueprints')
+    await page.goto('/account/settings')
     const sidebar = page.getByRole('complementary')
     await expect(
       sidebar.getByRole('list', { name: 'Pinned' }).getByRole('listitem'),
@@ -83,14 +82,12 @@ test.describe('signed in', () => {
     await expect(
       sidebar.getByRole('list', { name: 'Collections' }).getByRole('listitem'),
     ).toHaveText([/NES Games\s*3/, /Atari\s*3/])
-    // Blueprints and Settings live in the account menu, not the sidebar.
-    await expect(sidebar.getByRole('link', { name: 'Blueprints' })).toHaveCount(
-      0,
-    )
+    // Account and Settings live in the account menu, not the sidebar.
+    await expect(sidebar.getByRole('link', { name: 'Account' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Account menu' }).click()
     await expect(
-      page.getByRole('menuitem', { name: 'Blueprints' }),
-    ).toHaveAttribute('href', '/blueprints')
+      page.getByRole('menuitem', { name: 'Account' }),
+    ).toHaveAttribute('href', '/account')
     await page.keyboard.press('Escape')
     await expect(page.getByRole('banner').getByRole('searchbox')).toBeVisible()
   })
@@ -100,7 +97,7 @@ test.describe('signed in', () => {
       summary(`Collection ${i}`, `2026-02-${String(i + 10)}T00:00:00.000Z`),
     )
     await signedInWith(page, [pinned, ...many])
-    await page.goto('/blueprints')
+    await page.goto('/account/settings')
     const list = page.getByRole('list', { name: 'Collections' })
     await expect(list.getByRole('listitem')).toHaveCount(9)
     await expect(
@@ -110,7 +107,7 @@ test.describe('signed in', () => {
 
   test('folding the collections is remembered', async ({ page }) => {
     await signedInWith(page, [pinned])
-    await page.goto('/blueprints')
+    await page.goto('/account/settings')
     const toggle = page.getByRole('button', {
       name: 'Show or hide collections',
     })
@@ -143,7 +140,7 @@ test.describe('signed in', () => {
       pinned,
       summary('NES Games', '2026-05-01T00:00:00.000Z'),
     ])
-    await page.goto('/blueprints')
+    await page.goto('/account/settings')
     await expect(page.getByRole('complementary')).toBeHidden()
 
     await page.getByRole('button', { name: 'Menu', exact: true }).click()

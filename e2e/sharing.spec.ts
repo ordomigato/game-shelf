@@ -108,7 +108,7 @@ test('the shelf shows who it belongs to', async ({ page }) => {
   await page.goto('/u/retro_fan')
   await expect(page).toHaveURL(/\/u\/retro_fan\/shelf$/)
   await expect(
-    page.getByRole('heading', { name: "Retro Fan's shelf" }),
+    page.getByRole('heading', { name: "Retro Fan's collections" }),
   ).toBeVisible()
   await expect(
     page.getByText('@retro_fan · Member since January 2026'),

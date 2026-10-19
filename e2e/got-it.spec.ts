@@ -121,11 +121,23 @@ async function openCollection(
       },
     })
   })
+  // What was sent to change a game's collections, as
+  // "<item id> +<added ids> -<removed ids>".
   const adds: string[] = []
-  await page.route(/\/api\/collections\/[^/]+\/items\/[^/]+$/, (route) => {
-    const url = route.request().url().split('/api/')[1]!
-    adds.push(`${route.request().method()} ${url}`)
-    if (full.some((id) => url.includes(id))) {
+  const inside = new Map<string, string[]>(
+    (rows as { id: string; inCollections?: { id: string }[] }[]).map((row) => [
+      row.id,
+      row.inCollections?.map(({ id }) => id) ?? [],
+    ]),
+  )
+  await page.route('**/api/library-items/*/collections', (route) => {
+    const { add, remove } = route.request().postDataJSON() as {
+      add: string[]
+      remove: string[]
+    }
+    const id = route.request().url().split('/').at(-2)!
+    adds.push(`${id} +${add.join(',')} -${remove.join(',')}`)
+    if (full.some((fullId) => add.includes(fullId))) {
       return route.fulfill({
         status: 403,
         json: {
@@ -137,7 +149,12 @@ async function openCollection(
         },
       })
     }
-    return route.fulfill({ json: { collectionIds: [] } })
+    const now = [...(inside.get(id) ?? []), ...add].filter(
+      (collectionId, i, all) =>
+        !remove.includes(collectionId) && all.indexOf(collectionId) === i,
+    )
+    inside.set(id, now)
+    return route.fulfill({ json: { collectionIds: now } })
   })
   await page.goto(`/u/retro_fan/shelf/${collection.slug}`)
   await expect(page.getByRole('table')).toBeVisible()
@@ -163,7 +180,7 @@ test('"Got it" flips a wanted game at once and offers the collections', async ({
   const { changes, adds } = await openSnes(page)
   const row = page.locator('tbody tr').first()
   await expect(row).toHaveClass(/is-wanted/)
-  await expect(row.getByText('Wanted', { exact: true })).toBeVisible()
+  await expect(row.getByText('Wishlist', { exact: true })).toBeVisible()
 
   await gotIt(page, 'Chrono Trigger')
 
@@ -171,7 +188,7 @@ test('"Got it" flips a wanted game at once and offers the collections', async ({
   await expect(page.getByText('Moved to Owned')).toBeVisible()
   await expect(row).toContainText('Chrono Trigger')
   await expect(row).not.toHaveClass(/is-wanted/)
-  await expect(row.getByText('Wanted', { exact: true })).toHaveCount(0)
+  await expect(row.getByText('Wishlist', { exact: true })).toHaveCount(0)
   expect(changes).toEqual([`${items[0]!.id} gotIt`])
 
   // It's in SNES Games already, so only RPGs is offered.
@@ -183,7 +200,7 @@ test('"Got it" flips a wanted game at once and offers the collections', async ({
   await dialog.getByRole('checkbox', { name: 'RPGs' }).click()
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(dialog).toBeHidden()
-  expect(adds).toEqual([`PUT collections/${rpg.id}/items/${items[0]!.id}`])
+  expect(adds).toEqual([`${items[0]!.id} +${rpg.id} -`])
   await expect(page.getByText('Added to RPGs')).toBeVisible()
 })
 
@@ -221,7 +238,7 @@ test('the popup leaves out collections the game is already in', async ({
   await expect(dialog.getByRole('checkbox', { name: 'RPGs' })).toHaveCount(0)
 })
 
-test('a collection that is full is named, and the rest still go in', async ({
+test('a collection that is full is named, and nothing is added until it is unticked', async ({
   page,
 }) => {
   const { adds } = await openSnes(
@@ -241,12 +258,17 @@ test('a collection that is full is named, and the rest still go in', async ({
       'A collection or your Wishlist can hold up to 1000 games on your plan.',
     ),
   ).toBeVisible()
-  await expect(page.getByText('Added to SNES Games')).toBeVisible()
-  // The one that went in is gone from the list, and only RPGs is left.
+  // The whole set is refused, so both stay ticked and the dialog stays open.
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('checkbox')).toHaveCount(1)
   await expect(dialog.getByRole('checkbox', { name: 'RPGs' })).toBeChecked()
-  expect(adds).toHaveLength(2)
+  await dialog.getByRole('checkbox', { name: 'RPGs' }).click()
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(page.getByText('Added to SNES Games')).toBeVisible()
+  await expect(dialog).toBeHidden()
+  expect(adds).toEqual([
+    `${items[0]!.id} +${snes.id},${rpg.id} -`,
+    `${items[0]!.id} +${snes.id} -`,
+  ])
 })
 
 test('"Got it" when the game is in every collection has no popup', async ({
@@ -308,39 +330,61 @@ test.describe('Add to', () => {
   ]
   const lists = [snes, rpg]
 
-  test('adds a game to another collection and keeps it here', async ({
+  /** Opens a row's menu and its "Add to" submenu, the keyboard way. */
+  async function openAddTo(page: Page, name: string) {
+    await page.getByRole('button', { name: `Actions for ${name}` }).click()
+    await page.getByRole('menuitem', { name: 'Add to' }).focus()
+    await page.keyboard.press('ArrowRight')
+  }
+
+  test('ticks a collection for a game and keeps the menu and the list', async ({
     page,
   }) => {
     const { adds, changes } = await openCollection(page, snes, lists, rows)
-    await page
-      .getByRole('button', { name: 'Actions for Chrono Trigger' })
-      .click()
-    // The keyboard way in: focus "Add to", open its submenu, pick.
-    await page.getByRole('menuitem', { name: 'Add to' }).focus()
-    await page.keyboard.press('ArrowRight')
-    await expect(page.getByRole('menuitem', { name: 'RPGs' })).toBeFocused()
+    await openAddTo(page, 'Chrono Trigger')
+    const boxes = page.getByRole('menuitemcheckbox')
+    await expect(boxes).toHaveText(['SNES Games', 'RPGs'])
+    await expect(boxes.nth(0)).toBeChecked()
+    await expect(boxes.nth(1)).not.toBeChecked()
+    await boxes.nth(1).focus()
     await page.keyboard.press('Enter')
 
-    await expect(page.getByText('Added to RPGs')).toBeVisible()
+    await expect(boxes.nth(1)).toBeChecked()
+    // The submenu stays open and keeps its order. The row stays too.
+    await expect(boxes).toHaveText(['SNES Games', 'RPGs'])
     await expect(
-      page.getByRole('link', { name: 'Chrono Trigger' }),
+      page.locator('tbody a', { hasText: 'Chrono Trigger' }),
     ).toBeVisible()
-    // Its lists are left alone.
+    // Its lists are left alone, and the whole set was sent.
     expect(changes).toEqual([])
-    expect(adds).toEqual([`PUT collections/${rpg.id}/items/${items[0]!.id}`])
+    expect(adds).toEqual([`${items[0]!.id} +${rpg.id} -`])
 
-    await page.getByRole('button', { name: 'View' }).click()
-    await expect(page).toHaveURL(/\/u\/retro_fan\/shelf\/rpgs$/)
+    await page.keyboard.press('Enter')
+    await expect(boxes.nth(1)).not.toBeChecked()
+    expect(adds.at(-1)).toBe(`${items[0]!.id} + -${rpg.id}`)
   })
 
-  test('leaves out collections the game is already in', async ({ page }) => {
-    await openCollection(page, snes, lists, rows)
-    await page.getByRole('button', { name: 'Actions for EarthBound' }).click()
-    await page.getByRole('menuitem', { name: 'Add to' }).focus()
-    await page.keyboard.press('ArrowRight')
+  test('unticking this collection takes the game off the page', async ({
+    page,
+  }) => {
+    const { adds } = await openCollection(page, snes, lists, rows)
+    await openAddTo(page, 'Chrono Trigger')
+    await page.getByRole('menuitemcheckbox', { name: 'SNES Games' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('tbody tr')).toHaveCount(1)
     await expect(
-      page.getByRole('menuitem', { name: 'No other collections to add to' }),
-    ).toBeVisible()
+      page.getByRole('link', { name: 'Chrono Trigger' }),
+    ).toHaveCount(0)
+    expect(adds).toEqual([`${items[0]!.id} + -${snes.id}`])
+  })
+
+  test('shows every collection, ticked where the game is', async ({ page }) => {
+    await openCollection(page, snes, lists, rows)
+    await openAddTo(page, 'EarthBound')
+    const boxes = page.getByRole('menuitemcheckbox')
+    await expect(boxes).toHaveText(['SNES Games', 'RPGs'])
+    await expect(boxes.nth(0)).toBeChecked()
+    await expect(boxes.nth(1)).toBeChecked()
   })
 })
 
@@ -362,7 +406,7 @@ test('the pinned name matches the row while its menu is open', async ({
     .not.toBe(closed)
 })
 
-test.describe('Wanted games in a collection', () => {
+test.describe('Wishlist games in a collection', () => {
   test('fade and carry a badge, with no heart button', async ({ page }) => {
     await openSnes(page)
     const rows = page.locator('table tbody tr')
@@ -372,7 +416,9 @@ test.describe('Wanted games in a collection', () => {
       'opacity',
       '0.5',
     )
-    await expect(rows.nth(0).getByText('Wanted', { exact: true })).toBeVisible()
+    await expect(
+      rows.nth(0).getByText('Wishlist', { exact: true }),
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: /Wishlist:/ })).toHaveCount(0)
   })
 
@@ -390,13 +436,13 @@ test.describe('Wanted games in a collection', () => {
     ])
     const row = page.locator('table tbody tr').first()
     await expect(row).not.toHaveClass(/is-wanted/)
-    await expect(row.getByText('Wanted', { exact: true })).toBeVisible()
+    await expect(row.getByText('Wishlist', { exact: true })).toBeVisible()
   })
 
   test('can be filtered', async ({ page }) => {
     await openSnes(page)
     await page.getByRole('button', { name: 'Filter' }).click()
-    await page.getByRole('menuitem', { name: 'Owned or wanted' }).click()
+    await page.getByRole('menuitem', { name: 'Owned or Wishlist' }).click()
     await page.getByRole('menuitemcheckbox', { name: 'Owned' }).click()
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
@@ -414,7 +460,7 @@ test.describe('Wanted games in a collection', () => {
       page
         .locator('table tbody tr')
         .nth(0)
-        .getByText('Wanted', { exact: true }),
+        .getByText('Wishlist', { exact: true }),
     ).toBeVisible()
     await expect(page.getByRole('button', { name: /Actions for/ })).toHaveCount(
       0,

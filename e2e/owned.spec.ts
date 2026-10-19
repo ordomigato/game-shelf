@@ -143,12 +143,32 @@ async function openLists(page: Page, listDelay = 0) {
   return calls
 }
 
-/** Stubs adding a game to a collection. Resolves with what was asked. */
+/**
+ * Stubs changing a game's collections. Collects what was sent, as
+ * "<item id> +<added ids> -<removed ids>", and answers with the collections
+ * the game is in after the change.
+ */
 async function stubAdds(page: Page) {
   const adds: string[] = []
-  await page.route(/\/api\/collections\/[^/]+\/items\/[^/]+$/, (route) => {
-    adds.push(route.request().url().split('/api/')[1]!)
-    return route.fulfill({ json: { collectionIds: [] } })
+  const inside = new Map<string, string[]>(
+    [linkToThePast, homebrew, gtaV, chrono].map((item) => [
+      item.id,
+      item.inCollections.map(({ id }) => id),
+    ]),
+  )
+  await page.route('**/api/library-items/*/collections', (route) => {
+    const { add, remove } = route.request().postDataJSON() as {
+      add: string[]
+      remove: string[]
+    }
+    const id = route.request().url().split('/').at(-2)!
+    adds.push(`${id} +${add.join(',')} -${remove.join(',')}`)
+    const now = [...(inside.get(id) ?? []), ...add].filter(
+      (collectionId, i, all) =>
+        !remove.includes(collectionId) && all.indexOf(collectionId) === i,
+    )
+    inside.set(id, now)
+    return route.fulfill({ json: { collectionIds: now } })
   })
   return adds
 }
@@ -345,9 +365,9 @@ async function openAddTo(page: Page, name: string) {
   await page.keyboard.press('ArrowRight')
 }
 
-/** Picks a collection in the open "Add to" submenu. */
+/** Ticks or unticks a collection in the open "Add to" submenu. */
 async function pick(page: Page, collection: string) {
-  await page.getByRole('menuitem', { name: collection }).focus()
+  await page.getByRole('menuitemcheckbox', { name: collection }).focus()
   await page.keyboard.press('Enter')
 }
 
@@ -368,7 +388,7 @@ test('"Got it" on the Wishlist offers the collections, even slow ones', async ({
   ).toBeVisible()
 })
 
-test('Owned: "Add to" puts a game in a collection and leaves its lists alone', async ({
+test('Owned: "Add to" ticks and unticks collections, and leaves its lists alone', async ({
   page,
 }) => {
   const calls = await openLists(page)
@@ -376,21 +396,28 @@ test('Owned: "Add to" puts a game in a collection and leaves its lists alone', a
   await page.goto('/u/retro_fan/shelf/owned')
   const row = page.locator('tbody tr', { hasText: 'Homebrew Cart' })
   await openAddTo(page, 'Homebrew Cart')
+  const boxes = page.getByRole('menuitemcheckbox')
+  await expect(boxes).toHaveText(['Zelda Games', 'SNES'])
   await pick(page, 'Zelda Games')
-  await expect(page.getByText('Added to Zelda Games')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'View' })).toBeVisible()
-  await expect(row.getByRole('link', { name: 'Zelda Games' })).toBeVisible()
-  expect(adds).toEqual([`collections/${zelda.id}/items/${homebrew.id}`])
+  await expect(row.locator('a', { hasText: 'Zelda Games' })).toBeVisible()
+  expect(adds).toEqual([`${homebrew.id} +${zelda.id} -`])
+
+  // The menu stays open with every collection in place, ticked or not.
+  await expect(boxes).toHaveText(['Zelda Games', 'SNES'])
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: 'Zelda Games' }),
+  ).toBeChecked()
+  await pick(page, 'SNES')
+  await expect(row.locator('a', { hasText: 'SNES' })).toBeVisible()
+  expect(adds.at(-1)).toBe(`${homebrew.id} +${snes.id} -`)
+  await pick(page, 'Zelda Games')
+  await expect(row.locator('a', { hasText: 'Zelda Games' })).toHaveCount(0)
+  expect(adds.at(-1)).toBe(`${homebrew.id} + -${zelda.id}`)
+  await expect(boxes).toHaveText(['Zelda Games', 'SNES'])
+
   // Still on Owned, and no list change was sent.
   await expect(page.locator('tbody tr')).toHaveCount(3)
   expect(calls).toEqual([])
-
-  // It's in Zelda Games now, so only SNES is left to offer.
-  await openAddTo(page, 'Homebrew Cart')
-  await expect(page.getByRole('menuitem', { name: 'Zelda Games' })).toHaveCount(
-    0,
-  )
-  await expect(page.getByRole('menuitem', { name: 'SNES' })).toBeVisible()
 })
 
 test('Wishlist: "Add to" keeps the game wanted', async ({ page }) => {
@@ -400,14 +427,102 @@ test('Wishlist: "Add to" keeps the game wanted', async ({ page }) => {
   const row = page.locator('tbody tr', { hasText: 'Chrono Trigger' })
   await openAddTo(page, 'Chrono Trigger')
   // It's in Zelda Games already.
-  await expect(page.getByRole('menuitem', { name: 'Zelda Games' })).toHaveCount(
-    0,
-  )
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: 'Zelda Games' }),
+  ).toBeChecked()
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: 'SNES' }),
+  ).not.toBeChecked()
   await pick(page, 'SNES')
-  await expect(page.getByText('Added to SNES')).toBeVisible()
-  await expect(row.getByRole('link', { name: 'SNES' })).toBeVisible()
-  await expect(row.getByRole('link', { name: 'Zelda Games' })).toBeVisible()
-  expect(adds).toEqual([`collections/${snes.id}/items/${chrono.id}`])
+  await expect(row.locator('a', { hasText: 'SNES' })).toBeVisible()
+  await expect(row.locator('a', { hasText: 'Zelda Games' })).toBeVisible()
+  expect(adds).toEqual([`${chrono.id} +${snes.id} -`])
   await expect(page.locator('tbody tr')).toHaveCount(2)
   expect(calls).toEqual([])
+})
+
+test('Owned: the + beside a game’s collections opens a dialog to change them', async ({
+  page,
+}) => {
+  const calls = await openLists(page)
+  const adds = await stubAdds(page)
+  await page.goto('/u/retro_fan/shelf/owned')
+  const row = page.locator('tbody tr', { hasText: 'Homebrew Cart' })
+  await row
+    .getByRole('button', { name: 'Choose collections for Homebrew Cart' })
+    .click()
+  const dialog = page.getByRole('dialog')
+  await expect(
+    dialog.getByRole('heading', { name: 'Collections for Homebrew Cart' }),
+  ).toBeVisible()
+  await expect(dialog.getByRole('checkbox')).toHaveCount(2)
+  await dialog.getByRole('checkbox', { name: 'Zelda Games' }).click()
+  // Nothing is saved until Save.
+  expect(adds).toEqual([])
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+  expect(adds).toEqual([`${homebrew.id} +${zelda.id} -`])
+  await expect(row.locator('a', { hasText: 'Zelda Games' })).toBeVisible()
+  await expect(page.locator('tbody tr')).toHaveCount(3)
+  expect(calls).toEqual([])
+})
+
+test('Wishlist: the + dialog starts from the game’s collections and can leave one', async ({
+  page,
+}) => {
+  await openLists(page)
+  const adds = await stubAdds(page)
+  await page.goto('/u/retro_fan/shelf/wishlist')
+  const row = page.locator('tbody tr', { hasText: 'Chrono Trigger' })
+  await row
+    .getByRole('button', { name: 'Choose collections for Chrono Trigger' })
+    .click()
+  const dialog = page.getByRole('dialog')
+  await expect(
+    dialog.getByRole('checkbox', { name: 'Zelda Games' }),
+  ).toBeChecked()
+  await dialog.getByRole('checkbox', { name: 'Zelda Games' }).click()
+  await dialog.getByRole('checkbox', { name: 'SNES' }).click()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+  expect(adds).toEqual([`${chrono.id} +${snes.id} -${zelda.id}`])
+  await expect(row.locator('a', { hasText: 'SNES' })).toBeVisible()
+  await expect(row.locator('a', { hasText: 'Zelda Games' })).toHaveCount(0)
+  await expect(page.locator('tbody tr')).toHaveCount(2)
+})
+
+test('a collection deleted elsewhere reloads the page and the collections', async ({
+  page,
+}) => {
+  await openLists(page)
+  await page.route('**/api/library-items/*/collections', (route) =>
+    route.fulfill({ status: 404, json: { statusCode: 404 } }),
+  )
+  await page.goto('/u/retro_fan/shelf/owned')
+  await expect(page.locator('tbody tr')).toHaveCount(3)
+  const reloads: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (request.method() === 'GET') reloads.push(path)
+  })
+  const row = page.locator('tbody tr', { hasText: 'Homebrew Cart' })
+  await row
+    .getByRole('button', { name: 'Choose collections for Homebrew Cart' })
+    .click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox', { name: 'Zelda Games' }).click()
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(
+    page.getByText("Couldn't save the collections. Try again."),
+  ).toBeVisible()
+  await expect
+    .poll(() => reloads.filter((path) => path === '/api/collections').length)
+    .toBeGreaterThan(0)
+  await expect
+    .poll(
+      () =>
+        reloads.filter((path) => path === '/api/u/retro_fan/lists/owned')
+          .length,
+    )
+    .toBeGreaterThan(0)
 })

@@ -15,7 +15,6 @@ import {
   ArrowUpDown,
   ArrowUpToLine,
   FolderPlus,
-  Heart,
   PackageCheck,
   ChevronLeft,
   ChevronRight,
@@ -25,13 +24,16 @@ import {
   MoveDown,
   MoveUp,
   Pencil,
+  Plus,
   Search,
+  Star,
   Trash2,
   X,
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type {
   CollectionEntry,
+  CollectionLink,
   CollectionSummary,
   FieldDefinition,
   FieldValue,
@@ -53,8 +55,8 @@ const props = defineProps<{
   items: CollectionEntry[]
   editable: boolean
   /**
-   * The owner's custom collections other than this one, for "Add to". A
-   * row lists the ones its game isn't in yet. Without them, rows have no
+   * All of the owner's custom collections, for "Add to": a row lists each
+   * with a tick for the ones its game is in. Without them, rows have no
    * such menu.
    */
   addTargets?: CollectionSummary[]
@@ -67,8 +69,10 @@ const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
   remove: [itemId: string]
   rename: [itemId: string]
-  /** Add the game to another collection. It stays in this one. */
-  addTo: [itemId: string, collectionId: string]
+  /** A collection the user ticked was deleted: the page's data is stale. */
+  missing: []
+  /** The collections a game is in were saved: all of them, as links. */
+  collectionsChanged: [itemId: string, collections: CollectionLink[]]
   /** The owner has the game now: it moves from the Wishlist to Owned. */
   gotIt: [itemId: string]
   /** The owner wants the game instead: it moves from Owned to the Wishlist. */
@@ -109,12 +113,54 @@ const showToWishlist = (item: CollectionEntry) =>
   tableMode.value === 'owned' ||
   (!isList.value && item.owned && !item.wishlisted)
 
-/** The collections a game can still be added to. */
-const addTargetsFor = (item: CollectionEntry) =>
-  (props.addTargets ?? []).filter(
-    (target) =>
-      !item.inCollections?.some((collection) => collection.id === target.id),
-  )
+// Changing the collections a game is in, from the row menu or the dialog.
+// Only what was ticked or unticked is sent, so a stale row can't undo
+// changes made elsewhere.
+const { saving: savingItems, save: saveCollections } = useItemCollections(() =>
+  emit('missing'),
+)
+const targets = computed(() => props.addTargets ?? [])
+const isIn = (item: CollectionEntry, collectionId: string) =>
+  item.inCollections?.some((collection) => collection.id === collectionId) ??
+  false
+
+async function changeCollections(
+  item: CollectionEntry,
+  change: { add: string[]; remove: string[] },
+) {
+  const links = await saveCollections(item.id, change, targets.value)
+  if (!links) return false
+  emit('collectionsChanged', item.id, links)
+  return true
+}
+
+function toggleTarget(
+  item: CollectionEntry,
+  collectionId: string,
+  on: boolean,
+) {
+  return changeCollections(item, {
+    add: on ? [collectionId] : [],
+    remove: on ? [] : [collectionId],
+  })
+}
+
+const editingItem = ref<CollectionEntry | null>(null)
+const editingOpen = ref(false)
+
+function editCollections(item: CollectionEntry) {
+  editingItem.value = item
+  editingOpen.value = true
+}
+
+async function saveEditing(change: { add: string[]; remove: string[] }) {
+  if (
+    editingItem.value &&
+    (await changeCollections(editingItem.value, change))
+  ) {
+    editingOpen.value = false
+  }
+}
 const collectionTitles = (item: CollectionEntry) =>
   (item.inCollections ?? []).map((collection) => collection.title)
 
@@ -141,7 +187,7 @@ function filterChoices(field: FieldDefinition) {
 
 const stateChoices = computed(() => [
   { value: 'owned', label: t('table.owned') },
-  { value: 'wanted', label: t('table.wanted') },
+  { value: 'wanted', label: t('table.wishlist') },
 ])
 
 function toggleFilter(fieldId: string, value: string, on: boolean) {
@@ -592,32 +638,42 @@ const addedFormat = computed(
                 <Badge
                   v-if="!isList && item.wanted"
                   variant="outline"
-                  class="shrink-0 gap-1 text-muted-foreground"
+                  class="shrink-0 text-muted-foreground"
                 >
-                  <Heart class="size-3 fill-current" aria-hidden="true" />
-                  {{ $t('table.wanted') }}
+                  {{ $t('table.wishlist') }}
                 </Badge>
               </div>
-              <ul
+              <div
                 v-else-if="cell.column.id === 'inCollections'"
-                class="wanted-fade flex flex-wrap gap-1.5"
+                class="wanted-fade flex flex-wrap items-center gap-1.5"
               >
-                <li
-                  v-for="collection in item.inCollections"
-                  :key="collection.id"
+                <ul class="flex flex-wrap gap-1.5">
+                  <li
+                    v-for="collection in item.inCollections"
+                    :key="collection.id"
+                  >
+                    <Badge as-child variant="secondary">
+                      <NuxtLink :to="`${shelfPath}/${collection.slug}`">
+                        <span
+                          class="size-2 shrink-0 rounded-sm ring-1 ring-foreground/15 ring-inset"
+                          :style="{ background: collectionColour(collection) }"
+                          aria-hidden="true"
+                        />
+                        {{ collection.title }}
+                      </NuxtLink>
+                    </Badge>
+                  </li>
+                </ul>
+                <Button
+                  v-if="editable && addTargets"
+                  variant="ghost"
+                  size="icon-sm"
+                  :aria-label="$t('table.editCollections', { name: item.name })"
+                  @click="editCollections(item)"
                 >
-                  <Badge as-child variant="secondary">
-                    <NuxtLink :to="`${shelfPath}/${collection.slug}`">
-                      <span
-                        class="size-2 shrink-0 rounded-sm ring-1 ring-foreground/15 ring-inset"
-                        :style="{ background: collectionColour(collection) }"
-                        aria-hidden="true"
-                      />
-                      {{ collection.title }}
-                    </NuxtLink>
-                  </Badge>
-                </li>
-              </ul>
+                  <Plus />
+                </Button>
+              </div>
               <ul
                 v-else-if="cell.column.id === 'platforms'"
                 class="flex flex-wrap gap-1"
@@ -664,25 +720,27 @@ const addedFormat = computed(
                     v-if="showToWishlist(item)"
                     @select="emit('toWishlist', item.id)"
                   >
-                    <Heart /> {{ $t('table.moveToWishlist') }}
+                    <Star /> {{ $t('table.moveToWishlist') }}
                   </DropdownMenuItem>
                   <DropdownMenuSub v-if="addTargets">
                     <DropdownMenuSubTrigger>
                       <FolderPlus /> {{ $t('table.addTo') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent class="w-max">
-                      <DropdownMenuItem
-                        v-for="target in addTargetsFor(item)"
+                      <DropdownMenuCheckboxItem
+                        v-for="target in targets"
                         :key="target.id"
-                        @select="emit('addTo', item.id, target.id)"
+                        :model-value="isIn(item, target.id)"
+                        :disabled="savingItems.has(item.id)"
+                        @update:model-value="
+                          toggleTarget(item, target.id, $event === true)
+                        "
+                        @select.prevent
                       >
                         {{ target.title }}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        v-if="!addTargetsFor(item).length"
-                        disabled
-                      >
-                        {{ $t('table.noOtherCollections') }}
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuItem v-if="!targets.length" disabled>
+                        {{ $t('table.noCollections') }}
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
@@ -811,5 +869,13 @@ const addedFormat = computed(
         </Button>
       </div>
     </nav>
+
+    <ItemCollectionsDialog
+      v-model:open="editingOpen"
+      :item="editingItem"
+      :collections="targets"
+      :saving="editingItem ? savingItems.has(editingItem.id) : false"
+      @save="saveEditing"
+    />
   </div>
 </template>

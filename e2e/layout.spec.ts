@@ -150,7 +150,7 @@ test.describe('signed in', () => {
     const drawer = page.getByRole('dialog', { name: 'Menu' })
     await expect(
       drawer.getByRole('navigation', { name: 'Main' }).getByRole('link'),
-    ).toHaveText(['Search', 'Explore', 'My shelf', 'Owned', 'Wishlist'])
+    ).toHaveText(['Search', 'Explore', 'My collections', 'Owned', 'Wishlist'])
     await expect(
       drawer.getByRole('list', { name: 'Pinned' }).getByRole('link'),
     ).toHaveText(['Retro Pins'])

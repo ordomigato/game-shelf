@@ -64,7 +64,7 @@ test.describe('as a visitor', () => {
     await page.goto('/u/retro_fan/shelf')
 
     await expect(
-      page.getByRole('heading', { level: 1, name: "retro_fan's shelf" }),
+      page.getByRole('heading', { level: 1, name: "retro_fan's collections" }),
     ).toBeVisible()
     await expect(page.getByRole('link', { name: /Zelda Games/ })).toBeVisible()
     await expect(page.getByRole('link', { name: /Secret Stash/ })).toBeHidden()
@@ -105,10 +105,10 @@ test.describe('as the owner', () => {
     page,
   }) => {
     await page.goto('/')
-    await page.getByRole('link', { name: 'My shelf' }).click()
+    await page.getByRole('link', { name: 'My collections' }).click()
 
     await expect(
-      page.getByRole('heading', { level: 1, name: 'My shelf' }),
+      page.getByRole('heading', { level: 1, name: 'My collections' }),
     ).toBeVisible()
     await expect(
       page.getByRole('link', { name: /Secret Stash/ }),

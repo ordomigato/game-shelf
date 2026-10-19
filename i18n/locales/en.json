@@ -6,7 +6,7 @@
     "signIn": "Sign in",
     "account": "Account",
     "signOut": "Sign out",
-    "myShelf": "My shelf",
+    "myCollections": "My collections",
     "blueprints": "Blueprints",
     "explore": "Explore",
     "search": "Search",
@@ -30,7 +30,7 @@
     "pinFailed": "Couldn't pin {name}. Try again.",
     "unpinFailed": "Couldn't unpin {name}. Try again.",
     "moveFailed": "Couldn't move {name}. Try again.",
-    "drawerDescription": "Your shelf, collections and the rest of ThisPlayShelf."
+    "drawerDescription": "Your collections and the rest of ThisPlayShelf."
   },
   "theme": {
     "label": "Theme",
@@ -450,8 +450,8 @@
     }
   },
   "shelf": {
-    "myTitle": "My shelf",
-    "userTitle": "{username}'s shelf",
+    "myTitle": "My collections",
+    "userTitle": "{username}'s collections",
     "newCollection": "New collection",
     "gameCount": "No games | {count} game | {count} games",
     "private": "Private",
@@ -507,7 +507,15 @@
     "addTo": "Add {name} to {collection}",
     "removeFrom": "Remove {name} from {collection}",
     "ownedOn": "Owned on",
-    "wantedOn": "Wanted on"
+    "wantedOn": "Wishlisted on"
+  },
+  "itemCollections": {
+    "title": "Collections for {name}",
+    "description": "Tick the collections this game should be in.",
+    "none": "You don't have any collections yet.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…"
   },
   "table": {
     "name": "Name",
@@ -554,7 +562,9 @@
     },
     "gotIt": "Got it",
     "addTo": "Add to",
-    "noOtherCollections": "No other collections to add to",
+    "noCollections": "You don't have any collections yet",
+    "editCollections": "Choose collections for {name}",
+    "collectionsFailed": "Couldn't save the collections. Try again.",
     "addedTo": "Added to {collection}",
     "view": "View",
     "moveToFailed": "Couldn't move that game. Try again.",
@@ -562,8 +572,8 @@
     "removeFromWishlist": "Remove from Wishlist",
     "inCollections": "Collections",
     "owned": "Owned",
-    "wanted": "Wanted",
-    "state": "Owned or wanted",
+    "wishlist": "Wishlist",
+    "state": "Owned or Wishlist",
     "platforms": "Platforms",
     "moveToWishlist": "Move to Wishlist",
     "removeFromOwned": "Remove from Owned",
@@ -724,10 +734,10 @@
     "makePublicConfirm": "Make public and share"
   },
   "preview": {
-    "collectionTitle": "{collection} · {owner}'s shelf",
+    "collectionTitle": "{collection} · {owner}'s collections",
     "text": "{text}",
     "gameCount": "An empty collection on ThisPlayShelf | 1 game on ThisPlayShelf | {count} games on ThisPlayShelf",
-    "shelfTitle": "{owner}'s shelf",
+    "shelfTitle": "{owner}'s collections",
     "collectionCount": "No public collections on ThisPlayShelf yet | 1 public collection on ThisPlayShelf | {count} public collections on ThisPlayShelf",
     "site": "Search games, track your collection and share your shelf.",
     "imageAlt": "The ThisPlayShelf logo, an S-shaped glass shelf, with the words “Your collection, on display.”"

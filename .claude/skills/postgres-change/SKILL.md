@@ -64,7 +64,7 @@ values for other blueprints untouched.
   `getList` reads a list (owner only, 404 for anyone else) with the custom
   collections each game is in. A new game is owned unless it's added to
   the Wishlist, and adding a game to a custom collection never touches its
-  flags. Custom collections hold owned and wanted games alike.
+  flags. Custom collections hold owned and Wishlist games alike.
 - `collection_items`: the junction table (composite primary key), with
   `position` and `added_at`. Custom collections only.
 - `collections`: owner, `blueprint_id`, title, `slug` (unique per owner),

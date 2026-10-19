@@ -4,7 +4,7 @@ import {
   ChevronDown,
   Compass,
   Gamepad2,
-  Heart,
+  Star,
   Library,
   Plus,
   Search,
@@ -110,7 +110,7 @@ const sections = computed(() => [
   },
   {
     to: props.shelfPath,
-    labelKey: 'header.myShelf',
+    labelKey: 'header.myCollections',
     icon: Library,
     current: route.path === props.shelfPath,
   },
@@ -124,7 +124,7 @@ const sections = computed(() => [
   {
     to: `${props.shelfPath}/wishlist`,
     labelKey: 'shelf.wishlist',
-    icon: Heart,
+    icon: Star,
     current: route.path === `${props.shelfPath}/wishlist`,
     count: counts.value?.wishlist,
   },

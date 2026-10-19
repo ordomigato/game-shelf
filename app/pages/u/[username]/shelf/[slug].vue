@@ -6,7 +6,6 @@ import {
   Columns3,
   Download,
   Ellipsis,
-  Heart,
   LayoutGrid,
   PenLine,
   Pencil,
@@ -24,6 +23,7 @@ import { toast } from 'vue-sonner'
 import type {
   Blueprint,
   CollectionEntry,
+  CollectionLink,
   CollectionSummary,
   FieldValue,
   ItemData,
@@ -195,29 +195,20 @@ watch(
   },
   { immediate: true },
 )
-// Where "Add to" puts a game: the owner's other collections.
-const addTargets = computed(() =>
-  mine.value.filter((collection) => collection.id !== data.value?.id),
-)
-
-const addToTarget = useAddToCollection(shelfPath)
-
-/** Adds a game to another collection. It stays in this one. */
-async function addToCollection(itemId: string, collectionId: string) {
-  const target = mine.value.find((collection) => collection.id === collectionId)
-  if (!data.value || !target) return
-  const pageId = data.value.id
-  const link = await addToTarget(itemId, target)
-  // The page may have moved on to another collection while this saved.
-  if (link && data.value?.id === pageId) {
-    setItems(
-      data.value.items.map((entry) =>
-        entry.id === itemId && entry.inCollections
-          ? { ...entry, inCollections: [...entry.inCollections, link] }
-          : entry,
-      ),
-    )
-  }
+/**
+ * Shows the collections a game is in after they were saved. Leaving this
+ * collection takes the game's row off the page.
+ */
+function collectionsChanged(itemId: string, links: CollectionLink[]) {
+  if (!data.value) return
+  const stays = links.some((link) => link.id === data.value?.id)
+  setItems(
+    stays
+      ? data.value.items.map((entry) =>
+          entry.id === itemId ? { ...entry, inCollections: links } : entry,
+        )
+      : data.value.items.filter((entry) => entry.id !== itemId),
+  )
 }
 
 const gotItItem = ref<CollectionEntry | null>(null)
@@ -642,13 +633,14 @@ async function deleteCollection() {
           :fields="data.blueprint.fields"
           :items="data.items"
           :editable="data.isOwner"
-          :add-targets="addTargets"
+          :add-targets="mine"
           :shelf-path="shelfPath"
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"
           @rename="startRenaming"
-          @add-to="addToCollection"
+          @collections-changed="collectionsChanged"
+          @missing="refresh()"
           @got-it="gotIt"
           @to-wishlist="toWishlist"
         />
@@ -693,13 +685,13 @@ async function deleteCollection() {
                 {{ item.name }}
               </span>
             </component>
-            <span
+            <Badge
               v-if="item.wanted"
-              class="pointer-events-none absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-card/95 text-primary shadow-md"
+              variant="secondary"
+              class="pointer-events-none absolute top-2 right-2 shadow-md"
             >
-              <Heart class="size-4 fill-current" aria-hidden="true" />
-              <span class="sr-only">{{ $t('table.wanted') }}</span>
-            </span>
+              {{ $t('table.wishlist') }}
+            </Badge>
           </li>
         </VueDraggable>
         <div
@@ -733,6 +725,7 @@ async function deleteCollection() {
         :item-name="gotItItem?.name ?? ''"
         :collections="mine"
         :already-in="gotItItem?.inCollections?.map(({ id }) => id)"
+        @missing="refresh()"
       />
       <RenameItemDialog
         v-if="data.isOwner"

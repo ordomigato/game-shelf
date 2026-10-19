@@ -7,7 +7,7 @@ import {
   type PlanLimits,
 } from '../../shared/utils/plans'
 import type { ListName } from '../../shared/types/collection'
-import { collectionItems, collections, libraryItems } from '../db/schema'
+import { collectionItems, collections, libraryItems, users } from '../db/schema'
 import { assertOwnsCollections, collectionIdsForItem } from './collections'
 
 /** The plan a user has right now: a paid plan that ended counts as free. */
@@ -115,9 +115,20 @@ export async function assertLibraryRoom(
   }
 }
 
-export function assertFieldCount(fields: number, limits: PlanLimits): void {
-  if (fields > limits.fieldsPerCollection) {
-    limitReached('fieldsPerCollection', limits.fieldsPerCollection)
+/**
+ * Refuses a new field once the account has as many as its plan allows. An
+ * account that already has more (the plan changed, or fields were merged)
+ * keeps them all and can still edit and remove them.
+ */
+export function assertFieldRoom(
+  before: { id: string }[],
+  after: { id: string }[],
+  limits: PlanLimits,
+): void {
+  const known = new Set(before.map((field) => field.id))
+  const adding = after.some((field) => !known.has(field.id))
+  if (adding && after.length > limits.fields) {
+    limitReached('fields', limits.fields)
   }
 }
 
@@ -130,7 +141,7 @@ export function assertChartCount(charts: number, limits: PlanLimits): void {
 /** The user's counts, for Settings. */
 export async function usage(ownerId: string) {
   const db = useDb()
-  const [[owned], [games]] = await Promise.all([
+  const [[owned], [games], [account]] = await Promise.all([
     db
       .select({ n: count() })
       .from(collections)
@@ -139,8 +150,16 @@ export async function usage(ownerId: string) {
       .select({ n: count() })
       .from(libraryItems)
       .where(eq(libraryItems.ownerId, ownerId)),
+    db
+      .select({ fields: users.fields })
+      .from(users)
+      .where(eq(users.id, ownerId)),
   ])
-  return { collections: owned?.n ?? 0, games: games?.n ?? 0 }
+  return {
+    collections: owned?.n ?? 0,
+    games: games?.n ?? 0,
+    fields: account?.fields.length ?? 0,
+  }
 }
 
 /**

@@ -25,15 +25,10 @@ const zelda = {
 const zeldaDetail = (isOwner: boolean) => ({
   ...zelda,
   isOwner,
-  blueprint: {
-    id: '20000000-0000-4000-8000-000000000001',
-    name: null,
-    shared: false,
-    fields: [
-      { id: 'f1', name: 'Condition', type: 'select', options: ['Loose'] },
-      { id: 'f2', name: 'Price paid', type: 'currency' },
-    ],
-  },
+  fields: [
+    { id: 'f1', name: 'Condition', type: 'select', options: ['Loose'] },
+    { id: 'f2', name: 'Price paid', type: 'currency' },
+  ],
   items: [
     {
       id: '30000000-0000-4000-8000-000000000001',
@@ -118,9 +113,7 @@ test.describe('as the owner', () => {
     )
   })
 
-  test('creates a collection from a starter and lands on it', async ({
-    page,
-  }) => {
+  test('creates a collection and lands on it', async ({ page }) => {
     let created: unknown
     await page.route('**/api/collections', async (route) => {
       // The new collection's page also lists the owner's collections.
@@ -158,7 +151,8 @@ test.describe('as the owner', () => {
     await expect(create).toBeDisabled()
     await page.getByLabel('Name').fill('N64 Games')
     await expect(page.getByText('/u/retro_fan/shelf/n64-games')).toBeVisible()
-    await page.getByLabel('Player').check()
+    // Fields belong to the account, so there is nothing to start from.
+    await expect(page.getByLabel('Player')).toHaveCount(0)
     await page.getByRole('radio', { name: 'Teal' }).click()
     await page.getByRole('button', { name: 'Create collection' }).click()
 
@@ -168,7 +162,6 @@ test.describe('as the owner', () => {
       title: 'N64 Games',
       description: null,
       color: '#14b8a6',
-      starter: 'player',
     })
   })
 

@@ -5,19 +5,11 @@ import {
   RadioGroupIndicator as SwatchCheck,
   RadioGroupItem as Swatch,
 } from 'reka-ui'
-import type {
-  CollectionSummary,
-  BlueprintSummary,
-} from '#shared/types/collection'
-import {
-  STARTER_BLUEPRINTS,
-  type StarterBlueprint,
-} from '#shared/utils/starter-blueprints'
+import type { CollectionSummary } from '#shared/types/collection'
 
 /**
- * Creates a collection (name, description, colour, and a starter or one of
- * the user's blueprints) or edits an existing one's name, description and
- * colour.
+ * Creates a collection (name, description and colour) or edits an existing
+ * one's.
  * Emits the saved collection.
  */
 const props = defineProps<{
@@ -31,42 +23,15 @@ const { t } = useI18n()
 const auth = useAuth()
 const collections = useCollections()
 
-const starters: {
-  id: StarterBlueprint
-  labelKey: string
-  descriptionKey: string
-}[] = [
-  {
-    id: 'collector',
-    labelKey: 'collections.form.starters.collector.name',
-    descriptionKey: 'collections.form.starters.collector.description',
-  },
-  {
-    id: 'player',
-    labelKey: 'collections.form.starters.player.name',
-    descriptionKey: 'collections.form.starters.player.description',
-  },
-  {
-    id: 'blank',
-    labelKey: 'collections.form.starters.blank.name',
-    descriptionKey: 'collections.form.starters.blank.description',
-  },
-]
-
 const title = ref('')
 const description = ref('')
 /** 'auto' for a colour from the name, 'custom', or a preset's hex code. */
 const colour = ref<string>('auto')
 const customColour = ref('#808080')
-/** A starter's id, or the id of one of the user's blueprints. */
-const start = ref<string>('collector')
-const blueprints = ref<BlueprintSummary[]>([])
-/** With a blueprint picked: share its fields, or start from a copy. */
-const keepLinked = ref(true)
 const error = ref('')
 const saving = ref(false)
 
-watch(open, async (isOpen) => {
+watch(open, (isOpen) => {
   if (!isOpen) return
   title.value = props.collection?.title ?? ''
   description.value = props.collection?.description ?? ''
@@ -75,21 +40,8 @@ watch(open, async (isOpen) => {
   const isPreset = COLOUR_PRESETS.some((preset) => preset.hex === saved)
   colour.value = !saved ? 'auto' : isPreset ? saved : 'custom'
   if (saved && !isPreset) customColour.value = saved
-  start.value = 'collector'
-  keepLinked.value = true
   error.value = ''
-  if (props.collection) return
-  try {
-    blueprints.value = await collections.blueprints()
-  } catch (e) {
-    // Without the list, the starters are still there to pick from.
-    console.error(e)
-    blueprints.value = []
-  }
 })
-
-const isStarter = (id: string): id is StarterBlueprint =>
-  STARTER_BLUEPRINTS.includes(id as StarterBlueprint)
 
 const slugPreview = computed(() => slugify(title.value))
 const canSave = computed(() => !saving.value && title.value.trim() !== '')
@@ -116,9 +68,6 @@ async function save() {
           title: title.value.trim(),
           description: details.description,
           color: details.color,
-          ...(isStarter(start.value)
-            ? { starter: start.value }
-            : { blueprintId: start.value, copy: !keepLinked.value }),
         })
     open.value = false
     emit('saved', saved)
@@ -226,76 +175,6 @@ async function save() {
           <p class="text-xs text-muted-foreground">
             {{ $t('collections.form.colourHelp') }}
           </p>
-        </fieldset>
-        <fieldset v-if="!collection" class="flex flex-col gap-2">
-          <legend class="mb-2 text-sm font-medium">
-            {{ $t('collections.form.start') }}
-          </legend>
-          <RadioGroup v-model="start" class="gap-2">
-            <Label
-              v-for="option in starters"
-              :key="option.id"
-              :for="`starter-${option.id}`"
-              class="flex cursor-pointer items-start gap-3 rounded-md border p-3 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
-            >
-              <RadioGroupItem
-                :id="`starter-${option.id}`"
-                :value="option.id"
-                class="mt-0.5"
-              />
-              <span class="flex flex-col gap-0.5">
-                <span class="font-medium">{{ $t(option.labelKey) }}</span>
-                <span class="text-xs font-normal text-muted-foreground">
-                  {{ $t(option.descriptionKey) }}
-                </span>
-              </span>
-            </Label>
-            <template v-if="blueprints.length">
-              <p class="mt-2 text-sm font-medium">
-                {{ $t('collections.form.yourBlueprints') }}
-              </p>
-              <Label
-                v-for="set in blueprints"
-                :key="set.id"
-                :for="`blueprint-${set.id}`"
-                class="flex cursor-pointer items-start gap-3 rounded-md border p-3 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
-              >
-                <RadioGroupItem
-                  :id="`blueprint-${set.id}`"
-                  :value="set.id"
-                  class="mt-0.5"
-                />
-                <span class="flex flex-col gap-0.5">
-                  <span class="font-medium">{{ set.name }}</span>
-                  <span class="text-xs font-normal text-muted-foreground">
-                    {{
-                      $t(
-                        'collections.form.fieldCount',
-                        { count: set.fieldCount },
-                        set.fieldCount,
-                      )
-                    }}
-                  </span>
-                </span>
-              </Label>
-            </template>
-          </RadioGroup>
-          <div
-            v-if="!isStarter(start)"
-            class="flex flex-col gap-1 rounded-md bg-muted/50 p-3"
-          >
-            <Label class="flex items-center gap-2">
-              <Checkbox v-model="keepLinked" />
-              {{ $t('collections.form.keepLinked') }}
-            </Label>
-            <p class="text-xs text-muted-foreground">
-              {{
-                keepLinked
-                  ? $t('collections.form.keepLinkedOn')
-                  : $t('collections.form.keepLinkedOff')
-              }}
-            </p>
-          </div>
         </fieldset>
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">

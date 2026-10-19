@@ -20,9 +20,6 @@ describe('routeLabel', () => {
     expect(routeLabel('/u/retro_fan/shelf/nes-games')).toBe(
       '/u/:username/shelf/:slug',
     )
-    expect(routeLabel('/blueprints/20000000-0000-4000-8000-000000000011')).toBe(
-      '/blueprints/:id',
-    )
   })
 
   it('ignores catch-all matches, which say nothing about the page', () => {

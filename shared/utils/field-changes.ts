@@ -202,7 +202,7 @@ function isLoss(value: FieldValue, carried: FieldValue | undefined) {
 /**
  * An item's data after its fields change from `before` to `after`. Values
  * for removed fields are dropped, values for changed fields carried over
- * (or dropped when they no longer fit), values for other blueprints left
+ * (or dropped when they no longer fit), values for other keys left
  * alone. Returns null when nothing changes.
  */
 export function migrateItemData(

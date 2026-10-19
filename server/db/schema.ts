@@ -51,6 +51,12 @@ export const users = pgTable(
      * on top of the plan's. Null for most people.
      */
     customLimits: jsonb('custom_limits').$type<CustomLimits>(),
+    /**
+     * The extra fields the user keeps for their games, shared by every
+     * game and collection. Values live in `library_items.data`, keyed by
+     * field id.
+     */
+    fields: jsonb('fields').$type<FieldDefinition[]>().notNull().default([]),
     ...timestamps,
   },
   (table) => [
@@ -62,25 +68,6 @@ export const users = pgTable(
   ],
 )
 
-/**
- * A set of field definitions. A shared blueprint has a name and can be used
- * by several collections. A private one (no name) belongs to one collection.
- */
-export const blueprints = pgTable(
-  'blueprints',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name'),
-    shared: boolean('shared').notNull().default(false),
-    fields: jsonb('fields').$type<FieldDefinition[]>().notNull().default([]),
-    ...timestamps,
-  },
-  (table) => [index('blueprints_owner_id_idx').on(table.ownerId)],
-)
-
 export const collections = pgTable(
   'collections',
   {
@@ -88,9 +75,6 @@ export const collections = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    blueprintId: uuid('blueprint_id')
-      .notNull()
-      .references(() => blueprints.id, { onDelete: 'restrict' }),
     title: text('title').notNull(),
     /** URL name, from the title. Unique per owner. */
     slug: text('slug').notNull(),
@@ -143,7 +127,7 @@ export const games = pgTable('games', {
 
 /**
  * A game a user is tracking, once per game per user, however many
- * collections it's in. `data` holds its values for every blueprint field,
+ * collections it's in. `data` holds its values for the user's fields,
  * keyed by field id.
  *
  * Owned and the Wishlist are the `owned` and `wishlisted` flags, not

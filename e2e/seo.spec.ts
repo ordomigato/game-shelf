@@ -34,7 +34,7 @@ test('sign-in and account pages stay out of search results', async ({
     '/login',
     '/signup',
     '/account/settings',
-    '/blueprints',
+    '/account/fields',
   ]) {
     const response = await request.get(path)
     expect(response.headers()['x-robots-tag'], path).toBe('noindex')

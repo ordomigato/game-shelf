@@ -45,12 +45,7 @@ async function openCharts(
         itemCount: items.length,
         updatedAt: '2026-01-01T00:00:00.000Z',
         isOwner: owner,
-        blueprint: {
-          id: '20000000-0000-4000-8000-000000000031',
-          name: null,
-          shared: false,
-          fields,
-        },
+        fields,
         items,
         dashboard: current,
       },

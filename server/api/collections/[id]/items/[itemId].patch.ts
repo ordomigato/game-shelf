@@ -3,7 +3,7 @@ import type { LibraryItem } from '../../../../../shared/types/collection'
 
 const paramsSchema = z.object({ id: z.uuid(), itemId: z.uuid() })
 const bodySchema = z.object({
-  /** Field id to value, for this collection's blueprint. `null` clears. */
+  /** Field id to value, for the user's fields. `null` clears. */
   values: z.record(z.string().max(100), z.unknown()),
 })
 

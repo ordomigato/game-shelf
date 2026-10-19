@@ -11,9 +11,10 @@ description: >
 # Where this project keeps its own context
 
 ThisPlayShelf lets people build their own game collections and share them.
-Each collection has columns the user defines (a collector tracks price and
-quantity, a player tracks console and progress). Facts about a game that
-are the same for everyone (title, cover, year, genres, platforms) come
+Each user has a small set of extra fields they define for their games (a
+collector tracks price paid and condition, a player tracks status and
+rating), the same for every game and every collection. Facts about a game
+that are the same for everyone (title, cover, year, genres, platforms) come
 from a shared catalog filled from IGDB on the server, and a user's item
 links to it. Users own the values they enter. Public collections can be
 browsed by others, with posts and comments planned around them. `main` is v3, a clean rewrite with no
@@ -40,9 +41,11 @@ user first.
 - **Postgres on Neon, through Drizzle.** Neon is serverless Postgres: free
   at this scale, sleeps when idle, no VPC needed. Each SST stage has its
   own Neon branch, reached through the `DatabaseUrl` secret. Relational
-  tables for users, collections, posts and comments. A collection's fields
-  come from a blueprint (JSONB `blueprints.fields`), and each game's values
-  live in JSONB `library_items.data`. A game can be in many collections
+  tables for users, collections, posts and comments. A user's extra fields
+  live on the account (JSONB `users.fields`, the plan's limit is
+  `limits.fields`), and each game's values for them live in JSONB
+  `library_items.data`, keyed by field id. Collections have no fields of
+  their own: a collection is a user's games, grouped. A game can be in many collections
   through the `collection_items` junction table. See `postgres-change`.
 - **Collection addresses are `/u/<username>/shelf/<slug>`**, the same for
   the owner and visitors. A private collection is a 404 for anyone else.

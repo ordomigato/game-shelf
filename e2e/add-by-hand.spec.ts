@@ -43,12 +43,7 @@ test('adds a game by hand from the collection page', async ({ page }) => {
         ...nes,
         isOwner: true,
         itemCount: added ? 1 : 0,
-        blueprint: {
-          id: '20000000-0000-4000-8000-000000000009',
-          name: null,
-          shared: false,
-          fields: [],
-        },
+        fields: [],
         items: added
           ? [{ ...homebrew, addedAt: '2026-01-02T00:00:00.000Z' }]
           : [],

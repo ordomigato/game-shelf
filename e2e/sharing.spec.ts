@@ -9,12 +9,7 @@ const collection = {
   description: null,
   itemCount: 0,
   updatedAt: '2026-01-01T00:00:00.000Z',
-  blueprint: {
-    id: '20000000-0000-4000-8000-000000000021',
-    name: null,
-    shared: false,
-    fields: [],
-  },
+  fields: [],
   items: [],
 }
 const profile = {

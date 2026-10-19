@@ -94,7 +94,14 @@ async function onCreated(collection: CollectionSummary) {
             @{{ profile.username }} ·
             {{ $t('shelf.memberSince', { date: memberSince }) }}
           </p>
-          <p v-if="isMine && data" class="text-sm text-muted-foreground">
+          <p
+            v-if="isMine && data"
+            class="text-sm text-muted-foreground"
+            :class="{
+              'font-medium text-destructive':
+                ownCollections > limits.collections,
+            }"
+          >
             {{
               $t('limits.collectionsUsed', {
                 used: ownCollections,

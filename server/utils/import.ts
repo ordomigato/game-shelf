@@ -4,12 +4,7 @@ import type { FieldDefinition, ItemData } from '../../shared/types/collection'
 import type { ImportRow } from '../../shared/utils/csv-import'
 import { cleanFields, fieldsProblem } from '../../shared/utils/field-changes'
 import { normalizeFieldValue } from '../../shared/utils/field-values'
-import {
-  blueprints,
-  collectionItems,
-  collections,
-  libraryItems,
-} from '../db/schema'
+import { collectionItems, collections, libraryItems, users } from '../db/schema'
 import type { PlanLimits } from '../../shared/utils/plans'
 
 export interface ImportResult {
@@ -61,7 +56,7 @@ function validValues(fields: FieldDefinition[], values: ItemData) {
 
 /**
  * Imports one chunk of games into a collection the user owns. The first
- * chunk also brings the fields after import (new fields and choices).
+ * chunk also brings the user's fields after import (new fields and choices).
  * Games with an IGDB id the user already has are updated, not duplicated,
  * and only with the values the file has: empty cells never erase anything.
  * Every game ends up in the collection, at the end, in file order.
@@ -74,25 +69,15 @@ export async function importIntoCollection(
 ): Promise<ImportResult> {
   const collection = await getOwnedCollection(ownerId, collectionId)
   const db = useDb()
-  const [blueprint] = await db
-    .select()
-    .from(blueprints)
-    .where(eq(blueprints.id, collection.blueprintId))
-  if (!blueprint)
-    throw createError({ statusCode: 404, statusMessage: 'Not found' })
-
-  let fields = blueprint.fields
+  let fields = await getUserFields(ownerId)
   if (input.fields) {
     const next = cleanFields(input.fields)
     checkOnlyAdds(fields, next)
-    assertFieldCount(next.length, limits)
+    assertFieldRoom(fields, next, limits)
     const problem = fieldsProblem(next)
     if (problem)
       throw createError({ statusCode: 400, statusMessage: problem.key })
-    await db
-      .update(blueprints)
-      .set({ fields: next })
-      .where(eq(blueprints.id, blueprint.id))
+    await db.update(users).set({ fields: next }).where(eq(users.id, ownerId))
     fields = next
   }
 

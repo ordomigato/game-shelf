@@ -17,7 +17,7 @@ describe('parseSharePath', () => {
   })
 
   it('ignores every other page', () => {
-    for (const path of ['/', '/games/1', '/u/retro_fan', '/blueprints/x']) {
+    for (const path of ['/', '/games/1', '/u/retro_fan', '/account/fields']) {
       expect(parseSharePath(path)).toBeNull()
     }
     expect(parseSharePath('/u/%E0%A4%A/shelf')).toBeNull()

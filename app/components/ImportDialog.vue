@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { FileUp } from '@lucide/vue'
-import type { Blueprint, FieldType } from '#shared/types/collection'
+import type { FieldDefinition, FieldType } from '#shared/types/collection'
 import {
   MATCH_BATCH_SIZE,
   MAX_MATCH_NAMES,
@@ -23,7 +23,8 @@ import {
  */
 const props = defineProps<{
   collectionId: string
-  blueprint: Pick<Blueprint, 'fields' | 'shared' | 'name' | 'usedBy'>
+  /** The user's fields, which the file's columns can go to. */
+  fields: FieldDefinition[]
 }>()
 const emit = defineEmits<{ imported: [] }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -80,7 +81,7 @@ async function readFile(event: Event) {
     headers.value = header.map((cell) => cell.replace(/^\uFEFF/, '').trim())
     tooMany.value = body.length > limits.value.importRows
     rows.value = body.slice(0, limits.value.importRows)
-    targets.value = autoMap(headers.value, rows.value, props.blueprint.fields)
+    targets.value = autoMap(headers.value, rows.value, props.fields)
     step.value = 'map'
   } catch {
     fileError.value = t('import.unreadable')
@@ -153,9 +154,9 @@ const plan = computed(() =>
         headers.value,
         rows.value,
         targets.value,
-        props.blueprint.fields,
+        props.fields,
         undefined,
-        limits.value.fieldsPerCollection,
+        limits.value.fields,
       )
     : null,
 )
@@ -353,16 +354,9 @@ async function runImport() {
           {{ $t('import.mapHint', { file: fileName, count: rows.length }) }}
         </p>
         <p
-          v-if="blueprint.shared"
           class="rounded-md border border-primary/40 bg-accent px-3 py-2 text-sm"
         >
-          {{
-            $t(
-              'import.sharedBlueprint',
-              { name: blueprint.name ?? '', count: blueprint.usedBy ?? 1 },
-              blueprint.usedBy ?? 1,
-            )
-          }}
+          {{ $t('import.accountFields', { limit: limits.fields }) }}
         </p>
         <p v-if="tooMany" class="text-sm text-muted-foreground">
           {{ $t('import.tooMany', { max: limits.importRows }) }}
@@ -399,7 +393,7 @@ async function runImport() {
                   $t('import.targets.igdbId')
                 }}</SelectItem>
                 <SelectItem
-                  v-for="field in blueprint.fields"
+                  v-for="field in fields"
                   :key="field.id"
                   :value="`field:${field.id}`"
                 >

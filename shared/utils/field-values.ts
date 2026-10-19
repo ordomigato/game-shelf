@@ -1,3 +1,4 @@
+import type { ChartWidget } from '../types/charts'
 import type { FieldDefinition, FieldValue, ItemData } from '../types/collection'
 
 export const TEXT_VALUE_MAX_LENGTH = 500
@@ -70,7 +71,7 @@ export function normalizeFieldValue(
  * Applies `changes` (field id to value, `null` to clear) to an item's data,
  * allowing only the given fields. Returns the new data, or the ids of the
  * fields whose values were rejected (unknown field or wrong type). Values
- * for fields outside `fields` (from other blueprints) are left untouched.
+ * for fields outside `fields` (deleted fields) are left untouched.
  */
 export function applyFieldValues(
   data: ItemData,
@@ -92,4 +93,29 @@ export function applyFieldValues(
     Object.entries({ ...data, ...set }).filter(([id]) => !cleared.has(id)),
   )
   return invalidFieldIds.length ? { invalidFieldIds } : { data: next }
+}
+
+/**
+ * The fields to show someone viewing a collection. The owner sees all of
+ * them. A visitor sees only the fields that some game in the collection has
+ * a value for, or that one of its charts uses, so a field the owner keeps
+ * for other games isn't listed.
+ */
+export function fieldsFor(
+  viewerIsOwner: boolean,
+  fields: FieldDefinition[],
+  items: { data: ItemData }[],
+  dashboard: ChartWidget[],
+): FieldDefinition[] {
+  if (viewerIsOwner) return fields
+  const used = new Set<string>()
+  for (const item of items) {
+    for (const id of Object.keys(item.data)) used.add(id)
+  }
+  for (const widget of dashboard) {
+    if ('fieldId' in widget.measure) used.add(widget.measure.fieldId)
+    if (widget.groupBy) used.add(widget.groupBy)
+    if (widget.timeline) used.add(widget.timeline.source)
+  }
+  return fields.filter((field) => used.has(field.id))
 }

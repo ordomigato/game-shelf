@@ -32,23 +32,18 @@ const detail = (isOwner: boolean, list: object[] = items) => ({
   itemCount: list.length,
   updatedAt: '2026-01-01T00:00:00.000Z',
   isOwner,
-  blueprint: {
-    id: '20000000-0000-4000-8000-000000000003',
-    name: null,
-    shared: false,
-    fields: [
-      {
-        id: 'status',
-        name: 'Status',
-        type: 'select',
-        options: ['Backlog', 'Playing', 'Finished'],
-      },
-      { id: 'hours', name: 'Hours played', type: 'number' },
-      { id: 'rating', name: 'Rating', type: 'rating' },
-      { id: 'done', name: 'Beaten', type: 'checkbox' },
-      { id: 'notes', name: 'Notes', type: 'text' },
-    ],
-  },
+  fields: [
+    {
+      id: 'status',
+      name: 'Status',
+      type: 'select',
+      options: ['Backlog', 'Playing', 'Finished'],
+    },
+    { id: 'hours', name: 'Hours played', type: 'number' },
+    { id: 'rating', name: 'Rating', type: 'rating' },
+    { id: 'done', name: 'Beaten', type: 'checkbox' },
+    { id: 'notes', name: 'Notes', type: 'text' },
+  ],
   items: list,
 })
 

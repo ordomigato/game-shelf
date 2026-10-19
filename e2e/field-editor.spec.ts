@@ -31,7 +31,7 @@ const items = [
     addedAt: '2026-01-02T00:00:00.000Z',
   },
 ]
-const detail = (blueprintFields: unknown[]) => ({
+const detail = (userFields: unknown[]) => ({
   id: collectionId,
   title: 'SNES Games',
   slug: 'snes-games',
@@ -40,36 +40,51 @@ const detail = (blueprintFields: unknown[]) => ({
   itemCount: items.length,
   updatedAt: '2026-01-01T00:00:00.000Z',
   isOwner: true,
-  blueprint: {
-    id: '20000000-0000-4000-8000-000000000005',
-    name: null,
-    shared: false,
-    fields: blueprintFields,
-  },
+  fields: userFields,
   items,
 })
 
-/** Opens the editor. Returns the bodies sent to save the fields. */
-async function openEditor(page: Page) {
-  await signInAs(page, { username: 'retro_fan' })
-  let current: unknown[] = fields
-  await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
-    route.fulfill({ json: detail(current) }),
-  )
-  const saved: { fields: unknown[]; optionRenames: unknown }[] = []
-  await page.route(`**/api/collections/${collectionId}/fields`, (route) => {
-    const body = route.request().postDataJSON() as (typeof saved)[number]
+type Impact = { lost: { name: string; count: number }[] }
+type Saved = { fields: unknown[]; optionRenames: unknown }
+
+/**
+ * Stubs the account's fields: reading them, checking what a save would
+ * change (answering with `impact`) and saving. Returns the saved bodies.
+ */
+async function stubFields(
+  page: Page,
+  start: unknown[],
+  impact: Impact = { lost: [] },
+) {
+  let current = start
+  const saved: Saved[] = []
+  await page.route('**/api/me/fields', (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ json: current })
+    }
+    const body = route.request().postDataJSON() as Saved
     saved.push(body)
     current = body.fields
-    return route.fulfill({
-      json: { ...detail(current).blueprint, fields: current },
-    })
+    return route.fulfill({ json: current })
   })
+  await page.route('**/api/me/fields/preview', (route) =>
+    route.fulfill({ json: impact }),
+  )
+  return { saved, current: () => current }
+}
+
+/** Opens the editor on a collection. Returns the bodies sent to save. */
+async function openEditor(page: Page, impact?: Impact) {
+  await signInAs(page, { username: 'retro_fan' })
+  const stub = await stubFields(page, fields, impact)
+  await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
+    route.fulfill({ json: detail(stub.current()) }),
+  )
   await page.goto('/u/retro_fan/shelf/snes-games')
   await expect(page.getByRole('table')).toBeVisible()
   await page.getByRole('button', { name: 'Edit fields' }).click()
   await expect(page.getByRole('dialog', { name: 'Fields' })).toBeVisible()
-  return saved
+  return stub.saved
 }
 
 test('amounts show their currency', async ({ page }) => {
@@ -120,7 +135,12 @@ test('adds a field and renames a choice', async ({ page }) => {
 })
 
 test('asks before clearing values', async ({ page }) => {
-  const saved = await openEditor(page)
+  const saved = await openEditor(page, {
+    lost: [
+      { name: 'Status', count: 2 },
+      { name: 'Notes', count: 1 },
+    ],
+  })
   const dialog = page.getByRole('dialog', { name: 'Fields' })
 
   await dialog.getByRole('button', { name: 'Remove Notes' }).click()
@@ -164,14 +184,10 @@ test('removing an empty field still asks, without the warning', async ({
 }) => {
   await signInAs(page, { username: 'retro_fan' })
   const withExtra = [...fields, { id: 'shelf', name: 'Shelf', type: 'text' }]
+  const { saved } = await stubFields(page, withExtra)
   await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
     route.fulfill({ json: detail(withExtra) }),
   )
-  const saved: unknown[] = []
-  await page.route(`**/api/collections/${collectionId}/fields`, (route) => {
-    saved.push(route.request().postDataJSON())
-    return route.fulfill({ json: { ...detail(fields).blueprint } })
-  })
   await page.goto('/u/retro_fan/shelf/snes-games')
   await page.getByRole('button', { name: 'Edit fields' }).click()
   const dialog = page.getByRole('dialog', { name: 'Fields' })
@@ -204,21 +220,17 @@ test('scores out of 10 edit like numbers and keep their place', async ({
   page,
 }) => {
   await signInAs(page, { username: 'retro_fan' })
-  let current: unknown[] = [{ id: 'score', name: 'Score', type: 'rating' }]
+  const stub = await stubFields(page, [
+    { id: 'score', name: 'Score', type: 'rating' },
+  ])
+  const saved = stub.saved
   const scored = items.map((item, i) => ({
     ...item,
     data: { score: [4, 2][i] },
   }))
   await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
-    route.fulfill({ json: { ...detail(current), items: scored } }),
+    route.fulfill({ json: { ...detail(stub.current()), items: scored } }),
   )
-  const saved: { fields: unknown[] }[] = []
-  await page.route(`**/api/collections/${collectionId}/fields`, (route) => {
-    const body = route.request().postDataJSON() as (typeof saved)[number]
-    saved.push(body)
-    current = body.fields
-    return route.fulfill({ json: { ...detail(current).blueprint } })
-  })
   await page.goto('/u/retro_fan/shelf/snes-games')
   await expect(
     page.getByRole('group', { name: 'Score for Chrono Trigger' }),
@@ -274,4 +286,53 @@ test('scores out of 10 edit like numbers and keep their place', async ({
     page.getByRole('button', { name: 'Score for Chrono Trigger: 9/10' }),
   ).toBeVisible()
   expect(values).toEqual([{ values: { score: 9 } }])
+})
+
+test('suggests common fields, one click each, while there is room', async ({
+  page,
+}) => {
+  const saved = await openEditor(page)
+  const dialog = page.getByRole('dialog', { name: 'Fields' })
+
+  // Already have Status and Notes, so those aren't offered.
+  await expect(dialog.getByRole('button', { name: 'Add Status' })).toHaveCount(
+    0,
+  )
+  await dialog.getByRole('button', { name: 'Add Rating' }).click()
+  await expect(dialog.getByText('4 of 5 extra fields per game')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Add Progress' }).click()
+  // Full at 5 of 5: suggestions and Add field are off.
+  await expect(
+    dialog.getByRole('button', { name: 'Add Region' }),
+  ).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Add field' })).toBeDisabled()
+  await dialog.getByRole('button', { name: 'Save fields' }).click()
+  await expect(dialog).toBeHidden()
+  expect(saved[0]!.fields).toEqual([
+    expect.objectContaining({ id: 'status' }),
+    expect.objectContaining({ id: 'price' }),
+    expect.objectContaining({ id: 'notes' }),
+    { id: expect.any(String), name: 'Rating', type: 'rating', scale: 5 },
+    { id: expect.any(String), name: 'Progress', type: 'progress' },
+  ])
+})
+
+test('the account page edits the same fields for every game', async ({
+  page,
+}) => {
+  await signInAs(page, { username: 'retro_fan' })
+  const { saved } = await stubFields(page, fields)
+  await page.goto('/account/fields')
+  await expect(page.getByRole('heading', { name: 'Fields' })).toBeVisible()
+  await expect(
+    page.getByText('They are the same in all your collections.'),
+  ).toBeVisible()
+  await expect(page.getByText('3 of 5 extra fields per game')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Add Region' }).click()
+  await page.getByRole('button', { name: 'Save fields' }).click()
+  await expect(page.getByText('Fields saved')).toBeVisible()
+  expect(saved).toHaveLength(1)
+  expect(saved[0]!.fields).toHaveLength(4)
+  await expect(page.getByText('4 of 5 extra fields per game')).toBeVisible()
 })

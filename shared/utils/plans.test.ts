@@ -16,13 +16,18 @@ describe('limitsFor', () => {
 
   it('never goes past what the app supports', () => {
     const limits = limitsFor('max', {
-      fieldsPerCollection: 100,
+      fields: 100,
       chartsPerCollection: 100,
       importRows: 50_000,
     })
-    expect(limits.fieldsPerCollection).toBe(30)
+    expect(limits.fields).toBe(30)
     expect(limits.chartsPerCollection).toBe(24)
     expect(limits.importRows).toBe(5000)
+  })
+
+  it('ignores custom keys that are not limits', () => {
+    const custom = { fieldsPerCollection: 90 } as unknown as { games: number }
+    expect(limitsFor('free', custom)).toEqual(PLAN_LIMITS.free)
   })
 
   it('ignores custom values that are not numbers', () => {

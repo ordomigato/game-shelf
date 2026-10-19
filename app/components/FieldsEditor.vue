@@ -2,14 +2,16 @@
 import { GripVertical, Plus, Trash2, X } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { FieldType, RatingScale } from '#shared/types/collection'
+import { limitsFor } from '#shared/utils/plans'
 import { RATING_SCALES } from '#shared/utils/field-changes'
+import { availableSuggestions } from '#shared/utils/suggested-fields'
 import type { FieldDrafts } from '~/composables/useFieldDrafts'
 
 /**
  * The list of fields being edited: add, rename, reorder, remove, change
  * type, and a choice list's choices, an amount's currency or what a score
  * is out of. The state lives in `useFieldDrafts`, so the field editor
- * dialog and the blueprint page share it.
+ * dialog and the account page share it.
  */
 const props = defineProps<{ editor: FieldDrafts }>()
 const { limits } = usePlan()
@@ -24,6 +26,20 @@ function add() {
     inputs[inputs.length - 1]?.focus()
   })
 }
+
+const used = computed(() => props.editor.drafts.value.length)
+const atLimit = computed(() => used.value >= limits.value.fields)
+const overLimit = computed(() => used.value > limits.value.fields)
+/** What Pro allows, when that is more than this account has. */
+const proFields = computed(() => {
+  const pro = limitsFor('pro').fields
+  return pro > limits.value.fields ? pro : null
+})
+
+/** Suggestions for fields the user doesn't have yet. */
+const suggestions = computed(() =>
+  availableSuggestions(props.editor.drafts.value),
+)
 
 const types: { type: FieldType; labelKey: string }[] = [
   { type: 'text', labelKey: 'fieldEditor.types.text' },
@@ -268,21 +284,52 @@ const currencyNames = computed(() => {
       </li>
     </VueDraggable>
 
+    <div v-if="suggestions.length" class="flex flex-col gap-2">
+      <p class="text-sm font-medium">{{ $t('fieldEditor.suggestedTitle') }}</p>
+      <ul class="flex flex-wrap gap-2">
+        <li v-for="suggestion in suggestions" :key="suggestion.name">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            :disabled="atLimit"
+            :aria-label="
+              $t('fieldEditor.addSuggestion', { name: suggestion.name })
+            "
+            @click="editor.addSuggestion(suggestion)"
+          >
+            <Plus /> {{ suggestion.name }}
+          </Button>
+        </li>
+      </ul>
+    </div>
+
+    <Alert v-if="overLimit" variant="destructive" data-testid="over-limit">
+      <AlertTitle>{{
+        $t('limits.overFields', { used, limit: limits.fields })
+      }}</AlertTitle>
+      <AlertDescription>
+        {{ $t('limits.overFieldsHelp', { limit: limits.fields }) }}
+        <NuxtLink v-if="proFields" to="/pricing">{{
+          $t('limits.proAllows', { limit: proFields })
+        }}</NuxtLink>
+      </AlertDescription>
+    </Alert>
+
     <div class="flex flex-wrap items-center gap-3">
-      <Button
-        type="button"
-        variant="outline"
-        :disabled="editor.drafts.value.length >= limits.fieldsPerCollection"
-        @click="add"
-      >
+      <Button type="button" variant="outline" :disabled="atLimit" @click="add">
         <Plus /> {{ $t('fieldEditor.add') }}
       </Button>
-      <span class="text-sm text-muted-foreground">{{
-        $t('limits.fieldsUsed', {
-          used: editor.drafts.value.length,
-          limit: limits.fieldsPerCollection,
-        })
-      }}</span>
+      <span
+        v-if="!overLimit"
+        class="text-sm text-muted-foreground"
+        data-testid="fields-used"
+        >{{
+          atLimit
+            ? $t('limits.fieldsAtLimit', { limit: limits.fields })
+            : $t('limits.fieldsUsed', { used, limit: limits.fields })
+        }}</span
+      >
     </div>
   </div>
 </template>

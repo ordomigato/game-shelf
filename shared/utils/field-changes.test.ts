@@ -4,6 +4,8 @@ import {
   carryValue,
   cleanFields,
   fieldsProblem,
+  MAX_FIELDS,
+  MAX_SELECT_OPTIONS,
   migrateItemData,
   valuesLost,
 } from './field-changes'
@@ -202,7 +204,7 @@ describe('migrateItemData', () => {
     ).toEqual({ s: 'Playing', other: 1 })
   })
 
-  it('renames options and leaves other blueprints alone', () => {
+  it('renames options and leaves other keys alone', () => {
     const after = [
       text,
       number,
@@ -256,5 +258,52 @@ describe('valuesLost', () => {
         s: { Playing: 'On it' },
       }),
     ).toEqual(new Map([['t', 2]]))
+  })
+})
+
+describe('fixing fields that were merged into too many', () => {
+  const plain = (i: number): FieldDefinition => ({
+    id: `f${i}`,
+    name: `Field ${i}`,
+    type: 'text',
+  })
+
+  it('explains too many fields, and allows a save once enough are removed', () => {
+    const fields = Array.from({ length: MAX_FIELDS + 3 }, (_, i) => plain(i))
+    expect(fieldsProblem(fields)).toEqual({
+      key: 'fieldEditor.errors.tooMany',
+      params: { max: MAX_FIELDS },
+    })
+    expect(fieldsProblem(fields.slice(0, MAX_FIELDS + 1))).not.toBeNull()
+    expect(fieldsProblem(fields.slice(0, MAX_FIELDS))).toBeNull()
+  })
+
+  it('explains too many choices, and allows removing some', () => {
+    const options = Array.from(
+      { length: MAX_SELECT_OPTIONS + 2 },
+      (_, i) => `O${i}`,
+    )
+    const field: FieldDefinition = {
+      id: 's',
+      name: 'Tags',
+      type: 'select',
+      options,
+    }
+    expect(fieldsProblem([field])?.key).toBe(
+      'fieldEditor.errors.tooManyOptions',
+    )
+    const fewer = options.slice(0, MAX_SELECT_OPTIONS)
+    expect(fieldsProblem([{ ...field, options: fewer }])).toBeNull()
+  })
+
+  it('explains two fields with the same name, and allows renaming one', () => {
+    const fields: FieldDefinition[] = [
+      { id: 'a', name: 'Rating (2)', type: 'text' },
+      { id: 'b', name: 'rating (2)', type: 'progress' },
+    ]
+    expect(fieldsProblem(fields)?.key).toBe('fieldEditor.errors.duplicateName')
+    expect(
+      fieldsProblem([fields[0]!, { ...fields[1]!, name: 'Progress' }]),
+    ).toBeNull()
   })
 })

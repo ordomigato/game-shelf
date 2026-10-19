@@ -62,8 +62,6 @@ export default defineNuxtConfig({
     '/account': { ssr: false, headers: noindex },
     '/account/**': { ssr: false, headers: noindex },
     '/welcome': { ssr: false, headers: noindex },
-    '/blueprints': { ssr: false, headers: noindex },
-    '/blueprints/**': { ssr: false, headers: noindex },
     '/owned': { ssr: false, headers: noindex },
     '/login': { ssr: false, headers: noindex },
     '/auth/**': { ssr: false, headers: noindex },

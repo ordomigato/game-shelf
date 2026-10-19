@@ -9,6 +9,7 @@ const currentPath = computed(() => router.currentRoute.value.path)
 const tabs = [
   { to: '/account', labelKey: 'account.tabs.profile' },
   { to: '/account/security', labelKey: 'account.tabs.security' },
+  { to: '/account/fields', labelKey: 'account.tabs.fields' },
   { to: '/account/usage', labelKey: 'account.tabs.usage' },
   { to: '/account/settings', labelKey: 'account.tabs.settings' },
 ]

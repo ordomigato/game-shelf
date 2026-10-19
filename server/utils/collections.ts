@@ -19,7 +19,7 @@ import {
   valuesLost,
   type OptionRenames,
 } from '../../shared/utils/field-changes'
-import { applyFieldValues } from '../../shared/utils/field-values'
+import { applyFieldValues, fieldsFor } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
 import type { ListState } from '../../shared/utils/lists'
 import {
@@ -246,7 +246,12 @@ export async function getCollectionBySlug(
   }))
   return {
     ...toSummary(found.collection, items.length),
-    fields: found.fields,
+    fields: fieldsFor(
+      viewerIsOwner,
+      found.fields,
+      items,
+      found.collection.dashboard,
+    ),
     items,
     dashboard: found.collection.dashboard,
     isOwner: viewerIsOwner,

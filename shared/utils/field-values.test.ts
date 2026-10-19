@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { FieldDefinition } from '../types/collection'
-import { applyFieldValues, normalizeFieldValue } from './field-values'
+import type { FieldDefinition, ItemData } from '../types/collection'
+import type { ChartWidget } from '../types/charts'
+import {
+  applyFieldValues,
+  fieldsFor,
+  normalizeFieldValue,
+} from './field-values'
 
 const field = (type: FieldDefinition['type'], options?: string[]) =>
   ({ id: 'f', name: 'F', type, options }) as FieldDefinition
@@ -102,5 +107,60 @@ describe('applyFieldValues', () => {
     expect(
       applyFieldValues({}, fields, { price: 'free', sneaky: 1, rating: 5 }),
     ).toEqual({ invalidFieldIds: ['price', 'sneaky'] })
+  })
+})
+
+describe('fieldsFor', () => {
+  const all: FieldDefinition[] = [
+    { id: 'a', name: 'Notes', type: 'text' },
+    { id: 'b', name: 'Price', type: 'number' },
+    { id: 'c', name: 'Region', type: 'text' },
+    { id: 'd', name: 'Hours', type: 'number' },
+    { id: 'e', name: 'Added', type: 'date' },
+  ]
+  const items: { data: ItemData }[] = [
+    { data: { a: 'hi' } },
+    { data: { b: 5 } },
+  ]
+  const widget = (extra: Partial<ChartWidget>): ChartWidget => ({
+    id: 'w',
+    kind: 'number',
+    title: '',
+    size: 'small',
+    measure: { op: 'count' },
+    ...extra,
+  })
+
+  it('gives the owner every field', () => {
+    expect(fieldsFor(true, all, items, [])).toEqual(all)
+  })
+
+  it('gives a visitor only fields with a value in the collection', () => {
+    expect(fieldsFor(false, all, items, []).map((f) => f.id)).toEqual([
+      'a',
+      'b',
+    ])
+  })
+
+  it('also keeps fields a chart uses, in the owner’s order', () => {
+    const dashboard = [
+      widget({ measure: { op: 'sum', fieldId: 'd' } }),
+      widget({ kind: 'bar', groupBy: 'c' }),
+      widget({
+        kind: 'line',
+        timeline: { source: 'e', bucket: 'month', cumulative: false },
+      }),
+    ]
+    expect(fieldsFor(false, all, items, dashboard).map((f) => f.id)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ])
+  })
+
+  it('shows a visitor nothing when no game has a value', () => {
+    expect(fieldsFor(false, all, [{ data: {} }], [])).toEqual([])
   })
 })

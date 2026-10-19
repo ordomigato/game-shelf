@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { FieldDefinition, FieldsImpact } from '#shared/types/collection'
+import { fieldsProblem } from '#shared/utils/field-changes'
 
 /**
  * Edits the user's fields and saves them all at once. Saving first asks the
@@ -34,7 +35,8 @@ watch(
     editor.reset(fields)
     impact.value = null
     acknowledged.value = false
-    attempted.value = false
+    // Fields that were merged into too many, or into a clash, say so at once.
+    attempted.value = fieldsProblem(fields) !== null
     error.value = ''
   },
   { immediate: true },

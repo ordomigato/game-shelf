@@ -5,8 +5,11 @@
 -- Per user, the fields of all their blueprints are merged into one set.
 -- Fields with the same name (ignoring case and surrounding spaces) and the
 -- same kind become one field: the earliest keeps its id, select options are
--- joined, and games' values stored under the other ids move to the kept id
--- (the kept id's own value wins unless it is empty). Dashboards' charts are
+-- joined (ignoring case, in the kept field's spelling when it has the option),
+-- and games' values stored under the other ids move to the kept id. A
+-- non-empty value beats an empty one, then the kept id's own wins, and a
+-- checkbox that is unticked counts as empty for this, so a tick is never lost.
+-- A multiple-choice value is the union of all of them. Dashboards' charts are
 -- pointed at the kept ids. A rating on a different scale, or a currency in a
 -- different currency, counts as a different kind, since its values mean
 -- something else. Fields that share a name but not a kind all stay, with
@@ -14,6 +17,7 @@
 -- every field. The _af_* tables are scratch space, dropped at the end.
 ALTER TABLE "users" ADD COLUMN "fields" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
 -- Every field of every blueprint, in order, once per field id.
+DROP TABLE IF EXISTS "_af_fields";--> statement-breakpoint
 CREATE TABLE "_af_fields" AS
 SELECT DISTINCT ON (owner_id, old_id) *
 FROM (
@@ -39,6 +43,7 @@ FROM (
 ORDER BY owner_id, old_id, seq;--> statement-breakpoint
 -- The merged fields: one per name, kind and variant. name_rank is 1 for the
 -- first field with a name, 2 for the next one of another kind, and so on.
+DROP TABLE IF EXISTS "_af_groups";--> statement-breakpoint
 CREATE TABLE "_af_groups" AS
 SELECT
   grouped.*,
@@ -54,6 +59,7 @@ FROM (
   GROUP BY owner_id, norm, type, variant
 ) AS grouped;--> statement-breakpoint
 -- Old field id to the id that replaces it, for fields that were merged away.
+DROP TABLE IF EXISTS "_af_map";--> statement-breakpoint
 CREATE TABLE "_af_map" AS
 SELECT field.owner_id, field.old_id, grp.keep_id, field.seq
 FROM "_af_fields" AS field
@@ -63,6 +69,29 @@ JOIN "_af_groups" AS grp
   AND grp.type = field.type
   AND grp.variant = field.variant
 WHERE field.old_id <> grp.keep_id;--> statement-breakpoint
+-- The choices of each merged choice list, one per spelling ignoring case,
+-- in order of first appearance, and the spelling to use for each.
+DROP TABLE IF EXISTS "_af_options";--> statement-breakpoint
+CREATE TABLE "_af_options" AS
+SELECT
+  grp.owner_id,
+  grp.keep_id,
+  lower(option.value #>> '{}') AS key,
+  (array_agg(
+    option.value #>> '{}'
+    ORDER BY (member.old_id = grp.keep_id) DESC, member.seq * 1000 + option.ord
+  ))[1] AS spelling,
+  min(member.seq * 1000 + option.ord) AS pos
+FROM "_af_groups" AS grp
+JOIN "_af_fields" AS member
+  ON member.owner_id = grp.owner_id
+  AND member.norm = grp.norm
+  AND member.type = grp.type
+  AND member.variant = grp.variant
+CROSS JOIN LATERAL jsonb_array_elements(coalesce(member.def -> 'options', '[]'::jsonb))
+  WITH ORDINALITY AS option(value, ord)
+WHERE grp.type IN ('select', 'multiselect')
+GROUP BY grp.owner_id, grp.keep_id, lower(option.value #>> '{}');--> statement-breakpoint
 -- Each user's merged set.
 UPDATE "users" AS u
 SET "fields" = built.fields
@@ -81,18 +110,9 @@ FROM (
         )
       ) || CASE WHEN grp.type IN ('select', 'multiselect')
         THEN jsonb_build_object('options', (
-          SELECT coalesce(jsonb_agg(joined.option ORDER BY joined.pos), '[]'::jsonb)
-          FROM (
-            SELECT option.value AS option, min(member.seq * 1000 + option.ord) AS pos
-            FROM "_af_fields" AS member
-            CROSS JOIN LATERAL jsonb_array_elements(coalesce(member.def -> 'options', '[]'::jsonb))
-              WITH ORDINALITY AS option(value, ord)
-            WHERE member.owner_id = grp.owner_id
-              AND member.norm = grp.norm
-              AND member.type = grp.type
-              AND member.variant = grp.variant
-            GROUP BY option.value
-          ) AS joined
+          SELECT coalesce(jsonb_agg(to_jsonb(opt.spelling) ORDER BY opt.pos), '[]'::jsonb)
+          FROM "_af_options" AS opt
+          WHERE opt.owner_id = grp.owner_id AND opt.keep_id = grp.keep_id
         ))
         ELSE '{}'::jsonb
       END
@@ -104,25 +124,66 @@ FROM (
   GROUP BY grp.owner_id
 ) AS built
 WHERE u.id = built.owner_id;--> statement-breakpoint
--- For each game and kept field, the value to keep: the kept id's own, else
--- the first value (in field order) under an id merged into it, ignoring
--- empty values.
+-- Every value a game holds under a kept id or an id merged into it.
+DROP TABLE IF EXISTS "_af_candidates";--> statement-breakpoint
+CREATE TABLE "_af_candidates" AS
+SELECT item.id AS item_id, item.owner_id, kept.keep_id, grp.type, 0 AS rank,
+  item.data -> kept.keep_id AS value
+FROM "library_items" AS item
+JOIN (SELECT DISTINCT owner_id, keep_id FROM "_af_map") AS kept
+  ON kept.owner_id = item.owner_id
+JOIN "_af_groups" AS grp
+  ON grp.owner_id = kept.owner_id AND grp.keep_id = kept.keep_id
+WHERE item.data ? kept.keep_id
+UNION ALL
+SELECT item.id, item.owner_id, map.keep_id, grp.type, map.seq,
+  item.data -> map.old_id
+FROM "library_items" AS item
+JOIN "_af_map" AS map ON map.owner_id = item.owner_id
+JOIN "_af_groups" AS grp
+  ON grp.owner_id = map.owner_id AND grp.keep_id = map.keep_id
+WHERE item.data ? map.old_id;--> statement-breakpoint
+-- For each game and kept field, the value to keep. Empty values (null, "",
+-- an empty list) are ignored. Otherwise a ticked or filled value comes first,
+-- then the kept id's own, then the earlier field. A multiple-choice value is
+-- the union of every list, in the field's choice order. Choices use the kept
+-- field's spelling. A 0 is a real value.
+DROP TABLE IF EXISTS "_af_picked";--> statement-breakpoint
 CREATE TABLE "_af_picked" AS
-SELECT DISTINCT ON (item_id, keep_id) item_id, keep_id, value
+SELECT item_id, keep_id, value
 FROM (
-  SELECT item.id AS item_id, map.keep_id, 0 AS rank, item.data -> map.keep_id AS value
-  FROM "library_items" AS item
-  JOIN (SELECT DISTINCT owner_id, keep_id FROM "_af_map") AS map
-    ON map.owner_id = item.owner_id
-  WHERE item.data ? map.keep_id
-  UNION ALL
-  SELECT item.id, map.keep_id, map.seq, item.data -> map.old_id
-  FROM "library_items" AS item
-  JOIN "_af_map" AS map ON map.owner_id = item.owner_id
-  WHERE item.data ? map.old_id
-) AS candidates
-WHERE value <> 'null'::jsonb AND value <> '""'::jsonb AND value <> '[]'::jsonb
-ORDER BY item_id, keep_id, rank;--> statement-breakpoint
+  SELECT DISTINCT ON (c.item_id, c.keep_id)
+    c.item_id, c.keep_id,
+    CASE WHEN c.type = 'select' AND jsonb_typeof(c.value) = 'string'
+      THEN to_jsonb(coalesce((
+        SELECT opt.spelling FROM "_af_options" AS opt
+        WHERE opt.owner_id = c.owner_id AND opt.keep_id = c.keep_id
+          AND opt.key = lower(c.value #>> '{}')
+      ), c.value #>> '{}'))
+      ELSE c.value
+    END AS value
+  FROM "_af_candidates" AS c
+  WHERE c.type <> 'multiselect'
+    AND c.value <> 'null'::jsonb AND c.value <> '""'::jsonb AND c.value <> '[]'::jsonb
+  ORDER BY c.item_id, c.keep_id, (c.value = 'false'::jsonb), c.rank
+) AS single
+UNION ALL
+SELECT item_id, keep_id, jsonb_agg(to_jsonb(spelling) ORDER BY pos, spelling)
+FROM (
+  SELECT DISTINCT
+    c.item_id, c.keep_id,
+    coalesce(opt.spelling, el.v) AS spelling,
+    coalesce(opt.pos, 1000000000) AS pos
+  FROM "_af_candidates" AS c
+  CROSS JOIN LATERAL jsonb_array_elements_text(
+    CASE WHEN jsonb_typeof(c.value) = 'array' THEN c.value ELSE '[]'::jsonb END
+  ) AS el(v)
+  LEFT JOIN "_af_options" AS opt
+    ON opt.owner_id = c.owner_id AND opt.keep_id = c.keep_id
+    AND opt.key = lower(el.v)
+  WHERE c.type = 'multiselect'
+) AS listed
+GROUP BY item_id, keep_id;--> statement-breakpoint
 -- Games' values move to the kept ids.
 UPDATE "library_items" AS item
 SET "data" = (item.data - olds.ids) || coalesce(picked.obj, '{}'::jsonb)
@@ -177,6 +238,8 @@ SET "custom_limits" = ("custom_limits" - 'fieldsPerCollection')
   || jsonb_build_object('fields', "custom_limits" -> 'fieldsPerCollection')
 WHERE "custom_limits" ? 'fieldsPerCollection';--> statement-breakpoint
 DROP TABLE "_af_picked";--> statement-breakpoint
+DROP TABLE "_af_candidates";--> statement-breakpoint
+DROP TABLE "_af_options";--> statement-breakpoint
 DROP TABLE "_af_map";--> statement-breakpoint
 DROP TABLE "_af_groups";--> statement-breakpoint
 DROP TABLE "_af_fields";--> statement-breakpoint

@@ -1,8 +1,18 @@
-import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  sql,
+  type SQL,
+} from 'drizzle-orm'
 import { createError } from 'h3'
 import type {
   OwnerEntry,
   CollectionLink,
+  FieldDefinition,
   LibraryItem,
   ListDetail,
   ListName,
@@ -12,6 +22,7 @@ import {
   type ListAction,
   type ListState,
 } from '../../shared/utils/lists'
+import type { ExportItem } from '../../shared/utils/csv'
 import type { PlanLimits } from '../../shared/utils/plans'
 import { games as catalogGames, libraryItems, platforms } from '../db/schema'
 import { useDb } from './db'
@@ -19,8 +30,10 @@ import {
   catalogJoin,
   customCollectionsOf,
   getOwnedItem,
+  itemName,
   toLibraryItem,
 } from './collections'
+import { isFiltered, listOrder, listWhere, type ListQuery } from './list-query'
 import { assertListRoom } from './limits'
 
 type ItemRow = typeof libraryItems.$inferSelect
@@ -49,18 +62,16 @@ async function platformNames(ids: number[]): Promise<Map<number, string>> {
   return new Map(rows.map((row) => [row.id, row.name]))
 }
 
-/**
- * Owned or the Wishlist: the user's games on that list, newest first, with
- * the custom collections each is in and the platforms for that list.
- */
-export async function getList(
+/** The platforms some game on the list is on, for the filter. */
+async function platformChoices(
   ownerId: string,
   list: ListName,
-): Promise<ListDetail> {
-  const rows = await useDb()
-    .select({ item: libraryItems, game: catalogGames })
+): Promise<{ id: number; name: string }[]> {
+  const db = useDb()
+  const column = list === 'owned' ? libraryItems.ownedOn : libraryItems.wantedOn
+  const onList = db
+    .select({ id: sql<number>`unnest(${column})` })
     .from(libraryItems)
-    .leftJoin(catalogGames, catalogJoin)
     .where(
       and(
         eq(libraryItems.ownerId, ownerId),
@@ -70,7 +81,63 @@ export async function getList(
         ),
       ),
     )
-    .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
+  const rows = await db
+    .select({
+      id: platforms.igdbId,
+      name: sql<string>`coalesce(${platforms.abbreviation}, ${platforms.name})`,
+    })
+    .from(platforms)
+    .where(inArray(platforms.igdbId, onList))
+  return rows.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * One page of Owned or the Wishlist: the user's games on that list that
+ * match the search and filters, in the asked order, with the custom
+ * collections each is in and the platforms for that list. A page past the
+ * end comes back as the last one. The sort, search and filters run in SQL
+ * (see `list-query.ts`), so only this page's rows leave the database.
+ */
+export async function getListPage(
+  ownerId: string,
+  list: ListName,
+  query: ListQuery,
+  fields: FieldDefinition[],
+): Promise<ListDetail> {
+  const db = useDb()
+  const where = listWhere(ownerId, list, query)
+  const order = listOrder(ownerId, list, query)
+  const onList = and(
+    eq(libraryItems.ownerId, ownerId),
+    eq(list === 'owned' ? libraryItems.owned : libraryItems.wishlisted, true),
+  )
+  const countWhere = (condition: SQL | undefined) =>
+    db
+      .select({ value: count() })
+      .from(libraryItems)
+      .leftJoin(catalogGames, catalogJoin)
+      .where(condition)
+  const pageOf = (page: number) =>
+    db
+      .select({ item: libraryItems, game: catalogGames })
+      .from(libraryItems)
+      .leftJoin(catalogGames, catalogJoin)
+      .where(where)
+      .orderBy(...order)
+      .limit(query.size)
+      .offset((page - 1) * query.size)
+
+  const [matching, listSize, firstTry, platformOptions] = await Promise.all([
+    countWhere(where),
+    isFiltered(query) ? countWhere(onList) : null,
+    pageOf(query.page),
+    platformChoices(ownerId, list),
+  ])
+  const total = matching[0]?.value ?? 0
+  const itemCount = listSize ? (listSize[0]?.value ?? 0) : total
+  const page = Math.min(query.page, Math.max(1, Math.ceil(total / query.size)))
+  const rows = page === query.page ? firstTry : await pageOf(page)
+
   const platformIdsOf = (item: ItemRow) =>
     list === 'owned' ? item.ownedOn : item.wantedOn
   const [inCollections, names] = await Promise.all([
@@ -87,7 +154,43 @@ export async function getList(
     inCollections: inCollections.get(item.id) ?? [],
     platforms: platformIdsOf(item).flatMap((id) => names.get(id) ?? []),
   }))
-  return { list, itemCount: items.length, items }
+  return {
+    list,
+    itemCount,
+    total,
+    page,
+    size: query.size,
+    fields,
+    platforms: platformOptions,
+    items,
+  }
+}
+
+/** Every game on a list, newest first, with what an export needs. */
+export async function listForExport(
+  ownerId: string,
+  list: ListName,
+): Promise<ExportItem[]> {
+  const rows = await useDb()
+    .select({
+      igdbId: libraryItems.igdbId,
+      name: itemName,
+      addedAt: libraryItems.createdAt,
+      data: libraryItems.data,
+    })
+    .from(libraryItems)
+    .leftJoin(catalogGames, catalogJoin)
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        eq(
+          list === 'owned' ? libraryItems.owned : libraryItems.wishlisted,
+          true,
+        ),
+      ),
+    )
+    .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
+  return rows.map((row) => ({ ...row, addedAt: row.addedAt.toISOString() }))
 }
 
 /** How many games are on each list, for the sidebar. */

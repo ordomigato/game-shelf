@@ -1,0 +1,268 @@
+import { and, eq, sql, type SQL } from 'drizzle-orm'
+import { createError } from 'h3'
+import { z } from 'zod'
+import type { FieldDefinition, ListName } from '../../shared/types/collection'
+import {
+  fieldIdOfKey,
+  isFieldKey,
+  LIST_SORT_COLUMNS,
+} from '../../shared/utils/list-view'
+import { libraryItems } from '../db/schema'
+import { itemName } from './collections'
+
+/** What a list page asks for, once checked against the user's fields. */
+export interface ListQuery {
+  page: number
+  size: number
+  sort: ListSort | null
+  dir: 'asc' | 'desc'
+  /** Text the game's name must contain. Empty for no search. */
+  q: string
+  collectionIds: string[]
+  platformIds: number[]
+  fieldFilters: { field: FieldDefinition; values: string[] }[]
+}
+
+export type ListSort =
+  { column: (typeof LIST_SORT_COLUMNS)[number] } | { field: FieldDefinition }
+
+const FILTERABLE: FieldDefinition['type'][] = [
+  'checkbox',
+  'select',
+  'multiselect',
+]
+const MAX_FILTER_FIELDS = 30
+
+const asArray = (value: unknown) =>
+  value === undefined ? [] : Array.isArray(value) ? value : [value]
+
+const baseSchema = z.object({
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  size: z
+    .enum(['25', '50', '100'])
+    .default('50')
+    .transform((size) => Number(size)),
+  sort: z.string().max(80).optional(),
+  dir: z.enum(['asc', 'desc']).default('asc'),
+  q: z.string().trim().max(100).default(''),
+  collection: z.preprocess(asArray, z.array(z.uuid()).max(50)),
+  platform: z.preprocess(
+    asArray,
+    z.array(z.coerce.number().int().positive().max(2_000_000_000)).max(50),
+  ),
+})
+
+const badRequest = (statusMessage: string) =>
+  createError({ statusCode: 400, statusMessage })
+
+/**
+ * Reads a list route's query string. Every part is checked against an allow
+ * list: sort keys are the known columns or one of the user's own field ids,
+ * and so are filter fields (`f.<id>`), whose values must be what that kind
+ * of field offers. Anything else is a 400, so no input reaches SQL as
+ * anything but a bound value.
+ */
+export function parseListQuery(
+  raw: Record<string, unknown>,
+  fields: FieldDefinition[],
+): ListQuery {
+  const parsed = baseSchema.safeParse(raw)
+  if (!parsed.success) throw badRequest('Invalid list query')
+  const { sort: sortKey, collection, platform, ...rest } = parsed.data
+  const byId = new Map(fields.map((field) => [field.id, field]))
+
+  let sort: ListSort | null = null
+  if (sortKey !== undefined) {
+    if (isFieldKey(sortKey)) {
+      const field = byId.get(fieldIdOfKey(sortKey))
+      if (!field) throw badRequest('Unknown sort')
+      sort = { field }
+    } else {
+      const column = LIST_SORT_COLUMNS.find((known) => known === sortKey)
+      if (!column) throw badRequest('Unknown sort')
+      sort = { column }
+    }
+  }
+
+  const fieldFilters: ListQuery['fieldFilters'] = []
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isFieldKey(key)) continue
+    const field = byId.get(fieldIdOfKey(key))
+    if (!field || !FILTERABLE.includes(field.type)) {
+      throw badRequest('Unknown filter')
+    }
+    const values = asArray(value)
+    if (values.length > 100 || values.some((v) => typeof v !== 'string')) {
+      throw badRequest('Invalid filter')
+    }
+    const strings = values as string[]
+    if (
+      field.type === 'checkbox' &&
+      strings.some((v) => v !== 'yes' && v !== 'no')
+    ) {
+      throw badRequest('Invalid filter')
+    }
+    if (strings.some((v) => v.length > 200)) throw badRequest('Invalid filter')
+    if (strings.length) fieldFilters.push({ field, values: strings })
+  }
+  if (fieldFilters.length > MAX_FILTER_FIELDS) {
+    throw badRequest('Too many filters')
+  }
+
+  return {
+    ...rest,
+    sort,
+    collectionIds: collection,
+    platformIds: platform,
+    fieldFilters,
+  }
+}
+
+/** Whether anything narrows the list. */
+export const isFiltered = (query: ListQuery) =>
+  Boolean(
+    query.q ||
+    query.collectionIds.length ||
+    query.platformIds.length ||
+    query.fieldFilters.length,
+  )
+
+/** The column holding the platforms for a list. */
+const platformColumn = (list: ListName) =>
+  list === 'owned'
+    ? sql.raw('library_items.owned_on')
+    : sql.raw('library_items.wanted_on')
+
+const textList = (values: string[]) =>
+  sql`ARRAY[${sql.join(
+    values.map((value) => sql`${value}`),
+    sql`, `,
+  )}]::text[]`
+
+const intList = (values: number[]) =>
+  sql`ARRAY[${sql.join(
+    values.map((value) => sql`${value}`),
+    sql`, `,
+  )}]::integer[]`
+
+/** `%`, `_` and `\` in text typed by a person, so LIKE reads them literally. */
+export const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&')
+
+/** The value of a field on the row, as jsonb. The id is a bound value. */
+const valueOf = (field: FieldDefinition) =>
+  sql`(library_items.data -> ${field.id}::text)`
+
+/** Matches one field filter, with the meaning the table has on screen. */
+function fieldFilter(field: FieldDefinition, values: string[]): SQL | null {
+  const value = valueOf(field)
+  if (field.type === 'checkbox') {
+    const yes = values.includes('yes')
+    const no = values.includes('no')
+    // Both ticked or unticked matches every game.
+    if (yes === no) return null
+    const ticked = sql`(${value} = 'true'::jsonb)`
+    return yes
+      ? sql`coalesce(${ticked}, false)`
+      : sql`not coalesce(${ticked}, false)`
+  }
+  if (field.type === 'select') {
+    return sql`(jsonb_typeof(${value}) = 'string' and (${value} #>> '{}') = any(${textList(values)}))`
+  }
+  // A list of choices matches when it has any of the wanted ones.
+  return sql`(jsonb_typeof(${value}) = 'array' and exists (select 1 from jsonb_array_elements_text(${value}) as choice(name) where choice.name = any(${textList(values)})))`
+}
+
+/**
+ * The rows of one list that match, always the owner's. Must run against a
+ * query from `library_items` left joined to the catalog game.
+ */
+export function listWhere(
+  ownerId: string,
+  list: ListName,
+  query: ListQuery,
+): SQL {
+  const conditions: (SQL | undefined)[] = [
+    eq(libraryItems.ownerId, ownerId),
+    eq(list === 'owned' ? libraryItems.owned : libraryItems.wishlisted, true),
+  ]
+  if (query.q) {
+    conditions.push(
+      sql`${itemName} ilike ${`%${escapeLike(query.q)}%`} escape '\\'`,
+    )
+  }
+  if (query.collectionIds.length) {
+    conditions.push(
+      sql`exists (select 1 from collection_items as entry inner join collections as owned_collection on owned_collection.id = entry.collection_id where entry.item_id = library_items.id and owned_collection.owner_id = ${ownerId} and entry.collection_id = any(${textList(query.collectionIds)}::uuid[]))`,
+    )
+  }
+  if (query.platformIds.length) {
+    conditions.push(
+      sql`${platformColumn(list)} && ${intList(query.platformIds)}`,
+    )
+  }
+  for (const { field, values } of query.fieldFilters) {
+    const condition = fieldFilter(field, values)
+    if (condition) conditions.push(condition)
+  }
+  return and(...conditions)!
+}
+
+/** The value a field sorts by. Missing or wrong-typed values are null. */
+function fieldSortValue(field: FieldDefinition): SQL {
+  const value = valueOf(field)
+  const scalar = sql`(${value} #>> '{}')`
+  switch (field.type) {
+    case 'number':
+    case 'currency':
+    case 'rating':
+    case 'progress':
+      return sql`(case when jsonb_typeof(${value}) = 'number' then ${scalar}::numeric end)`
+    case 'checkbox':
+      // Ticked first when ascending, like the table on screen.
+      return sql`(case when jsonb_typeof(${value}) = 'boolean' then not ${scalar}::boolean end)`
+    case 'date':
+      return sql`(case when jsonb_typeof(${value}) = 'string' then ${scalar} end)`
+    case 'multiselect':
+      return sql`(case when jsonb_typeof(${value}) = 'array' then (select lower(string_agg(choice.name, ', ' order by choice.idx)) from jsonb_array_elements_text(${value}) with ordinality as choice(name, idx)) end)`
+    default:
+      return sql`(case when jsonb_typeof(${value}) = 'string' then lower(${scalar}) end)`
+  }
+}
+
+function sortValue(sort: ListSort, list: ListName, ownerId: string): SQL {
+  if ('field' in sort) return fieldSortValue(sort.field)
+  switch (sort.column) {
+    case 'name':
+      return sql`lower(${itemName})`
+    case 'addedAt':
+      return sql`library_items.created_at`
+    case 'platforms':
+      return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = (${platformColumn(list)})[1])`
+    case 'inCollections':
+      return sql`(select string_agg(lower(sorted_collection.title), ', ' order by lower(sorted_collection.title)) from collection_items as entry inner join collections as sorted_collection on sorted_collection.id = entry.collection_id where entry.item_id = library_items.id and sorted_collection.owner_id = ${ownerId})`
+    case 'collectionCount':
+      return sql`(select nullif(count(*), 0)::int from collection_items as entry where entry.item_id = library_items.id)`
+  }
+}
+
+/**
+ * The order of a page: the chosen column (empty values last either way),
+ * then newest first and by id, so the same game never lands on two pages
+ * or on none.
+ */
+export function listOrder(
+  ownerId: string,
+  list: ListName,
+  query: ListQuery,
+): SQL[] {
+  const tiebreak = [
+    sql`library_items.created_at desc`,
+    sql`library_items.id desc`,
+  ]
+  if (!query.sort) return tiebreak
+  const direction = query.dir === 'desc' ? sql.raw('desc') : sql.raw('asc')
+  return [
+    sql`${sortValue(query.sort, list, ownerId)} ${direction} nulls last`,
+    ...tiebreak,
+  ]
+}

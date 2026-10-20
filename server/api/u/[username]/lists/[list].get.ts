@@ -7,7 +7,8 @@ const paramsSchema = z.object({
 })
 
 /**
- * Owned or the Wishlist at `/u/<username>/shelf/<list>`. Only the owner
+ * One page of Owned or the Wishlist at `/u/<username>/shelf/<list>`, sorted,
+ * searched and filtered by the query (see `parseListQuery`). Only the owner
  * sees them. Anyone else gets a 404, like a private collection.
  */
 export default defineEventHandler(async (event): Promise<ListDetail> => {
@@ -22,5 +23,7 @@ export default defineEventHandler(async (event): Promise<ListDetail> => {
   if (!owner || claims?.sub !== owner.cognitoSub) {
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
   }
-  return getList(owner.id, list)
+  const fields = await getUserFields(owner.id)
+  const query = parseListQuery(getQuery(event), fields)
+  return getListPage(owner.id, list, query, fields)
 })

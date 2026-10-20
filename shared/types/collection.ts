@@ -123,10 +123,23 @@ export interface CollectionEntry extends Omit<
   platforms?: string[]
 }
 
-/** Owned or the Wishlist, as its owner sees it. */
+/**
+ * One page of Owned or the Wishlist, as its owner sees it. The server sorts,
+ * searches and filters, so `items` holds only the rows of this page.
+ */
 export interface ListDetail {
   list: ListName
+  /** Every game on the list, whatever the search and filters. */
   itemCount: number
+  /** The games matching the search and filters. */
+  total: number
+  /** The page these items are, from 1. The server keeps it in range. */
+  page: number
+  size: number
+  /** All the owner's fields, hidden ones included. */
+  fields: FieldDefinition[]
+  /** The platforms some game on this list is on, for the filter. */
+  platforms: { id: number; name: string }[]
   items: OwnerEntry[]
 }
 

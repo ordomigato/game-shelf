@@ -110,6 +110,34 @@ describe('autoMap', () => {
     ])
   })
 
+  it("gives a file's only Genre or Platform column to the field of that name", () => {
+    const own: FieldDefinition[] = [
+      { id: 'g', name: 'Genre', type: 'text' },
+      { id: 'p', name: 'Platform', type: 'text' },
+    ]
+    expect(
+      autoMap(['Name', 'Genre', 'Platform'], [['Zelda', 'RPG', 'SNES']], own),
+    ).toEqual([
+      { kind: 'name' },
+      { kind: 'field', fieldId: 'g' },
+      { kind: 'field', fieldId: 'p' },
+    ])
+  })
+
+  it('reads Wishlist platforms too', () => {
+    expect(
+      autoMap(
+        ['Name', 'Platforms', 'Wishlist platforms'],
+        [['Zelda', 'SNES', 'Switch']],
+        [],
+      ),
+    ).toEqual([
+      { kind: 'name' },
+      { kind: 'platforms' },
+      { kind: 'wishlistPlatforms' },
+    ])
+  })
+
   it('lets a later column of the same name be a field, as in our exports', () => {
     const genre: FieldDefinition = { id: 'g', name: 'Genre', type: 'text' }
     const headers = ['Name', 'Genre', 'Platforms', 'Genre', 'Platforms']

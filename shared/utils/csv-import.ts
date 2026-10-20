@@ -25,6 +25,8 @@ export type ColumnTarget =
   | { kind: 'igdbId' }
   /** The platforms the game is owned on, matched on the server. */
   | { kind: 'platforms' }
+  /** The platforms the game is wanted on, matched on the server. */
+  | { kind: 'wishlistPlatforms' }
   | { kind: 'skip' }
   | { kind: 'field'; fieldId: string }
   | { kind: 'new'; name: string; type: FieldType }
@@ -36,6 +38,8 @@ export interface ImportRow {
   values: ItemData
   /** Platform names from the file, to tick as owned. The server matches them. */
   platforms?: string[]
+  /** Platform names from the file, to tick as wanted on the Wishlist. */
+  wishlistPlatforms?: string[]
   /** The row in the file (see `ImportProblem.row`), for platform problems. */
   row?: number
 }
@@ -47,12 +51,15 @@ export interface ImportRow {
  */
 export interface PlatformProblem {
   row: number
+  /** Which column it came from. */
+  list: 'owned' | 'wanted'
   value: string
   reason:
     | 'unknownPlatform'
     | 'handAddedPlatforms'
     | 'notOwnedPlatforms'
     | 'wantedPlatforms'
+    | 'ownedPlatforms'
 }
 
 /** A cell that couldn't be imported, for the person to see. */
@@ -83,11 +90,21 @@ const normalize = (text: string) =>
 
 const NAME_HEADERS = ['name', 'title', 'game', 'game name', 'game title']
 const IGDB_HEADERS = ['igdb id', 'igdb', 'igdbid']
-/** Columns that come from IGDB, so the file's values are never used. */
-const IGDB_FACT_HEADERS = ['released', 'release date', 'genre', 'genres']
-const PLATFORM_HEADERS = ['platforms', 'platform']
 /** ThisPlayShelf sets the date a game joins a collection itself. */
 const SKIPPED_HEADERS = ['added', 'date added', 'added at']
+/**
+ * The core columns of our exports, by the headers that name them. Released
+ * and Genre come from IGDB, so a file's values are never used. The platform
+ * columns are read.
+ */
+const CORE_HEADERS: Record<string, string[]> = {
+  released: ['released', 'release date'],
+  genre: ['genre', 'genres'],
+  platforms: ['platforms', 'platform'],
+  wishlistPlatforms: ['wishlist platforms', 'wishlist platform'],
+}
+const coreOf = (key: string) =>
+  Object.keys(CORE_HEADERS).find((core) => CORE_HEADERS[core]!.includes(key))
 
 const YES = new Set(['yes', 'y', 'true', '1', 'x', '✓', '✔'])
 const NO = new Set(['no', 'n', 'false', '0'])
@@ -243,10 +260,10 @@ export function autoMap(
 ): ColumnTarget[] {
   let hasName = false
   let hasIgdb = false
-  let hasPlatforms = false
-  const seenFacts = new Set<string>()
+  const seenCore = new Set<string>()
+  const keys = headers.map(normalize)
   return headers.map((header, index): ColumnTarget => {
-    const key = normalize(header)
+    const key = keys[index]!
     if (!hasName && NAME_HEADERS.includes(key)) {
       hasName = true
       return { kind: 'name' }
@@ -256,16 +273,19 @@ export function autoMap(
       return { kind: 'igdbId' }
     }
     if (SKIPPED_HEADERS.includes(key)) return { kind: 'skip' }
-    if (!hasPlatforms && PLATFORM_HEADERS.includes(key)) {
-      hasPlatforms = true
-      return { kind: 'platforms' }
-    }
-    if (IGDB_FACT_HEADERS.includes(key)) {
-      // Released and Release date are one column, and so are Genre and Genres.
-      const fact = key.startsWith('genre') ? 'genre' : 'released'
-      if (!seenFacts.has(fact)) {
-        seenFacts.add(fact)
-        return { kind: 'skip' }
+    const core = coreOf(key)
+    if (core && !seenCore.has(core)) {
+      // The user's own field of that name gets a file's only such column.
+      // Our exports repeat the header when a field has the same name, with
+      // the core column first.
+      const ownField = fields.some(
+        (candidate) => normalize(candidate.name) === key,
+      )
+      if (!ownField || keys.filter((other) => other === key).length > 1) {
+        seenCore.add(core)
+        return core === 'platforms' || core === 'wishlistPlatforms'
+          ? { kind: core }
+          : { kind: 'skip' }
       }
     }
     const field = fields.find((candidate) => normalize(candidate.name) === key)
@@ -350,6 +370,15 @@ export function planImport(
   const platformsColumn = targets.findIndex(
     (target) => target.kind === 'platforms',
   )
+  const wishlistColumn = targets.findIndex(
+    (target) => target.kind === 'wishlistPlatforms',
+  )
+  const platformNames = (column: number, row: string[]) =>
+    column >= 0
+      ? splitChoices(unguard((row[column] ?? '').trim()))
+          .slice(0, MAX_ROW_PLATFORMS)
+          .map((platform) => platform.slice(0, PLATFORM_NAME_MAX))
+      : []
   const problems: ImportProblem[] = []
   const planned: ImportRow[] = []
   rows.slice(0, MAX_IMPORT_ROWS).forEach((row, rowIndex) => {
@@ -394,17 +423,17 @@ export function planImport(
         values[field.id] = value
       }
     }
-    const platforms =
-      platformsColumn >= 0
-        ? splitChoices(unguard((row[platformsColumn] ?? '').trim()))
-            .slice(0, MAX_ROW_PLATFORMS)
-            .map((platform) => platform.slice(0, PLATFORM_NAME_MAX))
-        : []
+    const platforms = platformNames(platformsColumn, row)
+    const wishlistPlatforms = platformNames(wishlistColumn, row)
     planned.push({
       name,
       igdbId,
       values,
-      ...(platforms.length && { platforms, row: spreadsheetRow }),
+      ...(platforms.length && { platforms }),
+      ...(wishlistPlatforms.length && { wishlistPlatforms }),
+      ...((platforms.length || wishlistPlatforms.length) && {
+        row: spreadsheetRow,
+      }),
     })
   })
 

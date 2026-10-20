@@ -178,15 +178,25 @@ test('ignores Released and Genre, and reports platforms the server could not tic
     page,
     [],
     [
-      { row: 2, value: 'Atari 2600', reason: 'unknownPlatform' },
-      { row: 3, value: 'NES', reason: 'handAddedPlatforms' },
+      {
+        row: 2,
+        list: 'owned',
+        value: 'Atari 2600',
+        reason: 'unknownPlatform',
+      },
+      {
+        row: 3,
+        list: 'wanted',
+        value: 'NES',
+        reason: 'handAddedPlatforms',
+      },
     ],
   )
   await chooseFile(
     page,
-    'Name,IGDB ID,Added,Released,Genre,Platforms\r\n' +
-      'The Legend of Zelda,1022,2026-01-01,1986-02,Adventure,NES; Atari 2600\r\n' +
-      'Micro Mages,,2026-02-01,,,NES\r\n',
+    'Name,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms\r\n' +
+      'The Legend of Zelda,1022,2026-01-01,1986-02,Adventure,NES; Atari 2600,SNES\r\n' +
+      'Micro Mages,,2026-02-01,,,,NES\r\n',
   )
   const dialog = page.getByRole('dialog', { name: 'Import from a CSV file' })
   for (const column of ['Released', 'Genre']) {
@@ -197,6 +207,9 @@ test('ignores Released and Genre, and reports platforms the server could not tic
   await expect(
     dialog.getByRole('combobox', { name: 'Where Platforms goes' }),
   ).toHaveText('Owned platforms')
+  await expect(
+    dialog.getByRole('combobox', { name: 'Where Wishlist platforms goes' }),
+  ).toHaveText('Wishlist platforms')
   await dialog.getByRole('button', { name: 'Review' }).click()
   await dialog.getByRole('button', { name: 'Review' }).click()
   await expect(dialog.getByText('New fields')).toHaveCount(0)
@@ -210,23 +223,24 @@ test('ignores Released and Genre, and reports platforms the server could not tic
       igdbId: 1022,
       values: {},
       platforms: ['NES', 'Atari 2600'],
+      wishlistPlatforms: ['SNES'],
       row: 2,
     },
     {
       name: 'Micro Mages',
       igdbId: null,
       values: {},
-      platforms: ['NES'],
+      wishlistPlatforms: ['NES'],
       row: 3,
     },
   ])
-  await expect(dialog.getByText("2 platforms weren't ticked")).toBeVisible()
+  await expect(dialog.getByText("2 platforms weren't added")).toBeVisible()
   await expect(dialog.getByRole('row', { name: /Atari 2600/ })).toContainText(
-    'Not a platform this game is on in IGDB',
+    "IGDB doesn't list this game on that platform",
   )
-  await expect(dialog.getByRole('row', { name: /3 Platforms/ })).toContainText(
-    'Games added by hand have no platforms',
-  )
+  await expect(
+    dialog.getByRole('row', { name: /3 Wishlist platforms/ }),
+  ).toContainText('Games added by hand have no platforms')
 })
 
 test('asks which column holds the name when it cannot tell', async ({

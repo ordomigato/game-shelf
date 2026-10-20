@@ -9,8 +9,8 @@ import type { ReleasePrecision } from './release-date'
 
 /**
  * The columns every export starts with, before the collection's fields. The
- * last three are the core columns: IGDB's release date, genres, and the
- * platforms the game is owned on.
+ * last four are the core columns: IGDB's release date, genres, and the
+ * platforms the game is owned on and wanted on.
  */
 export const FIXED_COLUMNS: Message[] = [
   { key: 'export.columns.name' },
@@ -19,6 +19,7 @@ export const FIXED_COLUMNS: Message[] = [
   { key: 'export.columns.released' },
   { key: 'export.columns.genre' },
   { key: 'export.columns.platforms' },
+  { key: 'export.columns.wishlistPlatforms' },
 ]
 
 /** Joins a multiple-choice value in a cell. Choices can contain commas. */
@@ -86,6 +87,7 @@ export interface ExportItem extends Pick<CollectionEntry, 'name' | 'data'> {
   releasePrecision?: ReleasePrecision | null
   genres?: string[]
   ownedOn?: number[]
+  wantedOn?: number[]
   catalogPlatforms?: CollectionEntry['catalogPlatforms']
 }
 
@@ -113,18 +115,23 @@ export function releasedText(
   }
 }
 
-/** The platforms a game is owned on, by their short names. */
-export const ownedPlatformNames = (item: ExportItem) =>
-  platformsOf({
+/** The platforms a game is owned on and wanted on, by their short names. */
+export function exportPlatformNames(item: ExportItem) {
+  const { owned, wanted } = platformsOf({
     catalogPlatforms: item.catalogPlatforms,
     ownedOn: item.ownedOn,
-    wantedOn: [],
-  }).owned.map(({ name }) => name)
+    wantedOn: item.wantedOn,
+  })
+  return {
+    owned: owned.map(({ name }) => name),
+    wanted: wanted.map(({ name }) => name),
+  }
+}
 
 /**
  * A collection as CSV: a row per game, in the order given, with its name,
- * IGDB id, date added, release date, genres and owned platforms, then a
- * column per field. `columns` are the first six column names, already in
+ * IGDB id, date added, release date, genres, owned platforms and wishlist
+ * platforms, then a column per field. `columns` are the first seven names, already in
  * the reader's language. Used in the browser for one collection and on the
  * server for "Export all" and the lists.
  */
@@ -134,14 +141,18 @@ export function collectionCsv(
   columns: string[],
 ): string {
   const header = [...columns, ...fields.map((field) => safeText(field.name))]
-  const rows = items.map((item) => [
-    safeText(item.name),
-    item.igdbId === null ? '' : String(item.igdbId),
-    item.addedAt.slice(0, 10),
-    releasedText(item.releaseDate, item.releasePrecision),
-    safeText((item.genres ?? []).join(CHOICE_SEPARATOR)),
-    safeText(ownedPlatformNames(item).join(CHOICE_SEPARATOR)),
-    ...fields.map((field) => exportValue(field, item.data[field.id])),
-  ])
+  const rows = items.map((item) => {
+    const platforms = exportPlatformNames(item)
+    return [
+      safeText(item.name),
+      item.igdbId === null ? '' : String(item.igdbId),
+      item.addedAt.slice(0, 10),
+      releasedText(item.releaseDate, item.releasePrecision),
+      safeText((item.genres ?? []).join(CHOICE_SEPARATOR)),
+      safeText(platforms.owned.join(CHOICE_SEPARATOR)),
+      safeText(platforms.wanted.join(CHOICE_SEPARATOR)),
+      ...fields.map((field) => exportValue(field, item.data[field.id])),
+    ]
+  })
   return toCsv([header, ...rows])
 }

@@ -140,6 +140,21 @@ describe('core columns', () => {
     expect(groups.map((group) => group.value)).toEqual([2, 1, 2])
   })
 
+  it('keeps every release year, oldest first', () => {
+    const years = Array.from({ length: 15 }, (_, i) =>
+      game({ releaseDate: `${1990 + i}-05-05`, releasePrecision: 'day' }),
+    )
+    const groups = groupValues(
+      [...years, game({})],
+      [],
+      widget({ kind: 'bar', groupBy: 'releaseYear' }),
+    )
+    expect(labels(groups)).toEqual([
+      ...years.map((_, i) => String(1990 + i)),
+      '(none)',
+    ])
+  })
+
   it('draws charts split by a core column, and not by a made-up one', () => {
     for (const id of ['genre', 'platforms', 'releaseYear']) {
       expect(chartProblem(widget({ kind: 'pie', groupBy: id }), [])).toBeNull()

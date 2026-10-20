@@ -5,7 +5,7 @@ import { collectionItems, collections, games, libraryItems } from '../db/schema'
 import { catalogJoin, getUserFields, itemName } from './collections'
 import { exportItemsOf, listForExport } from './lists'
 
-/** The first six column names of an export, in English. */
+/** The first seven column names of an export, in English. */
 export const exportColumns = () =>
   FIXED_COLUMNS.map((column) => translate(column))
 
@@ -53,6 +53,7 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
           addedAt: addedAt.toISOString(),
           data: item.data,
           ownedOn: item.ownedOn,
+          wantedOn: item.wantedOn,
           game,
         })),
       ),

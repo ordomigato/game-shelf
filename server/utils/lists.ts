@@ -215,19 +215,24 @@ export async function setListColumns(
 export async function exportItemsOf(
   rows: (Pick<ExportItem, 'name' | 'igdbId' | 'addedAt' | 'data'> & {
     ownedOn: number[]
+    wantedOn: number[]
     game: typeof catalogGames.$inferSelect | null
   })[],
 ): Promise<ExportItem[]> {
-  const names = await platformNames(rows.flatMap((row) => row.ownedOn))
+  const names = await platformNames(
+    rows.flatMap((row) => [...row.ownedOn, ...row.wantedOn]),
+  )
   return rows.map(({ game, ...row }) => ({
     ...row,
     releaseDate: game?.releaseDate ?? null,
     releasePrecision: game?.releasePrecision ?? null,
     genres: game?.genres ?? [],
-    catalogPlatforms: row.ownedOn.flatMap((id) => {
-      const name = names.get(id)
-      return name === undefined ? [] : [{ id, name }]
-    }),
+    catalogPlatforms: [...row.ownedOn, ...row.wantedOn]
+      .flatMap((id) => {
+        const name = names.get(id)
+        return name === undefined ? [] : [{ id, name }]
+      })
+      .sort((a, b) => a.name.localeCompare(b.name)),
   }))
 }
 
@@ -243,6 +248,7 @@ export async function listForExport(
       addedAt: libraryItems.createdAt,
       data: libraryItems.data,
       ownedOn: libraryItems.ownedOn,
+      wantedOn: libraryItems.wantedOn,
       game: catalogGames,
     })
     .from(libraryItems)

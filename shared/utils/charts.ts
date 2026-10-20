@@ -246,7 +246,8 @@ export function groupValues(
   }
 
   let kept = keys
-  if (keys.length > MAX_GROUPS) {
+  // Every year stays: they read as a timeline, not a ranking.
+  if (keys.length > MAX_GROUPS && core !== 'releaseYear') {
     // Keep the largest groups, in their usual order, and lump the rest.
     const sizes = new Map(
       keys.map((key) => [
@@ -317,6 +318,7 @@ export function timeSeries(
 ): ChartPoint[] {
   const timeline = widget.timeline
   if (!timeline) return []
+  // A quarter's date is its first month, so those games land there.
   const dated = items.flatMap((item) => {
     const raw =
       timeline.source === 'addedAt'

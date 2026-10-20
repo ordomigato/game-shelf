@@ -81,6 +81,7 @@ describe('collectionCsv', () => {
           releasePrecision: 'day',
           genres: ['Adventure', 'Puzzle'],
           ownedOn: [130],
+          wantedOn: [19],
           catalogPlatforms: [
             { id: 19, name: 'SNES' },
             { id: 130, name: 'Switch' },
@@ -93,12 +94,20 @@ describe('collectionCsv', () => {
           data: {},
         },
       ],
-      ['Name', 'IGDB ID', 'Added', 'Released', 'Genre', 'Platforms'],
+      [
+        'Name',
+        'IGDB ID',
+        'Added',
+        'Released',
+        'Genre',
+        'Platforms',
+        'Wishlist platforms',
+      ],
     )
     expect(csv).toBe(
-      '\uFEFFName,IGDB ID,Added,Released,Genre,Platforms,Condition,Price\r\n' +
-        '"Zelda, The",1022,2026-01-15,2017-03-03,Adventure; Puzzle,Switch,Loose,40.00\r\n' +
-        'Homebrew,,2026-02-01,,,,,\r\n',
+      '\uFEFFName,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms,Condition,Price\r\n' +
+        '"Zelda, The",1022,2026-01-15,2017-03-03,Adventure; Puzzle,Switch,SNES,Loose,40.00\r\n' +
+        'Homebrew,,2026-02-01,,,,,,\r\n',
     )
   })
 })

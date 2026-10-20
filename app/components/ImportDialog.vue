@@ -111,6 +111,7 @@ function setTarget(index: number, value: unknown) {
     value === 'name' ||
     value === 'igdbId' ||
     value === 'platforms' ||
+    value === 'wishlistPlatforms' ||
     value === 'skip'
       ? { kind: value }
       : value.startsWith('field:')
@@ -120,13 +121,14 @@ function setTarget(index: number, value: unknown) {
             name: header.slice(0, 60) || t('import.newField'),
             type: 'text',
           }
-  // One column holds the name, one the IGDB id, and one the platforms.
+  // One column holds the name, one the IGDB id, and one each the platforms.
   targets.value = targets.value.map((target, i) =>
     i === index
       ? next
       : (next.kind === 'name' ||
             next.kind === 'igdbId' ||
-            next.kind === 'platforms') &&
+            next.kind === 'platforms' ||
+            next.kind === 'wishlistPlatforms') &&
           target.kind === next.kind
         ? { kind: 'skip' }
         : target,
@@ -354,14 +356,18 @@ const platformReasons: Record<PlatformProblem['reason'], { key: string }> = {
   handAddedPlatforms: { key: 'import.platformProblems.handAddedPlatforms' },
   notOwnedPlatforms: { key: 'import.platformProblems.notOwnedPlatforms' },
   wantedPlatforms: { key: 'import.platformProblems.wantedPlatforms' },
+  ownedPlatforms: { key: 'import.platformProblems.ownedPlatforms' },
 }
-/** The heading of the column the platforms are read from. */
-const platformsHeader = computed(
-  () =>
-    headers.value[
-      targets.value.findIndex((target) => target.kind === 'platforms')
-    ] ?? '',
-)
+/** Table rows shown before "and N more". */
+const SHOWN_PROBLEMS = 100
+/** The heading of the column a platform problem came from. */
+const platformsHeader = (list: PlatformProblem['list']) =>
+  headers.value[
+    targets.value.findIndex(
+      (target) =>
+        target.kind === (list === 'owned' ? 'platforms' : 'wishlistPlatforms'),
+    )
+  ] ?? ''
 
 async function runImport() {
   const current = plan.value
@@ -493,6 +499,9 @@ async function runImport() {
                 }}</SelectItem>
                 <SelectItem value="platforms">{{
                   $t('import.targets.platforms')
+                }}</SelectItem>
+                <SelectItem value="wishlistPlatforms">{{
+                  $t('import.targets.wishlistPlatforms')
                 }}</SelectItem>
                 <SelectItem
                   v-for="field in fields"
@@ -706,7 +715,10 @@ async function runImport() {
               </TableHeader>
               <TableBody>
                 <TableRow
-                  v-for="(problem, index) in plan.problems.slice(0, 100)"
+                  v-for="(problem, index) in plan.problems.slice(
+                    0,
+                    SHOWN_PROBLEMS,
+                  )"
                   :key="index"
                 >
                   <TableCell class="tabular-nums">{{ problem.row }}</TableCell>
@@ -719,6 +731,18 @@ async function runImport() {
               </TableBody>
             </Table>
           </div>
+          <p
+            v-if="plan.problems.length > SHOWN_PROBLEMS"
+            class="text-sm text-muted-foreground"
+          >
+            {{
+              $t(
+                'import.moreProblems',
+                { count: plan.problems.length - SHOWN_PROBLEMS },
+                plan.problems.length - SHOWN_PROBLEMS,
+              )
+            }}
+          </p>
         </div>
       </div>
 
@@ -784,11 +808,14 @@ async function runImport() {
               </TableHeader>
               <TableBody>
                 <TableRow
-                  v-for="(problem, index) in platformProblems.slice(0, 100)"
+                  v-for="(problem, index) in platformProblems.slice(
+                    0,
+                    SHOWN_PROBLEMS,
+                  )"
                   :key="index"
                 >
                   <TableCell class="tabular-nums">{{ problem.row }}</TableCell>
-                  <TableCell>{{ platformsHeader }}</TableCell>
+                  <TableCell>{{ platformsHeader(problem.list) }}</TableCell>
                   <TableCell class="max-w-40 truncate">{{
                     problem.value
                   }}</TableCell>
@@ -799,6 +826,18 @@ async function runImport() {
               </TableBody>
             </Table>
           </div>
+          <p
+            v-if="platformProblems.length > SHOWN_PROBLEMS"
+            class="text-sm text-muted-foreground"
+          >
+            {{
+              $t(
+                'import.moreProblems',
+                { count: platformProblems.length - SHOWN_PROBLEMS },
+                platformProblems.length - SHOWN_PROBLEMS,
+              )
+            }}
+          </p>
         </div>
       </div>
 

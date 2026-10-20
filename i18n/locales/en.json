@@ -813,7 +813,8 @@
       "added": "Added",
       "released": "Released",
       "genre": "Genre",
-      "platforms": "Platforms"
+      "platforms": "Platforms",
+      "wishlistPlatforms": "Wishlist platforms"
     }
   },
   "import": {
@@ -842,6 +843,7 @@
       "igdbId": "IGDB ID",
       "new": "New field",
       "platforms": "Owned platforms",
+      "wishlistPlatforms": "Wishlist platforms",
       "skip": "Don't import"
     },
     "needsName": "Choose which column holds the game's name.",
@@ -861,12 +863,14 @@
       "badIgdbId": "Not an IGDB ID, so the game is added by hand",
       "doesNotFit": "Doesn't fit the field"
     },
-    "platformProblemsTitle": "{count} platform wasn't ticked | {count} platforms weren't ticked",
+    "platformProblemsTitle": "{count} platform wasn't added | {count} platforms weren't added",
+    "moreProblems": "and {count} more | and {count} more",
     "platformProblems": {
-      "unknownPlatform": "Not a platform this game is on in IGDB",
+      "unknownPlatform": "IGDB doesn't list this game on that platform",
       "handAddedPlatforms": "Games added by hand have no platforms",
       "notOwnedPlatforms": "This game is on your Wishlist, not Owned",
-      "wantedPlatforms": "Already on your Wishlist for this platform"
+      "wantedPlatforms": "Already on your Wishlist for this platform",
+      "ownedPlatforms": "Already marked as owned on this platform"
     },
     "progress": "Imported {done} of {total} games…",
     "failed": "The import stopped after {done} games. Those are saved: import the file again to finish, and they'll be updated rather than added twice.",

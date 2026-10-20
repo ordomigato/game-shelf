@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   COLLECTIONS_FILTER,
   columnOfSortKey,
+  GENRES_FILTER,
   pruneView,
   PLATFORMS_FILTER,
   sortKeyOf,
@@ -32,6 +33,7 @@ describe('viewFromQuery', () => {
           q: 'zelda',
           collection: ['a', 'b'],
           platform: '19',
+          genre: ['Adventure', 'Puzzle'],
           'f.status': ['Done', 'Playing'],
           'f.done': 'yes',
         },
@@ -46,6 +48,7 @@ describe('viewFromQuery', () => {
       filters: {
         [COLLECTIONS_FILTER]: ['a', 'b'],
         [PLATFORMS_FILTER]: ['19'],
+        [GENRES_FILTER]: ['Adventure', 'Puzzle'],
         status: ['Done', 'Playing'],
         done: ['yes'],
       },
@@ -69,6 +72,7 @@ describe('viewToQuery', () => {
       dir: 'desc',
       q: 'mario',
       collection: ['a'],
+      genre: ['RPG'],
       'f.status': ['Done'],
     }
     expect(viewToQuery(viewFromQuery(query, 50), { withSize: true })).toEqual(
@@ -102,6 +106,7 @@ describe('pruneView', () => {
         'f.kept': 'y',
         collection: 'c',
         platform: '1',
+        genre: 'Puzzle',
         q: 'a',
       },
       50,
@@ -113,6 +118,7 @@ describe('pruneView', () => {
         kept: ['y'],
         [COLLECTIONS_FILTER]: ['c'],
         [PLATFORMS_FILTER]: ['1'],
+        [GENRES_FILTER]: ['Puzzle'],
       },
     })
     expect(

@@ -119,8 +119,18 @@ export interface CollectionEntry extends Omit<
   wantedOn?: number[]
   /** On Owned and the Wishlist: the custom collections the game is in. */
   inCollections?: CollectionLink[]
-  /** On Owned and the Wishlist: short names of the platforms for that list. */
-  platforms?: string[]
+  /**
+   * Owner only: the platforms the catalog knows the game on, with short
+   * names. Empty for a game added by hand. `ownedOn` and `wantedOn` pick
+   * from these.
+   */
+  catalogPlatforms?: PlatformOption[]
+}
+
+/** A catalog platform, by IGDB id, with the short name to show. */
+export interface PlatformOption {
+  id: number
+  name: string
 }
 
 /**
@@ -141,7 +151,9 @@ export interface ListDetail {
   /** All the owner's fields, hidden ones included. */
   fields: FieldDefinition[]
   /** The platforms some game on this list is on, for the filter. */
-  platforms: { id: number; name: string }[]
+  platforms: PlatformOption[]
+  /** The genres some game on this list has, for the filter. */
+  genres: string[]
   /** Keys of the columns the owner hides on this list. */
   hiddenColumns: string[]
   items: OwnerEntry[]
@@ -150,7 +162,10 @@ export interface ListDetail {
 /** A game as its owner sees it: with its place on the lists. */
 export type OwnerEntry = CollectionEntry &
   Required<
-    Pick<CollectionEntry, 'owned' | 'wishlisted' | 'ownedOn' | 'wantedOn'>
+    Pick<
+      CollectionEntry,
+      'owned' | 'wishlisted' | 'ownedOn' | 'wantedOn' | 'catalogPlatforms'
+    >
   >
 
 /** A collection named next to a game, linking to it. */

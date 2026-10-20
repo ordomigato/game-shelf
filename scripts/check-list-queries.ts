@@ -164,6 +164,28 @@ for (const list of ['owned', 'wishlist'] as const) {
       platform: String(platform.id),
     })
   }
+  // Genres: one, two together, a name that is not a genre, and one beside a
+  // sort on the columns that read the same catalog row.
+  const genres = base?.genres ?? []
+  for (const genre of genres.slice(0, 5)) {
+    await run(list, `filter genre ${genre}`, { genre })
+  }
+  if (genres.length > 1) {
+    await run(list, 'filter two genres', { genre: genres.slice(0, 2) })
+  }
+  await run(list, `filter genre with quotes and wildcards`, {
+    genre: `x'%_\\; drop table games`,
+  })
+  if (genres[0]) {
+    for (const sort of ['year', 'genre']) {
+      await run(list, `filter genre ${genres[0]} + sort ${sort} desc`, {
+        genre: genres[0],
+        sort,
+        dir: 'desc',
+        size: '25',
+      })
+    }
+  }
   for (const field of fields) {
     if (field.type === 'checkbox') {
       for (const value of ['yes', 'no']) {

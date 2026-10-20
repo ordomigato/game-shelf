@@ -33,9 +33,11 @@ import {
 import { useDb } from './db'
 import {
   catalogJoin,
+  catalogPlatformsOf,
   customCollectionsOf,
   getOwnedItem,
   itemName,
+  platformNames,
   toLibraryItem,
 } from './collections'
 import { isFiltered, listOrder, listWhere, type ListQuery } from './list-query'
@@ -50,20 +52,6 @@ export function listStateOf(row: ItemRow): ListState {
     ownedOn: row.ownedOn,
     wantedOn: row.wantedOn,
   }
-}
-
-/** The short name to show for each platform id. */
-async function platformNames(ids: number[]): Promise<Map<number, string>> {
-  const unique = [...new Set(ids)]
-  if (!unique.length) return new Map()
-  const rows = await useDb()
-    .select({
-      id: platforms.igdbId,
-      name: sql<string>`coalesce(${platforms.abbreviation}, ${platforms.name})`,
-    })
-    .from(platforms)
-    .where(inArray(platforms.igdbId, unique))
-  return new Map(rows.map((row) => [row.id, row.name]))
 }
 
 /** The platforms some game on the list is on, for the filter. */
@@ -93,6 +81,27 @@ async function platformChoices(
     .from(platforms)
     .where(inArray(platforms.igdbId, onList))
   return rows.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** The genres some game on the list has, for the filter. */
+async function genreChoices(
+  ownerId: string,
+  list: ListName,
+): Promise<string[]> {
+  const rows = await useDb()
+    .selectDistinct({ name: sql<string>`unnest(${catalogGames.genres})` })
+    .from(libraryItems)
+    .innerJoin(catalogGames, catalogJoin)
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        eq(
+          list === 'owned' ? libraryItems.owned : libraryItems.wishlisted,
+          true,
+        ),
+      ),
+    )
+  return rows.map((row) => row.name).sort((a, b) => a.localeCompare(b))
 }
 
 /**
@@ -132,12 +141,13 @@ export async function getListPage(
       .limit(query.size)
       .offset((page - 1) * query.size)
 
-  const [matching, listSize, firstTry, platformOptions, library] =
+  const [matching, listSize, firstTry, platformOptions, genreOptions, library] =
     await Promise.all([
       countWhere(where),
       isFiltered(query) ? countWhere(onList) : null,
       pageOf(query.page),
       platformChoices(ownerId, list),
+      genreChoices(ownerId, list),
       db
         .select({ value: count() })
         .from(libraryItems)
@@ -148,21 +158,19 @@ export async function getListPage(
   const page = Math.min(query.page, Math.max(1, Math.ceil(total / query.size)))
   const rows = page === query.page ? firstTry : await pageOf(page)
 
-  const platformIdsOf = (item: ItemRow) =>
-    list === 'owned' ? item.ownedOn : item.wantedOn
   const [inCollections, names] = await Promise.all([
     customCollectionsOf(
       ownerId,
       rows.map(({ item }) => item.id),
     ),
-    platformNames(rows.flatMap(({ item }) => platformIdsOf(item))),
+    platformNames(rows.flatMap(({ game }) => game?.platformIds ?? [])),
   ])
   const items: OwnerEntry[] = rows.map(({ item, game }) => ({
     ...toLibraryItem(item, game),
     addedAt: item.createdAt.toISOString(),
     wanted: item.wishlisted,
     inCollections: inCollections.get(item.id) ?? [],
-    platforms: platformIdsOf(item).flatMap((id) => names.get(id) ?? []),
+    catalogPlatforms: catalogPlatformsOf(game, names),
   }))
   return {
     list,
@@ -173,6 +181,7 @@ export async function getListPage(
     size: query.size,
     fields,
     platforms: platformOptions,
+    genres: genreOptions,
     hiddenColumns: knownHiddenColumns(
       listColumns[list],
       'list',

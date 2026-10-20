@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogRow } from './catalog'
-import { toCollectionEntry, toLibraryItem } from './collections'
+import {
+  catalogPlatformsOf,
+  toCollectionEntry,
+  toLibraryItem,
+} from './collections'
 
 const item = {
   id: '30000000-0000-4000-8000-000000000001',
@@ -112,9 +116,54 @@ describe('toCollectionEntry', () => {
   it('gives a visitor only whether the game is wanted', () => {
     const entry = toCollectionEntry(both, game, new Date(0), false)
     expect(entry.wanted).toBe(true)
-    for (const key of ['owned', 'wishlisted', 'ownedOn', 'wantedOn']) {
+    for (const key of [
+      'owned',
+      'wishlisted',
+      'ownedOn',
+      'wantedOn',
+      'catalogPlatforms',
+    ]) {
       expect(entry).not.toHaveProperty(key)
     }
     expect(toCollectionEntry(item, game, new Date(0), false).wanted).toBe(false)
+  })
+
+  it('shows a visitor the year and genres but no platforms', () => {
+    const names = new Map([[19, 'SNES']])
+    const entry = toCollectionEntry(both, game, new Date(0), false, names)
+    expect(entry).toMatchObject({
+      year: 1991,
+      genres: ['Adventure', 'Role-playing (RPG)'],
+    })
+    expect(JSON.stringify(entry)).not.toContain('SNES')
+  })
+
+  it('gives the owner the catalog platforms to pick from, named', () => {
+    const names = new Map([[19, 'SNES']])
+    expect(
+      toCollectionEntry(both, game, new Date(0), true, names),
+    ).toMatchObject({ catalogPlatforms: [{ id: 19, name: 'SNES' }] })
+  })
+})
+
+describe('catalogPlatformsOf', () => {
+  const names = new Map([
+    [19, 'SNES'],
+    [4, 'N64'],
+    [7, 'Wii'],
+  ])
+
+  it('names the game’s platforms in name order and skips unknown ones', () => {
+    expect(
+      catalogPlatformsOf({ ...game, platformIds: [19, 99, 7, 4] }, names),
+    ).toEqual([
+      { id: 4, name: 'N64' },
+      { id: 19, name: 'SNES' },
+      { id: 7, name: 'Wii' },
+    ])
+  })
+
+  it('has none for a game added by hand', () => {
+    expect(catalogPlatformsOf(null, names)).toEqual([])
   })
 })

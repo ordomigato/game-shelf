@@ -7,7 +7,7 @@ import {
   isFieldKey,
   LIST_SORT_COLUMNS,
 } from '../../shared/utils/list-view'
-import { libraryItems } from '../db/schema'
+import { games as catalogGames, libraryItems } from '../db/schema'
 import { itemName } from './collections'
 
 /** What a list page asks for, once checked against the user's fields. */
@@ -22,6 +22,8 @@ export interface ListQuery {
   searchFields: FieldDefinition[]
   collectionIds: string[]
   platformIds: number[]
+  /** Genre names: a game matches when it has any of them. */
+  genres: string[]
   fieldFilters: { field: FieldDefinition; values: string[] }[]
 }
 
@@ -52,6 +54,7 @@ const baseSchema = z.object({
     asArray,
     z.array(z.coerce.number().int().positive().max(2_000_000_000)).max(50),
   ),
+  genre: z.preprocess(asArray, z.array(z.string().min(1).max(100)).max(50)),
 })
 
 const badRequest = (statusMessage: string) =>
@@ -70,7 +73,7 @@ export function parseListQuery(
 ): ListQuery {
   const parsed = baseSchema.safeParse(raw)
   if (!parsed.success) throw badRequest('Invalid list query')
-  const { sort: sortKey, collection, platform, ...rest } = parsed.data
+  const { sort: sortKey, collection, platform, genre, ...rest } = parsed.data
   const byId = new Map(fields.map((field) => [field.id, field]))
 
   let sort: ListSort | null = null
@@ -119,6 +122,7 @@ export function parseListQuery(
     ),
     collectionIds: collection,
     platformIds: platform,
+    genres: genre,
     fieldFilters,
   }
 }
@@ -129,6 +133,7 @@ export const isFiltered = (query: ListQuery) =>
     query.q ||
     query.collectionIds.length ||
     query.platformIds.length ||
+    query.genres.length ||
     query.fieldFilters.length,
   )
 
@@ -231,6 +236,13 @@ export function listWhere(
       sql`${platformColumn(list)} && ${intList(query.platformIds)}`,
     )
   }
+  if (query.genres.length) {
+    // Games added by hand have no catalog row, so no genres: the guard keeps
+    // the array operator off a null.
+    conditions.push(
+      sql`(case when ${catalogGames.igdbId} is not null then ${catalogGames.genres} && ${textList(query.genres)} else false end)`,
+    )
+  }
   for (const { field, values } of query.fieldFilters) {
     const condition = fieldFilter(field, values)
     if (condition) conditions.push(condition)
@@ -267,6 +279,10 @@ function sortValue(sort: ListSort, list: ListName, ownerId: string): SQL {
       return sql`lower(${itemName})`
     case 'addedAt':
       return sql`library_items.created_at`
+    case 'year':
+      return sql`${catalogGames.releaseDate}`
+    case 'genre':
+      return sql`lower((${catalogGames.genres})[1])`
     case 'platforms':
       return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = (${platformColumn(list)})[1])`
     case 'inCollections':
@@ -284,7 +300,7 @@ function sortsAsText(sort: ListSort): boolean {
   if ('field' in sort) {
     return ['text', 'select', 'multiselect'].includes(sort.field.type)
   }
-  return sort.column !== 'addedAt'
+  return sort.column !== 'addedAt' && sort.column !== 'year'
 }
 
 /**

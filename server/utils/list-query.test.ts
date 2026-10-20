@@ -47,6 +47,7 @@ describe('parseListQuery', () => {
       searchFields: [fields[4], fields[5], fields[6]],
       collectionIds: [],
       platformIds: [],
+      genres: [],
       fieldFilters: [],
     })
   })
@@ -60,6 +61,7 @@ describe('parseListQuery', () => {
       q: '  zelda ',
       collection: [collection],
       platform: ['19', '12'],
+      genre: ['Adventure', 'Role-playing (RPG)'],
       'f.status': ['Done'],
       'f.done': 'yes',
     })
@@ -70,6 +72,7 @@ describe('parseListQuery', () => {
     expect(query.q).toBe('zelda')
     expect(query.collectionIds).toEqual([collection])
     expect(query.platformIds).toEqual([19, 12])
+    expect(query.genres).toEqual(['Adventure', 'Role-playing (RPG)'])
     expect(query.fieldFilters.map((f) => [f.field.id, f.values])).toEqual([
       ['status', ['Done']],
       ['done', ['yes']],
@@ -77,7 +80,14 @@ describe('parseListQuery', () => {
   })
 
   it('accepts the built-in columns', () => {
-    for (const column of ['name', 'inCollections', 'platforms', 'addedAt']) {
+    for (const column of [
+      'name',
+      'inCollections',
+      'year',
+      'genre',
+      'platforms',
+      'addedAt',
+    ]) {
       expect(parse({ sort: column }).sort).toEqual({ column })
     }
   })
@@ -92,6 +102,12 @@ describe('parseListQuery', () => {
     ['a checkbox filter that is not yes or no', { 'f.done': 'maybe' }],
     ['a collection that is not an id', { collection: 'x' }],
     ['a platform that is not a number', { platform: '1; drop table x' }],
+    ['a genre that is empty', { genre: '' }],
+    ['a genre that is too long', { genre: 'x'.repeat(101) }],
+    [
+      'too many genres',
+      { genre: Array.from({ length: 51 }, (_, i) => `g${i}`) },
+    ],
     ['a search that is too long', { q: 'x'.repeat(101) }],
     ['a page given twice', { page: ['1', '2'] }],
   ])('rejects %s', (_name, raw) => {
@@ -126,6 +142,7 @@ describe('isFiltered', () => {
     expect(isFiltered(parse({ q: 'a' }))).toBe(true)
     expect(isFiltered(parse({ 'f.done': 'yes' }))).toBe(true)
     expect(isFiltered(parse({ platform: '1' }))).toBe(true)
+    expect(isFiltered(parse({ genre: 'RPG' }))).toBe(true)
     expect(isFiltered(parse({ collection: collection }))).toBe(true)
   })
 })
@@ -205,6 +222,16 @@ describe('listWhere', () => {
     )
   })
 
+  it('filters genres by any overlap, guarded for games with no catalog row', () => {
+    const { sql, params } = where({ genre: ["Puzzle'; drop table x", 'RPG'] })
+    expect(sql).toContain(
+      '(case when "games"."igdb_id" is not null then "games"."genres" && ARRAY[$3, $4]::text[] else false end)',
+    )
+    expect(sql).not.toContain('Puzzle')
+    expect(params.slice(2)).toEqual(["Puzzle'; drop table x", 'RPG'])
+    expect(sql).toContain('"library_items"."owner_id" = $1')
+  })
+
   it('filters a checkbox to ticked, or to everything not ticked', () => {
     expect(where({ 'f.done': 'yes' }).sql).toContain(
       "coalesce(((library_items.data -> $3::text) = 'true'::jsonb), false)",
@@ -281,6 +308,21 @@ describe('listOrder', () => {
     )
   })
 
+  it('sorts the year by the release date, empty last, without word order', () => {
+    expect(order({ sort: 'year' })[0]).toBe(
+      '"games"."release_date" asc nulls last',
+    )
+    expect(order({ sort: 'year', dir: 'desc' })[0]).toBe(
+      '"games"."release_date" desc nulls last',
+    )
+  })
+
+  it('sorts the genre by the first genre, in natural order', () => {
+    expect(order({ sort: 'genre' })[0]).toBe(
+      'lower(("games"."genres")[1]) collate "natural_sort" asc nulls last',
+    )
+  })
+
   it('sorts collections by name, only the owners own', () => {
     const names = renderAll(
       listOrder(owner, 'owned', parse({ sort: 'inCollections' })),
@@ -309,6 +351,7 @@ describe('listOrder', () => {
     for (const sort of [
       'name',
       'platforms',
+      'genre',
       'inCollections',
       'f.status',
       'f.note',
@@ -316,7 +359,7 @@ describe('listOrder', () => {
     ]) {
       expect(order({ sort })[0]).toContain(' collate "natural_sort" asc')
     }
-    for (const sort of ['addedAt', 'f.price', 'f.bought', 'f.done']) {
+    for (const sort of ['addedAt', 'year', 'f.price', 'f.bought', 'f.done']) {
       expect(order({ sort })[0]).not.toContain('collate')
     }
   })

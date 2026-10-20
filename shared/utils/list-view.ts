@@ -10,11 +10,14 @@ export const DEFAULT_LIST_PAGE_SIZE = 50
 /** Filter keys that aren't fields. */
 export const COLLECTIONS_FILTER = '__collections'
 export const PLATFORMS_FILTER = '__platforms'
+export const GENRES_FILTER = '__genres'
 
 /** Sort keys for the columns every list has. Fields sort as `f.<id>`. */
 export const LIST_SORT_COLUMNS = [
   'name',
   'inCollections',
+  'year',
+  'genre',
   'platforms',
   'addedAt',
 ] as const
@@ -76,6 +79,8 @@ export function viewFromQuery(query: RawQuery, defaultSize: number): ListView {
   if (collections.length) filters[COLLECTIONS_FILTER] = collections
   const platforms = many(query.platform)
   if (platforms.length) filters[PLATFORMS_FILTER] = platforms
+  const genres = many(query.genre)
+  if (genres.length) filters[GENRES_FILTER] = genres
   return {
     page: Number.isInteger(page) && page >= 1 ? page : 1,
     size: (LIST_PAGE_SIZES as readonly number[]).includes(size)
@@ -98,6 +103,7 @@ export function pruneView(view: ListView, fieldIds: Set<string>): ListView {
       ([key]) =>
         key === COLLECTIONS_FILTER ||
         key === PLATFORMS_FILTER ||
+        key === GENRES_FILTER ||
         fieldIds.has(key),
     ),
   )
@@ -128,6 +134,7 @@ export function viewToQuery(
     if (!values.length) continue
     if (key === COLLECTIONS_FILTER) query.collection = values
     else if (key === PLATFORMS_FILTER) query.platform = values
+    else if (key === GENRES_FILTER) query.genre = values
     else query[`${FIELD_PREFIX}${key}`] = values
   }
   return query

@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { allColumnsKnown, columnKeys, knownHiddenColumns } from './columns'
 
 describe('columnKeys', () => {
-  it('gives a collection only the Added column besides its fields', () => {
+  it('gives a collection the core columns and Added besides its fields', () => {
     expect([...columnKeys('collection', ['status'])]).toEqual([
+      'year',
+      'genre',
+      'platforms',
       'addedAt',
       'status',
     ])
   })
 
-  it('gives the lists their collections and platforms too', () => {
-    expect(columnKeys('list', []).has('platforms')).toBe(true)
+  it('gives the lists the same core columns, and their collections', () => {
+    for (const key of ['year', 'genre', 'platforms']) {
+      expect(columnKeys('list', []).has(key)).toBe(true)
+      expect(columnKeys('collection', []).has(key)).toBe(true)
+    }
     expect(columnKeys('list', []).has('inCollections')).toBe(true)
-    expect(columnKeys('collection', []).has('platforms')).toBe(false)
+    expect(columnKeys('collection', []).has('inCollections')).toBe(false)
   })
 
   it('never lets the name be hidden', () => {
@@ -42,7 +48,7 @@ describe('allColumnsKnown', () => {
   })
 
   it('rejects a key the table does not have', () => {
-    expect(allColumnsKnown(['platforms'], 'collection', [])).toBe(false)
+    expect(allColumnsKnown(['inCollections'], 'collection', [])).toBe(false)
     expect(allColumnsKnown(['name'], 'list', [])).toBe(false)
     expect(allColumnsKnown(['nope'], 'list', ['status'])).toBe(false)
   })

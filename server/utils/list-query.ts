@@ -18,6 +18,8 @@ export interface ListQuery {
   dir: 'asc' | 'desc'
   /** Text the game's name must contain. Empty for no search. */
   q: string
+  /** The fields whose text a search reads: text, select and multiselect. */
+  searchFields: FieldDefinition[]
   collectionIds: string[]
   platformIds: number[]
   fieldFilters: { field: FieldDefinition; values: string[] }[]
@@ -112,6 +114,9 @@ export function parseListQuery(
   return {
     ...rest,
     sort,
+    searchFields: fields.filter((field) =>
+      ['text', 'select', 'multiselect'].includes(field.type),
+    ),
     collectionIds: collection,
     platformIds: platform,
     fieldFilters,
@@ -172,6 +177,31 @@ function fieldFilter(field: FieldDefinition, values: string[]): SQL | null {
   return sql`(jsonb_typeof(${value}) = 'array' and exists (select 1 from jsonb_array_elements_text(${value}) as choice(name) where choice.name = any(${textList(values)})))`
 }
 
+/** Whether a word appears in the parts of a game the search reads. */
+function wordMatch(
+  ownerId: string,
+  list: ListName,
+  searchFields: FieldDefinition[],
+  word: string,
+): SQL {
+  const pattern = `%${escapeLike(word)}%`
+  const like = (column: SQL) => sql`${column} ilike ${pattern} escape '\\'`
+  const parts: SQL[] = [
+    like(sql`${itemName}`),
+    sql`exists (select 1 from collection_items as entry inner join collections as searched_collection on searched_collection.id = entry.collection_id where entry.item_id = library_items.id and searched_collection.owner_id = ${ownerId} and ${like(sql`searched_collection.title`)})`,
+    sql`exists (select 1 from platforms as searched_platform where searched_platform.igdb_id = any(${platformColumn(list)}) and ${like(sql`coalesce(searched_platform.abbreviation, searched_platform.name)`)})`,
+  ]
+  for (const field of searchFields) {
+    const value = valueOf(field)
+    parts.push(
+      field.type === 'multiselect'
+        ? sql`(jsonb_typeof(${value}) = 'array' and exists (select 1 from jsonb_array_elements_text(${value}) as searched_choice(name) where ${like(sql`searched_choice.name`)}))`
+        : sql`(jsonb_typeof(${value}) = 'string' and ${like(sql`(${value} #>> '{}')`)})`,
+    )
+  }
+  return sql`(${sql.join(parts, sql` or `)})`
+}
+
 /**
  * The rows of one list that match, always the owner's. Must run against a
  * query from `library_items` left joined to the catalog game.
@@ -185,10 +215,10 @@ export function listWhere(
     eq(libraryItems.ownerId, ownerId),
     eq(list === 'owned' ? libraryItems.owned : libraryItems.wishlisted, true),
   ]
-  if (query.q) {
-    conditions.push(
-      sql`${itemName} ilike ${`%${escapeLike(query.q)}%`} escape '\\'`,
-    )
+  // Every word must be found somewhere: in the name, a text or choice value,
+  // a collection title or a platform name.
+  for (const word of query.q.split(/\s+/).filter(Boolean)) {
+    conditions.push(wordMatch(ownerId, list, query.searchFields, word))
   }
   if (query.collectionIds.length) {
     conditions.push(

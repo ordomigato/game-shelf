@@ -369,10 +369,10 @@ function onRenamed(saved: LibraryItem) {
           <Button variant="outline" :disabled="exporting" @click="exportCsv">
             <Download />
             <span class="hidden sm:inline">{{
-              $t('collection.exportCsv')
+              $t('lists.exportAll', data.itemCount)
             }}</span>
             <span class="sr-only sm:hidden">{{
-              $t('collection.exportCsv')
+              $t('lists.exportAll', data.itemCount)
             }}</span>
           </Button>
           <Button v-if="!fullCap" as-child>

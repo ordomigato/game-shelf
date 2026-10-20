@@ -44,6 +44,7 @@ describe('parseListQuery', () => {
       sort: null,
       dir: 'asc',
       q: '',
+      searchFields: [fields[4], fields[5], fields[6]],
       collectionIds: [],
       platformIds: [],
       fieldFilters: [],
@@ -154,6 +155,35 @@ describe('listWhere', () => {
     expect(sql).toContain('ilike')
     expect(sql).toContain('coalesce("games"."name", "library_items"."name")')
     expect(params).toContain('%50\\%\\_off\\\\%')
+  })
+
+  it('also searches text and choice values, collection titles and platform names', () => {
+    const { sql, params } = where({ q: "Zelda'; drop table x" })
+    expect(sql).not.toContain('Zelda')
+    expect(sql).toContain('searched_collection.title')
+    expect(sql).toContain('searched_collection.owner_id =')
+    expect(sql).toContain(
+      'coalesce(searched_platform.abbreviation, searched_platform.name)',
+    )
+    expect(sql).toContain(
+      'searched_platform.igdb_id = any(library_items.owned_on)',
+    )
+    expect(sql).toContain('searched_choice.name')
+    // Text and select (Status, Note) and multiselect (Tags), not the others.
+    expect(params).toContain('status')
+    expect(params).toContain('note')
+    expect(params).toContain('tags')
+    expect(params).not.toContain('price')
+    expect(params).toContain("%Zelda';%")
+    expect(params).toContain('%drop%')
+  })
+
+  it('needs every word, each found in any of those places', () => {
+    const { sql } = where({ q: 'mario  snes' })
+    expect(sql.match(/searched_collection\.title/g)).toHaveLength(2)
+    expect(where({ q: 'x' }, 'wishlist').sql).toContain(
+      'any(library_items.wanted_on)',
+    )
   })
 
   it('filters platforms on the list being read', () => {

@@ -10,7 +10,6 @@ import {
 } from '@lucide/vue'
 import { FetchError } from 'ofetch'
 import { toast } from 'vue-sonner'
-import { PLAN_LIMITS } from '#shared/utils/plans'
 import {
   DEFAULT_LIST_PAGE_SIZE,
   LIST_PAGE_SIZES,
@@ -37,7 +36,7 @@ import type {
 const props = defineProps<{ list: ListName }>()
 
 const route = useRoute()
-const { t, n, locale } = useI18n()
+const { t, n } = useI18n()
 const { limits } = usePlan()
 const collections = useCollections()
 const leaving = useUnownConfirm()
@@ -184,29 +183,15 @@ const tableServer = computed(() =>
     : undefined,
 )
 
-// Only the Wishlist has a cap of its own. Over it, games can be kept and
-// removed but not added.
-const capped = computed(() => props.list === 'wishlist')
-const count = computed(() => data.value?.itemCount ?? 0)
-const overCap = computed(
-  () => capped.value && count.value > limits.value.wishlist,
-)
-const fullCap = computed(
-  () => capped.value && count.value >= limits.value.wishlist,
-)
-// Owned counts against the account's games limit, the Wishlist against its
-// own.
-const usage = computed(() =>
-  props.list === 'owned'
-    ? { used: count.value, limit: limits.value.games }
-    : { used: count.value, limit: limits.value.wishlist },
-)
-// Thousands get a separator in the reader's language.
-const shown = computed(() => ({
-  used: n(usage.value.used),
-  limit: n(usage.value.limit),
-}))
-const proWishlist = PLAN_LIMITS.pro.wishlist
+// The games limit counts the whole library, owned and wishlisted, so both
+// headers show the library total first, then this list's own count.
+// How each header words the count of its own list.
+const usageKey = {
+  owned: { key: 'limits.ownedUsage' },
+  wishlist: { key: 'limits.wishlistUsage' },
+}
+const total = computed(() => data.value?.libraryCount ?? 0)
+const overLimit = computed(() => total.value > limits.value.games)
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
@@ -429,13 +414,26 @@ function onRenamed(saved: LibraryItem) {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span
+            <i18n-t
+              scope="global"
+              :keypath="usageKey[list].key"
+              tag="span"
               data-testid="list-usage"
-              :class="{
-                'font-medium text-destructive': usage.used > usage.limit,
-              }"
-              >{{ $t('limits.gamesUsed', shown) }}</span
             >
+              <template #used>
+                <span
+                  data-testid="list-total"
+                  :class="{ 'font-medium text-destructive': overLimit }"
+                  >{{
+                    $t('limits.usedOf', {
+                      used: n(total),
+                      limit: n(limits.games),
+                    })
+                  }}</span
+                >
+              </template>
+              <template #count>{{ n(data.itemCount) }}</template>
+            </i18n-t>
           </div>
           <p class="max-w-prose text-sm text-muted-foreground">
             {{
@@ -450,20 +448,15 @@ function onRenamed(saved: LibraryItem) {
             <Lock class="size-3" aria-hidden="true" />
             {{ $t('lists.onlyYou') }}
           </Badge>
-          <Button v-if="!fullCap" as-child>
+          <Button as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
               {{ $t('collection.addGames') }}
             </NuxtLink>
           </Button>
-          <Button v-else disabled>
-            <Plus />
-            {{ $t('collection.addGames') }}
-          </Button>
           <Button
             v-if="ADD_BY_HAND"
             variant="outline"
-            :disabled="fullCap"
             @click="addingByHand = true"
           >
             <PenLine />
@@ -495,23 +488,6 @@ function onRenamed(saved: LibraryItem) {
           </DropdownMenu>
         </div>
       </div>
-
-      <Alert v-if="overCap" variant="destructive" data-testid="over-limit">
-        <AlertTitle>{{
-          $t('limits.overWishlist', {
-            used: data.itemCount,
-            limit: limits.wishlist,
-          })
-        }}</AlertTitle>
-        <AlertDescription>
-          {{ $t('limits.overGamesHelp', { limit: limits.wishlist }) }}
-          <NuxtLink v-if="proWishlist > limits.wishlist" to="/pricing">{{
-            $t('limits.proAllows', {
-              limit: new Intl.NumberFormat(locale).format(proWishlist),
-            })
-          }}</NuxtLink>
-        </AlertDescription>
-      </Alert>
 
       <div
         v-if="!data.itemCount"

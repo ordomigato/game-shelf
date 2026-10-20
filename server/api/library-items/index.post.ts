@@ -37,10 +37,9 @@ export default defineEventHandler(
     const limits = userLimits(user)
     const existingId = await itemIdForIgdb(user.id, game.igdbId)
     await assertRoomToAdd(user.id, existingId, collectionIds, limits)
-    // A game already in the library is checked when it joins a list.
+    // Only a new game takes room. One already in the library is just moved.
     if (!existingId) {
-      if (list === 'wishlist') await assertListRoom(user.id, list, 1, limits)
-      else await assertOwnedRoom(user.id, 1, limits)
+      await assertLibraryRoom(user.id, 1, limits)
     }
     // The catalog gets the game from IGDB, never the name and cover sent.
     const [catalogGame] =
@@ -68,7 +67,7 @@ export default defineEventHandler(
           platforms: [...named, ...platforms],
         })
       }
-      saved = await changeItemLists(user.id, item.id, actions, limits)
+      saved = await changeItemLists(user.id, item.id, actions)
     }
     return {
       item: saved!,

@@ -184,12 +184,6 @@ const isFull = (collection: CollectionSummary) =>
     selected.value.has(collection.id),
   )
 
-const wishlistFull = computed(
-  () =>
-    item.value?.wishlisted !== true &&
-    (myCollections.counts.value?.wishlist ?? 0) >= limits.value.wishlist,
-)
-
 function startCreating() {
   open.value = false
   creating.value = true
@@ -230,16 +224,11 @@ async function onCreated(collection: CollectionSummary) {
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           :model-value="item?.wishlisted === true"
-          :disabled="saving.has('wishlist') || wishlistFull"
+          :disabled="saving.has('wishlist')"
           @update:model-value="toggleList('wishlist', $event === true)"
           @select.prevent
         >
           {{ $t('shelf.wishlist') }}
-          <span
-            v-if="wishlistFull"
-            class="ml-auto pl-2 text-xs text-muted-foreground"
-            >{{ $t('addToCollection.full') }}</span
-          >
         </DropdownMenuCheckboxItem>
         <template v-if="platforms.length">
           <DropdownMenuSub

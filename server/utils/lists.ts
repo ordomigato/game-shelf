@@ -24,7 +24,6 @@ import {
 } from '../../shared/utils/lists'
 import { knownHiddenColumns } from '../../shared/utils/columns'
 import type { ExportItem } from '../../shared/utils/csv'
-import type { PlanLimits } from '../../shared/utils/plans'
 import {
   games as catalogGames,
   libraryItems,
@@ -40,7 +39,6 @@ import {
   toLibraryItem,
 } from './collections'
 import { isFiltered, listOrder, listWhere, type ListQuery } from './list-query'
-import { assertListRoom, assertOwnedRoom } from './limits'
 
 type ItemRow = typeof libraryItems.$inferSelect
 
@@ -134,12 +132,17 @@ export async function getListPage(
       .limit(query.size)
       .offset((page - 1) * query.size)
 
-  const [matching, listSize, firstTry, platformOptions] = await Promise.all([
-    countWhere(where),
-    isFiltered(query) ? countWhere(onList) : null,
-    pageOf(query.page),
-    platformChoices(ownerId, list),
-  ])
+  const [matching, listSize, firstTry, platformOptions, library] =
+    await Promise.all([
+      countWhere(where),
+      isFiltered(query) ? countWhere(onList) : null,
+      pageOf(query.page),
+      platformChoices(ownerId, list),
+      db
+        .select({ value: count() })
+        .from(libraryItems)
+        .where(eq(libraryItems.ownerId, ownerId)),
+    ])
   const total = matching[0]?.value ?? 0
   const itemCount = listSize ? (listSize[0]?.value ?? 0) : total
   const page = Math.min(query.page, Math.max(1, Math.ceil(total / query.size)))
@@ -164,6 +167,7 @@ export async function getListPage(
   return {
     list,
     itemCount,
+    libraryCount: library[0]?.value ?? 0,
     total,
     page,
     size: query.size,
@@ -283,8 +287,8 @@ const stillIn = (id: string, ownerId: string, read: ListState) =>
 /**
  * Changes a game's place on the lists, one action after another, and
  * saves the result once. A game left on neither list is deleted with its
- * values and collection links, and the answer is null. Room is checked when
- * the game becomes owned, or joins the Wishlist.
+ * values and collection links, and the answer is null. A game only moves
+ * between the lists here, so it never needs room in the library.
  *
  * The write only happens if the game is still in the state it was read in,
  * so a change made from a stale page can't undo another one (or delete a
@@ -295,7 +299,6 @@ export async function changeItemLists(
   ownerId: string,
   itemId: string,
   actions: ListAction[],
-  limits: PlanLimits,
 ): Promise<LibraryItem | null> {
   const db = useDb()
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -316,12 +319,6 @@ export async function changeItemLists(
         .returning({ id: libraryItems.id })
       if (deleted.length) return null
       continue
-    }
-    if (state.owned && !before.owned) {
-      await assertOwnedRoom(ownerId, 1, limits)
-    }
-    if (state.wishlisted && !before.wishlisted) {
-      await assertListRoom(ownerId, 'wishlist', 1, limits)
     }
     const [updated] = await db
       .update(libraryItems)

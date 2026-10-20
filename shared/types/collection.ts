@@ -131,6 +131,8 @@ export interface ListDetail {
   list: ListName
   /** Every game on the list, whatever the search and filters. */
   itemCount: number
+  /** Every game in the library, owned or wishlisted, each once. */
+  libraryCount: number
   /** The games matching the search and filters. */
   total: number
   /** The page these items are, from 1. The server keeps it in range. */

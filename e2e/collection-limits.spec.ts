@@ -234,7 +234,8 @@ test('an import that would pass the library limit is blocked at the preview', as
         plan: 'free',
         collections: 1,
         games: 2990,
-        wishlist: 0,
+        owned: 2000,
+        wishlist: 990,
         fields: 0,
       },
     }),
@@ -244,7 +245,7 @@ test('an import that would pass the library limit is blocked at the preview', as
   await page.getByLabel('Choose a CSV file').setInputFiles(csvOf(rows))
   await toReview(page)
   await expect(
-    page.getByText('This import adds 50 new games. You can own 10 more.'),
+    page.getByText('This import adds 50 new games. You can add 10 more.'),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: /^Import/ })).toBeDisabled()
 })
@@ -255,7 +256,14 @@ test('a refusal partway says how many rows were already imported', async ({
   await matchNothing(page)
   await page.route('**/api/me/usage', (route) =>
     route.fulfill({
-      json: { plan: 'pro', collections: 1, games: 0, wishlist: 0, fields: 0 },
+      json: {
+        plan: 'pro',
+        collections: 1,
+        games: 0,
+        owned: 0,
+        wishlist: 0,
+        fields: 0,
+      },
     }),
   )
   let calls = 0
@@ -281,7 +289,7 @@ test('a refusal partway says how many rows were already imported', async ({
   await page.getByRole('button', { name: /^Import 300/ }).click()
   await expect(
     page.getByText(
-      'Imported 250 of 300 rows. Then: You can own up to 10000 games on your plan.',
+      'Imported 250 of 300 rows. Then: You can have up to 10000 games on your plan, owned or wishlisted.',
     ),
   ).toBeVisible()
 })
@@ -299,49 +307,18 @@ test('a file that only updates games already there imports into a full collectio
   await expect(page.getByRole('button', { name: /^Import/ })).toBeEnabled()
 })
 
-test('the Wishlist over its cap warns and stops adding', async ({ page }) => {
-  await signInAs(page, { username: 'retro_fan' })
-  await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
-  await page.route('**/api/lists', (route) =>
-    route.fulfill({ json: { owned: 0, wishlist: 230 } }),
-  )
-  await page.route(/\/api\/u\/retro_fan\/lists\/wishlist(\?.*)?$/, (route) =>
-    route.fulfill({
-      json: {
-        list: 'wishlist',
-        itemCount: 230,
-        total: 230,
-        page: 1,
-        size: 50,
-        fields: [],
-        platforms: [],
-        items: Array.from({ length: 3 }, (_, i) => entry(i)),
-      },
-    }),
-  )
-  await page.goto('/u/retro_fan/shelf/wishlist')
-  const alert = page.getByTestId('over-limit')
-  await expect(alert).toContainText(
-    'Your Wishlist has 230 games. Your plan allows 200.',
-  )
-  await expect(
-    alert.getByRole('link', { name: 'Pro allows 2,000. See plans.' }),
-  ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Add games' })).toBeDisabled()
-})
-
 test('Pricing and Settings show the new numbers', async ({ page }) => {
   await page.goto('/pricing')
   const free = page.getByRole('region', { name: 'Free' })
   await expect(free.getByText('100 games per collection')).toBeVisible()
-  await expect(free.getByText('200 games on the Wishlist')).toBeVisible()
+  await expect(free.getByText('3,000 games, owned or wishlisted')).toBeVisible()
+  await expect(free.getByText('games on the Wishlist')).toHaveCount(0)
   const pro = page.getByRole('region', { name: 'Pro' })
   await expect(pro.getByText('1,000 games per collection')).toBeVisible()
-  await expect(pro.getByText('2,000 games on the Wishlist')).toBeVisible()
-  await expect(pro.getByText('10,000 owned games')).toBeVisible()
+  await expect(pro.getByText('10,000 games, owned or wishlisted')).toBeVisible()
 })
 
-test('Settings warns when owned games are over the limit', async ({ page }) => {
+test('Settings warns when the library is over the limit', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/me/usage', (route) =>
@@ -350,6 +327,7 @@ test('Settings warns when owned games are over the limit', async ({ page }) => {
         plan: 'free',
         collections: 3,
         games: 3400,
+        owned: 3390,
         wishlist: 10,
         fields: 2,
       },
@@ -357,6 +335,14 @@ test('Settings warns when owned games are over the limit', async ({ page }) => {
   )
   await page.goto('/account/usage')
   await expect(
-    page.getByText('You own 3,400 games. Your plan allows 3,000.'),
+    page.getByText(
+      'You have 3,400 games, owned or wishlisted. Your plan allows 3,000.',
+    ),
   ).toBeVisible()
+  await expect(
+    page.getByText('Games: 3,400 of 3,000 (3,390 owned, 10 wishlisted)'),
+  ).toBeVisible()
+  await expect(page.getByRole('progressbar', { name: 'Wishlist' })).toHaveCount(
+    0,
+  )
 })

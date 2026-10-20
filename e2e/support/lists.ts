@@ -33,6 +33,8 @@ export async function fakeList(
     platforms?: { id: number; name: string }[]
     /** Held back this long before answering, per request number. */
     delay?: (request: number) => number
+    /** Games in the whole library, owned and wishlisted. Defaults to this list's. */
+    libraryCount?: number
   } = {},
 ) {
   const fields = options.fields ?? []
@@ -121,6 +123,7 @@ export async function fakeList(
         json: {
           list,
           itemCount: state.items.length,
+          libraryCount: options.libraryCount ?? state.items.length,
           total: rows.length,
           page: current,
           size,

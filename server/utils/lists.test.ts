@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PlanLimits } from '../../shared/utils/plans'
 
 const reads: unknown[] = []
 const deleteResults: unknown[][] = []
@@ -33,19 +32,18 @@ vi.mock('./collections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./collections')>()),
   getOwnedItem: async () => reads.shift(),
 }))
-const ownedRooms: number[] = []
+// Moving a game between lists never creates a library row, so it must
+// never ask for room.
+const libraryRooms: number[] = []
 vi.mock('./limits', () => ({
-  assertListRoom: async () => {},
-  assertOwnedRoom: async (_owner: string, adding: number) => {
-    ownedRooms.push(adding)
-    if (refuseOwned) throw new Error('Plan limit reached')
+  assertLibraryRoom: async (_owner: string, adding: number) => {
+    libraryRooms.push(adding)
+    throw new Error('Plan limit reached')
   },
 }))
-let refuseOwned = false
 
 const { changeItemLists } = await import('./lists')
 
-const limits = {} as PlanLimits
 const row = (state: { owned: boolean; wishlisted: boolean }) => ({
   id: '30000000-0000-4000-8000-000000000001',
   ownerId: '00000000-0000-4000-8000-000000000001',
@@ -68,8 +66,7 @@ beforeEach(() => {
   updateResults.length = 0
   written.length = 0
   deletes = 0
-  ownedRooms.length = 0
-  refuseOwned = false
+  libraryRooms.length = 0
 })
 
 describe('changeItemLists', () => {
@@ -77,7 +74,7 @@ describe('changeItemLists', () => {
     reads.push(ownedRow)
     deleteResults.push([{ id: ownedRow.id }])
     expect(
-      await changeItemLists('o', ownedRow.id, [{ type: 'unown' }], limits),
+      await changeItemLists('o', ownedRow.id, [{ type: 'unown' }]),
     ).toBeNull()
     expect(deletes).toBe(1)
   })
@@ -88,12 +85,7 @@ describe('changeItemLists', () => {
     reads.push(ownedRow, wishlistedRow)
     deleteResults.push([])
     updateResults.push([wishlistedRow])
-    const saved = await changeItemLists(
-      'o',
-      ownedRow.id,
-      [{ type: 'unown' }],
-      limits,
-    )
+    const saved = await changeItemLists('o', ownedRow.id, [{ type: 'unown' }])
     expect(deletes).toBe(1)
     expect(saved).toMatchObject({ owned: false, wishlisted: true })
     expect(written).toEqual([
@@ -104,33 +96,26 @@ describe('changeItemLists', () => {
   it('answers 409 when the game keeps changing under it', async () => {
     reads.push(ownedRow, ownedRow)
     await expect(
-      changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }], limits),
+      changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }]),
     ).rejects.toMatchObject({ statusCode: 409 })
     expect(written).toHaveLength(2)
   })
 
-  it('checks owned room when Got it makes a wishlisted game owned', async () => {
+  it('lets Got it work even when the library is at its limit', async () => {
     reads.push(wishlistedRow)
     updateResults.push([ownedRow])
-    await changeItemLists('o', wishlistedRow.id, [{ type: 'gotIt' }], limits)
-    expect(ownedRooms).toEqual([1])
-  })
-
-  it('refuses Got it at the owned limit and saves nothing', async () => {
-    refuseOwned = true
-    reads.push(wishlistedRow)
     await expect(
-      changeItemLists('o', wishlistedRow.id, [{ type: 'gotIt' }], limits),
-    ).rejects.toThrow('Plan limit reached')
-    expect(written).toHaveLength(0)
+      changeItemLists('o', wishlistedRow.id, [{ type: 'gotIt' }]),
+    ).resolves.toMatchObject({ owned: true })
+    expect(libraryRooms).toEqual([])
   })
 
-  it('needs no owned room for a game that is already owned, or for the Wishlist', async () => {
-    refuseOwned = true
-    reads.push(ownedRow, ownedRow)
-    updateResults.push([ownedRow], [ownedRow])
-    await changeItemLists('o', ownedRow.id, [{ type: 'own' }], limits)
-    await changeItemLists('o', ownedRow.id, [{ type: 'want' }], limits)
-    expect(ownedRooms).toEqual([])
+  it('needs no room to wishlist an owned game or move it between lists', async () => {
+    reads.push(ownedRow, ownedRow, ownedRow)
+    updateResults.push([ownedRow], [ownedRow], [wishlistedRow])
+    await changeItemLists('o', ownedRow.id, [{ type: 'own' }])
+    await changeItemLists('o', ownedRow.id, [{ type: 'want' }])
+    await changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }])
+    expect(libraryRooms).toEqual([])
   })
 })

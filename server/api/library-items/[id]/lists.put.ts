@@ -25,7 +25,7 @@ export default defineEventHandler(
     const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
     const action = await readValidatedBody(event, bodySchema.parse)
     const user = await findOrCreateUser(sub)
-    const item = await changeItemLists(user.id, id, [action], userLimits(user))
+    const item = await changeItemLists(user.id, id, [action])
     return { item, collectionIds: item ? await collectionIdsForItem(id) : [] }
   },
 )

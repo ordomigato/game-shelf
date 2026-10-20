@@ -90,20 +90,17 @@ onMounted(() => {
 
 const tracked = useTrackedGames(games, target)
 
-// How many more games the target can take, null until its count is known.
+// How many more games a collection can take, null until its count is known.
+// Owned and the Wishlist share the library limit, which the server checks.
 const { limits } = usePlan()
 const room = computed<number | null>(() => {
   const goal = target.value
-  if (!goal || goal.list === 'owned') return null
-  const used = goal.list
-    ? myCollections.counts.value?.wishlist
-    : myCollections.list.value?.find((c) => c.id === goal.collectionId)
-        ?.itemCount
+  if (!goal || goal.list) return null
+  const used = myCollections.list.value?.find(
+    (c) => c.id === goal.collectionId,
+  )?.itemCount
   if (used === undefined) return null
-  const limit = goal.list
-    ? limits.value.wishlist
-    : limits.value.gamesPerCollection
-  return Math.max(0, limit - used)
+  return Math.max(0, limits.value.gamesPerCollection - used)
 })
 
 const addingByHand = ref(false)

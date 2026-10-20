@@ -258,12 +258,16 @@ test('"Got it" takes the game off the page at once, then fills the gap', async (
   await page.goto('/u/retro_fan/shelf/wishlist')
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(50)
-  await expect(page.getByTestId('list-usage')).toHaveText('120 of 200 games')
+  await expect(page.getByTestId('list-usage')).toHaveText(
+    '120 of 3,000 games (120 wishlisted)',
+  )
 
   await page.getByRole('button', { name: 'Actions for Game 120' }).click()
   await page.getByRole('menuitem', { name: 'Got it' }).click()
   await expect(rows).toHaveCount(49)
-  await expect(page.getByTestId('list-usage')).toHaveText('119 of 200 games')
+  await expect(page.getByTestId('list-usage')).toHaveText(
+    '119 of 3,000 games (119 wishlisted)',
+  )
   await expect(page.getByRole('link', { name: 'Game 120' })).toHaveCount(0)
   // Not dimmed: it's a quiet refetch.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
@@ -358,7 +362,7 @@ test('a value saved while moving to another page does not send you back', async 
   await expect(page.locator('tbody tr').first()).toContainText('Game 070')
 })
 
-test('Owned and the Wishlist show how much of the plan they use', async ({
+test('Owned and the Wishlist show the library total and their own count', async ({
   page,
 }) => {
   await signInAs(page, { username: 'retro_fan' })
@@ -367,38 +371,46 @@ test('Owned and the Wishlist show how much of the plan they use', async ({
     route.fulfill({ json: { owned: 120, wishlist: 120 } }),
   )
   const usage = page.getByTestId('list-usage')
+  const total = page.getByTestId('list-total')
 
-  // Owned counts owned games only, so the number matches the rows.
-  await fakeList(page, 'retro_fan', 'owned', games('owned'))
+  // 1500 owned and 1500 wishlisted still fit in 3,000.
+  await fakeList(page, 'retro_fan', 'owned', games('owned'), {
+    libraryCount: 3000,
+  })
   await page.goto('/u/retro_fan/shelf/owned')
-  await expect(usage).toHaveText('120 of 3,000 games')
-  await expect(usage).not.toHaveClass(/text-destructive/)
+  await expect(usage).toHaveText('3,000 of 3,000 games (120 owned)')
+  await expect(total).not.toHaveClass(/text-destructive/)
 
-  await fakeList(page, 'retro_fan', 'wishlist', games('wishlist'))
+  await fakeList(page, 'retro_fan', 'wishlist', games('wishlist'), {
+    libraryCount: 240,
+  })
   await page.goto('/u/retro_fan/shelf/wishlist')
-  await expect(usage).toHaveText('120 of 200 games')
-  await expect(usage).not.toHaveClass(/text-destructive/)
+  await expect(usage).toHaveText('240 of 3,000 games (120 wishlisted)')
+  await expect(total).not.toHaveClass(/text-destructive/)
 })
 
-test('the usage turns red once a list is over its limit', async ({ page }) => {
+test('the library total turns red once it is over the limit', async ({
+  page,
+}) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/lists', (route) =>
     route.fulfill({ json: { owned: 120, wishlist: 201 } }),
   )
   const usage = page.getByTestId('list-usage')
+  const total = page.getByTestId('list-total')
 
-  const owned = Array.from({ length: 3001 }, (_, i) => game(i + 1, 'owned'))
-  await fakeList(page, 'retro_fan', 'owned', owned)
+  await fakeList(page, 'retro_fan', 'owned', games('owned'), {
+    libraryCount: 3001,
+  })
   await page.goto('/u/retro_fan/shelf/owned')
-  await expect(usage).toHaveText('3,001 of 3,000 games')
-  await expect(usage).toHaveClass(/text-destructive/)
+  await expect(usage).toHaveText('3,001 of 3,000 games (120 owned)')
+  await expect(total).toHaveClass(/text-destructive/)
 
-  const wishlist = Array.from({ length: 201 }, (_, i) =>
-    game(i + 1, 'wishlist'),
-  )
-  await fakeList(page, 'retro_fan', 'wishlist', wishlist)
+  await fakeList(page, 'retro_fan', 'wishlist', games('wishlist'), {
+    libraryCount: 3001,
+  })
   await page.goto('/u/retro_fan/shelf/wishlist')
-  await expect(usage).toHaveText('201 of 200 games')
-  await expect(usage).toHaveClass(/text-destructive/)
+  await expect(usage).toHaveText('3,001 of 3,000 games (120 wishlisted)')
+  await expect(total).toHaveClass(/text-destructive/)
 })

@@ -12,6 +12,7 @@ function builder(fields: Record<string, unknown>) {
   const self: Record<string, unknown> = {
     from: () => self,
     leftJoin: () => self,
+    innerJoin: () => self,
     where: () => self,
     orderBy: (...order: unknown[]) => {
       call.orderBy = order
@@ -33,6 +34,9 @@ function builder(fields: Record<string, unknown>) {
         asked.push(call)
         return resolve(pages.shift() ?? [])
       }
+      // The genres the list has: a select of a name alone.
+      if (!('id' in fields))
+        return resolve([{ name: 'Puzzle' }, { name: 'Adventure' }])
       return resolve([{ id: 19, name: 'SNES' }])
     },
   }
@@ -42,11 +46,13 @@ function builder(fields: Record<string, unknown>) {
 vi.mock('./db', () => ({
   useDb: () => ({
     select: (fields: Record<string, unknown>) => builder(fields),
+    selectDistinct: (fields: Record<string, unknown>) => builder(fields),
   }),
 }))
 vi.mock('./collections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./collections')>()),
   customCollectionsOf: async () => new Map(),
+  platformNames: async () => new Map([[19, 'SNES']]),
 }))
 
 const { getListPage } = await import('./lists')
@@ -98,6 +104,7 @@ describe('getListPage', () => {
       page: 2,
       size: 25,
       platforms: [{ id: 19, name: 'SNES' }],
+      genres: ['Adventure', 'Puzzle'],
     })
     expect(result.items.map((item) => item.name)).toEqual(['Game 1', 'Game 2'])
   })
@@ -139,5 +146,33 @@ describe('getListPage', () => {
       [],
     )
     expect(result).toMatchObject({ page: 1, total: 0, itemCount: 0, items: [] })
+  })
+
+  it('gives each game its release date, genres and the catalog platforms it can pick from', async () => {
+    counts = [1, 1]
+    pages.push([
+      {
+        ...row(1),
+        item: { ...row(1).item, igdbId: 1026 },
+        game: {
+          igdbId: 1026,
+          name: 'A Link to the Past',
+          coverId: null,
+          releaseDate: '1991-11-21',
+          releasePrecision: 'month',
+          genres: ['Adventure'],
+          platformIds: [19, 5],
+          fetchedAt: new Date(0),
+        },
+      },
+    ])
+    const result = await getListPage(owner, 'owned', parseListQuery({}, []), [])
+    // Platform 5 has no name in the platforms table, so it can't be shown.
+    expect(result.items[0]).toMatchObject({
+      releaseDate: '1991-11-21',
+      releasePrecision: 'month',
+      genres: ['Adventure'],
+      catalogPlatforms: [{ id: 19, name: 'SNES' }],
+    })
   })
 })

@@ -8,7 +8,8 @@ const item = (n: number, name: string, data: Record<string, unknown>) => ({
   igdbId: 100 + n,
   name,
   coverId: null,
-  year: 1990 + n,
+  releaseDate: `${1990 + n}-03-04`,
+  releasePrecision: 'day',
   genres: ['Role-playing (RPG)'],
   data,
   addedAt: `2026-01-0${n}T00:00:00.000Z`,
@@ -71,6 +72,8 @@ test.describe('visitors', () => {
     await openCollection(page, false)
     await expect(page.getByRole('columnheader')).toHaveText([
       'Name',
+      'Released',
+      'Genre',
       'Status',
       'Hours played',
       'Rating',
@@ -233,7 +236,13 @@ test.describe('owners', () => {
   })
 
   test('rename a game added by hand', async ({ page }) => {
-    const byHand = { ...items[1]!, igdbId: null, year: null, genres: [] }
+    const byHand = {
+      ...items[1]!,
+      igdbId: null,
+      releaseDate: null,
+      releasePrecision: null,
+      genres: [],
+    }
     let renamed: unknown
     await page.route(`**/api/library-items/${byHand.id}`, (route) => {
       renamed = route.request().postDataJSON()

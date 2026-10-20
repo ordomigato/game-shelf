@@ -109,7 +109,7 @@ body. A game is read from IGDB when it's missing from the catalog or was
 last read more than 30 days ago (`CATALOG_MAX_AGE_MS`).
 
 A user's library item links to the catalog by `igdb_id`. Its name, cover,
-year and genres come from the catalog row (`catalogJoin`, `itemName`,
+release date (with its precision) and genres come from the catalog row (`catalogJoin`, `itemName`,
 `itemCoverId` and `toLibraryItem` in `server/utils/collections.ts`), so
 IGDB games can't be renamed. A game added by hand (`igdb_id` null) has no
 catalog row and keeps its own name, which the user can change. Until the

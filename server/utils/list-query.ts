@@ -6,8 +6,9 @@ import {
   fieldIdOfKey,
   isFieldKey,
   LIST_SORT_COLUMNS,
+  sortKeyFromQuery,
 } from '../../shared/utils/list-view'
-import { libraryItems } from '../db/schema'
+import { games as catalogGames, libraryItems } from '../db/schema'
 import { itemName } from './collections'
 
 /** What a list page asks for, once checked against the user's fields. */
@@ -22,6 +23,8 @@ export interface ListQuery {
   searchFields: FieldDefinition[]
   collectionIds: string[]
   platformIds: number[]
+  /** Genre names: a game matches when it has any of them. */
+  genres: string[]
   fieldFilters: { field: FieldDefinition; values: string[] }[]
 }
 
@@ -52,6 +55,7 @@ const baseSchema = z.object({
     asArray,
     z.array(z.coerce.number().int().positive().max(2_000_000_000)).max(50),
   ),
+  genre: z.preprocess(asArray, z.array(z.string().min(1).max(100)).max(50)),
 })
 
 const badRequest = (statusMessage: string) =>
@@ -70,11 +74,12 @@ export function parseListQuery(
 ): ListQuery {
   const parsed = baseSchema.safeParse(raw)
   if (!parsed.success) throw badRequest('Invalid list query')
-  const { sort: sortKey, collection, platform, ...rest } = parsed.data
+  const { sort: rawSortKey, collection, platform, genre, ...rest } = parsed.data
   const byId = new Map(fields.map((field) => [field.id, field]))
 
+  const sortKey = sortKeyFromQuery(rawSortKey)
   let sort: ListSort | null = null
-  if (sortKey !== undefined) {
+  if (sortKey !== null) {
     if (isFieldKey(sortKey)) {
       // A field since deleted: the link still opens, in the default order.
       const field = byId.get(fieldIdOfKey(sortKey))
@@ -119,6 +124,7 @@ export function parseListQuery(
     ),
     collectionIds: collection,
     platformIds: platform,
+    genres: genre,
     fieldFilters,
   }
 }
@@ -129,14 +135,17 @@ export const isFiltered = (query: ListQuery) =>
     query.q ||
     query.collectionIds.length ||
     query.platformIds.length ||
+    query.genres.length ||
     query.fieldFilters.length,
   )
 
-/** The column holding the platforms for a list. */
-const platformColumn = (list: ListName) =>
-  list === 'owned'
-    ? sql.raw('library_items.owned_on')
-    : sql.raw('library_items.wanted_on')
+/**
+ * Every platform the owner has the game on, owned and wanted together:
+ * what the platforms cell shows on both lists.
+ */
+const allPlatforms = sql.raw(
+  'library_items.owned_on || library_items.wanted_on',
+)
 
 const textList = (values: string[]) =>
   sql`ARRAY[${sql.join(
@@ -181,7 +190,6 @@ function fieldFilter(field: FieldDefinition, values: string[]): SQL | null {
 /** Whether a word appears in the parts of a game the search reads. */
 function wordMatch(
   ownerId: string,
-  list: ListName,
   searchFields: FieldDefinition[],
   word: string,
 ): SQL {
@@ -190,7 +198,7 @@ function wordMatch(
   const parts: SQL[] = [
     like(sql`${itemName}`),
     sql`exists (select 1 from collection_items as entry inner join collections as searched_collection on searched_collection.id = entry.collection_id where entry.item_id = library_items.id and searched_collection.owner_id = ${ownerId} and ${like(sql`searched_collection.title`)})`,
-    sql`exists (select 1 from platforms as searched_platform where searched_platform.igdb_id = any(${platformColumn(list)}) and ${like(sql`coalesce(searched_platform.abbreviation, searched_platform.name)`)})`,
+    sql`exists (select 1 from platforms as searched_platform where searched_platform.igdb_id = any(${allPlatforms}) and ${like(sql`coalesce(searched_platform.abbreviation, searched_platform.name)`)})`,
   ]
   for (const field of searchFields) {
     const value = valueOf(field)
@@ -219,7 +227,7 @@ export function listWhere(
   // Every word must be found somewhere: in the name, a text or choice value,
   // a collection title or a platform name.
   for (const word of query.q.split(/\s+/).filter(Boolean)) {
-    conditions.push(wordMatch(ownerId, list, query.searchFields, word))
+    conditions.push(wordMatch(ownerId, query.searchFields, word))
   }
   if (query.collectionIds.length) {
     conditions.push(
@@ -227,8 +235,13 @@ export function listWhere(
     )
   }
   if (query.platformIds.length) {
+    conditions.push(sql`(${allPlatforms}) && ${intList(query.platformIds)}`)
+  }
+  if (query.genres.length) {
+    // Games added by hand have no catalog row, so no genres: the guard keeps
+    // the array operator off a null.
     conditions.push(
-      sql`${platformColumn(list)} && ${intList(query.platformIds)}`,
+      sql`(case when ${catalogGames.igdbId} is not null then ${catalogGames.genres} && ${textList(query.genres)} else false end)`,
     )
   }
   for (const { field, values } of query.fieldFilters) {
@@ -260,15 +273,21 @@ function fieldSortValue(field: FieldDefinition): SQL {
   }
 }
 
-function sortValue(sort: ListSort, list: ListName, ownerId: string): SQL {
+function sortValue(sort: ListSort, ownerId: string): SQL {
   if ('field' in sort) return fieldSortValue(sort.field)
   switch (sort.column) {
     case 'name':
       return sql`lower(${itemName})`
     case 'addedAt':
       return sql`library_items.created_at`
+    case 'released':
+      // TBD has no date to speak of, so it goes last with the empty.
+      return sql`(case when ${catalogGames.releasePrecision} = 'tbd' then null else ${catalogGames.releaseDate} end)`
+    case 'genre':
+      return sql`lower((${catalogGames.genres})[1])`
     case 'platforms':
-      return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = (${platformColumn(list)})[1])`
+      // The first owned platform, else the first wanted one.
+      return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = coalesce((library_items.owned_on)[1], (library_items.wanted_on)[1]))`
     case 'inCollections':
       return sql`(select string_agg(lower(sorted_collection.title), ', ' order by lower(sorted_collection.title)) from collection_items as entry inner join collections as sorted_collection on sorted_collection.id = entry.collection_id where entry.item_id = library_items.id and sorted_collection.owner_id = ${ownerId})`
   }
@@ -284,7 +303,7 @@ function sortsAsText(sort: ListSort): boolean {
   if ('field' in sort) {
     return ['text', 'select', 'multiselect'].includes(sort.field.type)
   }
-  return sort.column !== 'addedAt'
+  return sort.column !== 'addedAt' && sort.column !== 'released'
 }
 
 /**
@@ -308,7 +327,7 @@ export function listOrder(
     ? sql.raw(` collate "${NATURAL_COLLATION}"`)
     : sql.raw('')
   return [
-    sql`${sortValue(query.sort, list, ownerId)}${collation} ${direction} nulls last`,
+    sql`${sortValue(query.sort, ownerId)}${collation} ${direction} nulls last`,
     ...tiebreak,
   ]
 }

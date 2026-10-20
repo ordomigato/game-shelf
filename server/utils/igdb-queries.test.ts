@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildBrowseQuery,
   buildCatalogQuery,
+  buildReleaseDatesQuery,
+  releasePrecisionOf,
   buildFilterListQueries,
   CATALOG_BATCH_SIZE,
   buildGameQuery,
@@ -273,7 +275,7 @@ describe('buildMatchQuery', () => {
 describe('buildCatalogQuery', () => {
   it('asks for the catalog fields of the given games', () => {
     expect(buildCatalogQuery([1, 2, 3])).toBe(
-      'fields name, cover.image_id, first_release_date, genres.name, platforms.name, platforms.abbreviation; where id = (1,2,3); limit 500;',
+      'fields name, cover.image_id, first_release_date, genres.name, platforms.name, platforms.abbreviation, release_dates.date, release_dates.date_format; where id = (1,2,3); limit 500;',
     )
   })
 
@@ -314,6 +316,7 @@ describe('toCatalogGame', () => {
         name: 'The Legend of Zelda: A Link to the Past',
         coverId: 'co3vzn',
         releaseDate: '1991-11-21',
+        releasePrecision: null,
         genres: ['Role-playing (RPG)', 'Adventure'],
         platformIds: [19, 58],
       },
@@ -340,10 +343,97 @@ describe('toCatalogGame', () => {
         name: 'Bare',
         coverId: null,
         releaseDate: null,
+        releasePrecision: null,
         genres: [],
         platformIds: [],
       },
       platforms: [],
     })
+  })
+})
+
+describe('releasePrecisionOf', () => {
+  const first = 1_320_000_000
+
+  it('maps each IGDB date format', () => {
+    const formats: [number, string][] = [
+      [0, 'day'],
+      [1, 'month'],
+      [2, 'year'],
+      [3, 'quarter'],
+      [6, 'quarter'],
+      [7, 'tbd'],
+    ]
+    for (const [date_format, precision] of formats) {
+      expect(
+        releasePrecisionOf({
+          first_release_date: first,
+          release_dates: [{ date: first, date_format }],
+        }),
+      ).toBe(precision)
+    }
+  })
+
+  it('takes the release whose date is the first release date', () => {
+    expect(
+      releasePrecisionOf({
+        first_release_date: first,
+        release_dates: [
+          { date: first + 100, date_format: 0 },
+          { date: first, date_format: 2 },
+        ],
+      }),
+    ).toBe('year')
+  })
+
+  it('falls back to the earliest dated release', () => {
+    expect(
+      releasePrecisionOf({
+        first_release_date: first,
+        release_dates: [
+          { date: first + 100, date_format: 0 },
+          { date: first + 50, date_format: 1 },
+          { date_format: 7 },
+        ],
+      }),
+    ).toBe('month')
+  })
+
+  it('is TBD for an undated game with a TBD release', () => {
+    expect(releasePrecisionOf({ release_dates: [{ date_format: 7 }] })).toBe(
+      'tbd',
+    )
+  })
+
+  it('is unknown with no releases or an unknown format', () => {
+    expect(releasePrecisionOf({ first_release_date: first })).toBeNull()
+    expect(
+      releasePrecisionOf({
+        first_release_date: first,
+        release_dates: [{ date: first, date_format: 99 }],
+      }),
+    ).toBeNull()
+  })
+
+  it('goes into toCatalogGame', () => {
+    expect(
+      toCatalogGame({
+        id: 1,
+        name: 'x',
+        first_release_date: first,
+        release_dates: [{ date: first, date_format: 1 }],
+      }).game.releasePrecision,
+    ).toBe('month')
+  })
+})
+
+describe('buildReleaseDatesQuery', () => {
+  it('asks only for the dates', () => {
+    expect(buildReleaseDatesQuery([4, 5])).toBe(
+      'fields first_release_date, release_dates.date, release_dates.date_format; where id = (4,5); limit 500;',
+    )
+  })
+  it('refuses bad ids', () => {
+    expect(() => buildReleaseDatesQuery([0])).toThrow()
   })
 })

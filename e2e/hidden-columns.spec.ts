@@ -32,7 +32,8 @@ test.describe('in a collection', () => {
     igdbId: 100 + n,
     name: `Game ${n}`,
     coverId: null,
-    year: 1990,
+    releaseDate: '1990-03-04',
+    releasePrecision: 'day',
     genres: [],
     data: { status: 'Playing', score: 4 },
     addedAt: `2026-01-0${n}T00:00:00.000Z`,
@@ -170,7 +171,8 @@ test.describe('on Owned', () => {
     igdbId: 1000 + i,
     name: `Game ${i}`,
     coverId: null,
-    year: null,
+    releaseDate: null,
+    releasePrecision: null,
     genres: [],
     addedAt: new Date(Date.UTC(2026, 0, 1, i)).toISOString(),
     data: { status: 'Playing' },
@@ -239,6 +241,8 @@ test.describe('on Owned', () => {
     await openColumns(page)
     await toggleColumn(page, 'Platforms')
     await expect(page).not.toHaveURL(/sort=/)
-    expect(list.requests.at(-1)!.searchParams.get('sort')).toBeNull()
+    await expect
+      .poll(() => list.requests.at(-1)!.searchParams.get('sort'))
+      .toBeNull()
   })
 })

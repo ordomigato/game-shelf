@@ -644,6 +644,7 @@ async function deleteCollection() {
           @move="moveItem"
           @rename="startRenaming"
           @collections-changed="collectionsChanged"
+          @platforms-changed="applyLists"
           @missing="refresh()"
           @got-it="gotIt"
           @to-wishlist="toWishlist"

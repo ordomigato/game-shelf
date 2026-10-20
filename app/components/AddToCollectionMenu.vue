@@ -96,9 +96,6 @@ function show(next: LibraryItem | null, collectionIds: string[]) {
   tracked.value = next !== null
 }
 
-const ownedOn = computed(() => item.value?.ownedOn ?? [])
-const wantedOn = computed(() => item.value?.wantedOn ?? [])
-
 /** Runs one change, keyed so its checkbox is disabled until it's saved. */
 async function save(key: string, change: () => Promise<void>) {
   if (saving.value.has(key)) return
@@ -140,25 +137,29 @@ function toggleList(list: ListName, checked: boolean) {
   })
 }
 
-function togglePlatform(list: ListName, id: number, checked: boolean) {
-  const current = list === 'owned' ? ownedOn.value : wantedOn.value
-  const next = checked ? [...current, id] : current.filter((n) => n !== id)
-  return save(`${list}:${id}`, async () => {
+const {
+  ownedOn,
+  wantedOn,
+  toggle: togglePlatform,
+} = usePlatformToggle(
+  () => item.value,
+  async (list, next) => {
     if (item.value) {
       const saved = await collections.changeLists(item.value.id, {
         type: list === 'owned' ? 'setOwnedOn' : 'setWantedOn',
         platforms: next,
       })
       show(saved.item, saved.collectionIds)
-    } else {
-      const added = await collections.addGame(props.game, [], {
-        list,
-        platforms: next,
-      })
-      show(added.item, added.collectionIds)
+      return saved.item
     }
-  })
-}
+    const added = await collections.addGame(props.game, [], {
+      list,
+      platforms: next,
+    })
+    show(added.item, added.collectionIds)
+    return added.item
+  },
+)
 
 function toggleCollection(collection: CollectionSummary, checked: boolean) {
   return save(collection.id, async () => {
@@ -246,10 +247,10 @@ async function onCreated(collection: CollectionSummary) {
               <DropdownMenuCheckboxItem
                 v-for="platform in platforms"
                 :key="platform.id"
+                class="min-h-10"
                 :model-value="
                   (list === 'owned' ? ownedOn : wantedOn).includes(platform.id)
                 "
-                :disabled="saving.has(`${list}:${platform.id}`)"
                 @update:model-value="
                   togglePlatform(list, platform.id, $event === true)
                 "

@@ -29,7 +29,8 @@ let wishlistList: Awaited<ReturnType<typeof fakeList>>
 
 const base = {
   coverId: null,
-  year: null,
+  releaseDate: null,
+  releasePrecision: null,
   genres: [],
   data: {},
   owned: true,
@@ -201,6 +202,8 @@ test('Owned shows the shared columns, with the collections and platforms', async
   await expect(table.getByRole('columnheader')).toHaveText([
     /Name/,
     /Collections/,
+    /Released/,
+    /Genre/,
     /Platforms/,
     /Added/,
     'Actions',

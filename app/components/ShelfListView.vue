@@ -179,6 +179,7 @@ const tableServer = computed(() =>
         listSize: data.value.itemCount,
         loading: loading.value,
         platforms: data.value.platforms,
+        genres: data.value.genres,
       }
     : undefined,
 )
@@ -260,6 +261,33 @@ function collectionsChanged(itemId: string, links: CollectionLink[]) {
     ),
   )
   // A collection filter or sort may now put the game elsewhere.
+  void refetchQuietly()
+}
+
+/**
+ * Shows a game's platforms after they were saved. Ticking the other list's
+ * platforms can take it off this one, and a platform sort or filter may put
+ * it elsewhere.
+ */
+function platformsChanged(saved: LibraryItem) {
+  if (!onList(saved)) {
+    leaveView(saved.id)
+    return
+  }
+  setItems(
+    (data.value?.items ?? []).map((entry) =>
+      entry.id === saved.id
+        ? {
+            ...entry,
+            owned: saved.owned,
+            wishlisted: saved.wishlisted,
+            wanted: saved.wishlisted,
+            ownedOn: saved.ownedOn,
+            wantedOn: saved.wantedOn,
+          }
+        : entry,
+    ),
+  )
   void refetchQuietly()
 }
 
@@ -526,6 +554,7 @@ function onRenamed(saved: LibraryItem) {
         @remove="removeItem"
         @rename="startRenaming"
         @collections-changed="collectionsChanged"
+        @platforms-changed="platformsChanged"
         @missing="refresh()"
         @got-it="gotIt"
         @to-wishlist="toWishlist"

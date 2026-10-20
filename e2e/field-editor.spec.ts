@@ -131,7 +131,7 @@ test('adds a field and renames a choice', async ({ page }) => {
     { id: expect.any(String), name: 'Platform', type: 'text' },
   ])
   await expect(
-    page.getByRole('columnheader', { name: 'Platform' }),
+    page.getByRole('columnheader', { name: 'Platform', exact: true }),
   ).toBeVisible()
 })
 

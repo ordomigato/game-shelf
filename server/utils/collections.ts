@@ -11,6 +11,7 @@ import type {
   ItemData,
   LibraryItem,
   ListName,
+  PlatformOption,
 } from '../../shared/types/collection'
 import {
   cleanFields,
@@ -33,6 +34,7 @@ import {
   collections,
   games as catalogGames,
   libraryItems,
+  platforms,
   users,
 } from '../db/schema'
 import { isForeignKeyViolation, isUniqueViolation } from './db-errors'
@@ -76,8 +78,8 @@ export const itemCoverId = sql<
 >`case when ${catalogGames.igdbId} is null then ${libraryItems.coverId} else ${catalogGames.coverId} end`
 
 /**
- * An item as the browser sees it. An IGDB game's name, cover, year and
- * genres come from its catalog row (from `catalogJoin`), and the item's own
+ * An item as the browser sees it. An IGDB game's name, cover, release
+ * date and genres come from its catalog row (from `catalogJoin`), and the item's own
  * name and cover are used when there's none.
  */
 export function toLibraryItem(
@@ -89,7 +91,8 @@ export function toLibraryItem(
     igdbId: row.igdbId,
     name: game ? game.name : row.name,
     coverId: game ? game.coverId : row.coverId,
-    year: game?.releaseDate ? Number(game.releaseDate.slice(0, 4)) : null,
+    releaseDate: game?.releaseDate ?? null,
+    releasePrecision: game?.releasePrecision ?? null,
     genres: game?.genres ?? [],
     data: row.data,
     owned: row.owned,
@@ -115,16 +118,48 @@ export async function assertOwnsCollections(
   if (rows.length !== asked.length) throw notFound()
 }
 
+/** The short name to show for each platform id. */
+export async function platformNames(
+  ids: number[],
+): Promise<Map<number, string>> {
+  const unique = [...new Set(ids)]
+  if (!unique.length) return new Map()
+  const rows = await useDb()
+    .select({
+      id: platforms.igdbId,
+      name: sql<string>`coalesce(${platforms.abbreviation}, ${platforms.name})`,
+    })
+    .from(platforms)
+    .where(inArray(platforms.igdbId, unique))
+  return new Map(rows.map((row) => [row.id, row.name]))
+}
+
+/** The catalog platforms of a game that have a name, in name order. */
+export function catalogPlatformsOf(
+  game: CatalogGameRow | null,
+  names: Map<number, string>,
+): PlatformOption[] {
+  return (game?.platformIds ?? [])
+    .flatMap((id) => {
+      const name = names.get(id)
+      return name === undefined ? [] : [{ id, name }]
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
 /**
  * A game in a collection as the viewer may see it. Only the owner gets the
- * flags and platforms. Visitors get `wanted`, so a public collection can
- * mark the games its owner is missing without saying more.
+ * flags and platforms, the catalog's and their own. Visitors get `wanted`,
+ * so a public collection can mark the games its owner is missing without
+ * saying more. The release date and genres are public catalog facts for
+ * everyone.
  */
 export function toCollectionEntry(
   row: ItemRow,
   game: CatalogGameRow | null,
   addedAt: Date,
   viewerIsOwner: boolean,
+  names: Map<number, string> = new Map(),
 ): CollectionEntry {
   const { owned, wishlisted, ownedOn, wantedOn, ...item } = toLibraryItem(
     row,
@@ -134,7 +169,13 @@ export function toCollectionEntry(
     ...item,
     addedAt: addedAt.toISOString(),
     wanted: wishlisted,
-    ...(viewerIsOwner && { owned, wishlisted, ownedOn, wantedOn }),
+    ...(viewerIsOwner && {
+      owned,
+      wishlisted,
+      ownedOn,
+      wantedOn,
+      catalogPlatforms: catalogPlatformsOf(game, names),
+    }),
   }
 }
 
@@ -244,13 +285,28 @@ export async function getCollectionBySlug(
         entries.map((entry) => entry.item.id),
       )
     : null
+  const names = viewerIsOwner
+    ? await platformNames(
+        entries.flatMap((entry) => [
+          ...(entry.game?.platformIds ?? []),
+          ...entry.item.ownedOn,
+          ...entry.item.wantedOn,
+        ]),
+      )
+    : undefined
   const dashboard = chartsFor(
     viewerIsOwner,
     found.fields,
     found.collection.dashboard,
   )
   const rawItems: CollectionEntry[] = entries.map((entry) => ({
-    ...toCollectionEntry(entry.item, entry.game, entry.addedAt, viewerIsOwner),
+    ...toCollectionEntry(
+      entry.item,
+      entry.game,
+      entry.addedAt,
+      viewerIsOwner,
+      names,
+    ),
     ...(inCollections && {
       inCollections: inCollections.get(entry.item.id) ?? [],
     }),

@@ -47,6 +47,7 @@ describe('parseListQuery', () => {
       searchFields: [fields[4], fields[5], fields[6]],
       collectionIds: [],
       platformIds: [],
+      genres: [],
       fieldFilters: [],
     })
   })
@@ -60,6 +61,7 @@ describe('parseListQuery', () => {
       q: '  zelda ',
       collection: [collection],
       platform: ['19', '12'],
+      genre: ['Adventure', 'Role-playing (RPG)'],
       'f.status': ['Done'],
       'f.done': 'yes',
     })
@@ -70,6 +72,7 @@ describe('parseListQuery', () => {
     expect(query.q).toBe('zelda')
     expect(query.collectionIds).toEqual([collection])
     expect(query.platformIds).toEqual([19, 12])
+    expect(query.genres).toEqual(['Adventure', 'Role-playing (RPG)'])
     expect(query.fieldFilters.map((f) => [f.field.id, f.values])).toEqual([
       ['status', ['Done']],
       ['done', ['yes']],
@@ -77,7 +80,14 @@ describe('parseListQuery', () => {
   })
 
   it('accepts the built-in columns', () => {
-    for (const column of ['name', 'inCollections', 'platforms', 'addedAt']) {
+    for (const column of [
+      'name',
+      'inCollections',
+      'released',
+      'genre',
+      'platforms',
+      'addedAt',
+    ]) {
       expect(parse({ sort: column }).sort).toEqual({ column })
     }
   })
@@ -92,6 +102,12 @@ describe('parseListQuery', () => {
     ['a checkbox filter that is not yes or no', { 'f.done': 'maybe' }],
     ['a collection that is not an id', { collection: 'x' }],
     ['a platform that is not a number', { platform: '1; drop table x' }],
+    ['a genre that is empty', { genre: '' }],
+    ['a genre that is too long', { genre: 'x'.repeat(101) }],
+    [
+      'too many genres',
+      { genre: Array.from({ length: 51 }, (_, i) => `g${i}`) },
+    ],
     ['a search that is too long', { q: 'x'.repeat(101) }],
     ['a page given twice', { page: ['1', '2'] }],
   ])('rejects %s', (_name, raw) => {
@@ -126,6 +142,7 @@ describe('isFiltered', () => {
     expect(isFiltered(parse({ q: 'a' }))).toBe(true)
     expect(isFiltered(parse({ 'f.done': 'yes' }))).toBe(true)
     expect(isFiltered(parse({ platform: '1' }))).toBe(true)
+    expect(isFiltered(parse({ genre: 'RPG' }))).toBe(true)
     expect(isFiltered(parse({ collection: collection }))).toBe(true)
   })
 })
@@ -176,7 +193,7 @@ describe('listWhere', () => {
       'coalesce(searched_platform.abbreviation, searched_platform.name)',
     )
     expect(sql).toContain(
-      'searched_platform.igdb_id = any(library_items.owned_on)',
+      'searched_platform.igdb_id = any(library_items.owned_on || library_items.wanted_on)',
     )
     expect(sql).toContain('searched_choice.name')
     // Text and select (Status, Note) and multiselect (Tags), not the others.
@@ -192,17 +209,27 @@ describe('listWhere', () => {
     const { sql } = where({ q: 'mario  snes' })
     expect(sql.match(/searched_collection\.title/g)).toHaveLength(2)
     expect(where({ q: 'x' }, 'wishlist').sql).toContain(
-      'any(library_items.wanted_on)',
+      'any(library_items.owned_on || library_items.wanted_on)',
     )
   })
 
-  it('filters platforms on the list being read', () => {
+  it('filters platforms on owned and wanted together, on either list', () => {
     expect(where({ platform: ['1', '2'] }).sql).toContain(
-      'library_items.owned_on && ARRAY[$3, $4]::integer[]',
+      '(library_items.owned_on || library_items.wanted_on) && ARRAY[$3, $4]::integer[]',
     )
     expect(where({ platform: '1' }, 'wishlist').sql).toContain(
-      'library_items.wanted_on &&',
+      '(library_items.owned_on || library_items.wanted_on) &&',
     )
+  })
+
+  it('filters genres by any overlap, guarded for games with no catalog row', () => {
+    const { sql, params } = where({ genre: ["Puzzle'; drop table x", 'RPG'] })
+    expect(sql).toContain(
+      '(case when "games"."igdb_id" is not null then "games"."genres" && ARRAY[$3, $4]::text[] else false end)',
+    )
+    expect(sql).not.toContain('Puzzle')
+    expect(params.slice(2)).toEqual(["Puzzle'; drop table x", 'RPG'])
+    expect(sql).toContain('"library_items"."owner_id" = $1')
   })
 
   it('filters a checkbox to ticked, or to everything not ticked', () => {
@@ -272,12 +299,28 @@ describe('listOrder', () => {
     )
   })
 
-  it('sorts platforms by the first platform of this list', () => {
-    expect(order({ sort: 'platforms' })[0]).toContain(
-      '(library_items.owned_on)[1]',
+  it('sorts platforms by the first owned platform, then the first wanted one', () => {
+    const expected =
+      'coalesce((library_items.owned_on)[1], (library_items.wanted_on)[1])'
+    expect(order({ sort: 'platforms' })[0]).toContain(expected)
+    expect(order({ sort: 'platforms' }, 'wishlist')[0]).toContain(expected)
+  })
+
+  it('sorts by the release date, TBD and empty last, without word order', () => {
+    const date = `(case when "games"."release_precision" = 'tbd' then null else "games"."release_date" end)`
+    expect(order({ sort: 'released' })[0]).toBe(`${date} asc nulls last`)
+    expect(order({ sort: 'released', dir: 'desc' })[0]).toBe(
+      `${date} desc nulls last`,
     )
-    expect(order({ sort: 'platforms' }, 'wishlist')[0]).toContain(
-      '(library_items.wanted_on)[1]',
+  })
+
+  it('still takes year, the old name of the released sort', () => {
+    expect(order({ sort: 'year' })[0]).toBe(order({ sort: 'released' })[0])
+  })
+
+  it('sorts the genre by the first genre, in natural order', () => {
+    expect(order({ sort: 'genre' })[0]).toBe(
+      'lower(("games"."genres")[1]) collate "natural_sort" asc nulls last',
     )
   })
 
@@ -309,6 +352,7 @@ describe('listOrder', () => {
     for (const sort of [
       'name',
       'platforms',
+      'genre',
       'inCollections',
       'f.status',
       'f.note',
@@ -316,7 +360,13 @@ describe('listOrder', () => {
     ]) {
       expect(order({ sort })[0]).toContain(' collate "natural_sort" asc')
     }
-    for (const sort of ['addedAt', 'f.price', 'f.bought', 'f.done']) {
+    for (const sort of [
+      'addedAt',
+      'released',
+      'f.price',
+      'f.bought',
+      'f.done',
+    ]) {
       expect(order({ sort })[0]).not.toContain('collate')
     }
   })

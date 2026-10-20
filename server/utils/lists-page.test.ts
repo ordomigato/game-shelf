@@ -79,7 +79,7 @@ beforeEach(() => {
 
 describe('getListPage', () => {
   it('returns one page with the counts, and counts the list once when unfiltered', async () => {
-    counts = [120, 500]
+    counts = [120]
     pages.push([row(1), row(2)])
     const result = await getListPage(
       owner,
@@ -87,13 +87,12 @@ describe('getListPage', () => {
       parseListQuery({ page: '2', size: '25' }, []),
       [],
     )
-    expect(countCalls).toBe(2)
+    expect(countCalls).toBe(1)
     expect(asked).toHaveLength(1)
     expect(asked[0]).toMatchObject({ limit: 25, offset: 25 })
     expect(result).toMatchObject({
       list: 'owned',
       itemCount: 120,
-      libraryCount: 500,
       total: 120,
       page: 2,
       size: 25,
@@ -103,7 +102,7 @@ describe('getListPage', () => {
   })
 
   it('counts the whole list separately once a search narrows it', async () => {
-    counts = [3, 120, 500]
+    counts = [3, 120]
     pages.push([row(1)])
     const result = await getListPage(
       owner,
@@ -111,7 +110,7 @@ describe('getListPage', () => {
       parseListQuery({ q: 'zelda' }, []),
       [],
     )
-    expect(countCalls).toBe(3)
+    expect(countCalls).toBe(2)
     expect(result).toMatchObject({ total: 3, itemCount: 120, page: 1 })
   })
 

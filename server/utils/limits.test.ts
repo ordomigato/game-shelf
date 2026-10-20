@@ -60,3 +60,48 @@ describe('limitReached', () => {
     )
   })
 })
+
+describe('assertOwnedRoom', () => {
+  // A stand-in database that remembers the condition it was asked about
+  // and answers with a count.
+  async function room(owned: number, adding: number, limit: number) {
+    let where: unknown
+    vi.resetModules()
+    vi.stubGlobal('useDb', () => ({
+      select: () => ({
+        from: () => ({
+          where: async (condition: unknown) => {
+            where = condition
+            return [{ n: owned }]
+          },
+        }),
+      }),
+    }))
+    const { assertOwnedRoom } = await import('./limits')
+    const { PgDialect } = await import('drizzle-orm/pg-core')
+    const result = assertOwnedRoom('o', adding, { ...free, games: limit })
+    await result.catch(() => {})
+    return {
+      result,
+      sql: where ? new PgDialect().sqlToQuery(where as never).sql : '',
+    }
+  }
+
+  it('counts owned games only, so wishlist-only games take no room', async () => {
+    const { sql } = await room(0, 1, 10)
+    expect(sql).toContain('"owned" = $')
+    expect(sql).not.toContain('wishlisted')
+  })
+
+  it('allows an owned game up to the limit and refuses the next', async () => {
+    await expect((await room(9, 1, 10)).result).resolves.toBeUndefined()
+    await expect((await room(10, 1, 10)).result).rejects.toMatchObject({
+      statusCode: 403,
+      data: { key: 'limits.reached.games', params: { limit: 10 } },
+    })
+  })
+
+  it('needs no room to add nothing', async () => {
+    await expect((await room(10, 0, 10)).result).resolves.toBeUndefined()
+  })
+})

@@ -244,9 +244,7 @@ test('an import that would pass the library limit is blocked at the preview', as
   await page.getByLabel('Choose a CSV file').setInputFiles(csvOf(rows))
   await toReview(page)
   await expect(
-    page.getByText(
-      'This import adds 50 new games. Your library has room for 10 more.',
-    ),
+    page.getByText('This import adds 50 new games. You can own 10 more.'),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: /^Import/ })).toBeDisabled()
 })
@@ -283,7 +281,7 @@ test('a refusal partway says how many rows were already imported', async ({
   await page.getByRole('button', { name: /^Import 300/ }).click()
   await expect(
     page.getByText(
-      'Imported 250 of 300 rows. Then: You can have up to 10000 games on your plan.',
+      'Imported 250 of 300 rows. Then: You can own up to 10000 games on your plan.',
     ),
   ).toBeVisible()
 })
@@ -340,10 +338,10 @@ test('Pricing and Settings show the new numbers', async ({ page }) => {
   const pro = page.getByRole('region', { name: 'Pro' })
   await expect(pro.getByText('1,000 games per collection')).toBeVisible()
   await expect(pro.getByText('2,000 games on the Wishlist')).toBeVisible()
-  await expect(pro.getByText('10,000 games in total')).toBeVisible()
+  await expect(pro.getByText('10,000 owned games')).toBeVisible()
 })
 
-test('Settings warns when the library is over the limit', async ({ page }) => {
+test('Settings warns when owned games are over the limit', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/me/usage', (route) =>
@@ -359,6 +357,6 @@ test('Settings warns when the library is over the limit', async ({ page }) => {
   )
   await page.goto('/account/usage')
   await expect(
-    page.getByText('You have 3,400 games in total. Your plan allows 3,000.'),
+    page.getByText('You own 3,400 games. Your plan allows 3,000.'),
   ).toBeVisible()
 })

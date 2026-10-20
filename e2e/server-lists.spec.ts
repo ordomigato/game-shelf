@@ -368,19 +368,11 @@ test('Owned and the Wishlist show how much of the plan they use', async ({
   )
   const usage = page.getByTestId('list-usage')
 
-  // Owned counts the whole library, not only the owned games.
-  await fakeList(page, 'retro_fan', 'owned', games('owned'), {
-    libraryCount: 2500,
-  })
-  await page.goto('/u/retro_fan/shelf/owned')
-  await expect(usage).toHaveText('2,500 of 3,000 in your library')
-  await expect(page.getByText('120 owned ·')).toBeVisible()
-  await expect(usage).not.toHaveClass(/text-destructive/)
-
-  // With nothing but owned games in the library, the number matches the rows.
+  // Owned counts owned games only, so the number matches the rows.
   await fakeList(page, 'retro_fan', 'owned', games('owned'))
   await page.goto('/u/retro_fan/shelf/owned')
   await expect(usage).toHaveText('120 of 3,000 games')
+  await expect(usage).not.toHaveClass(/text-destructive/)
 
   await fakeList(page, 'retro_fan', 'wishlist', games('wishlist'))
   await page.goto('/u/retro_fan/shelf/wishlist')
@@ -396,11 +388,10 @@ test('the usage turns red once a list is over its limit', async ({ page }) => {
   )
   const usage = page.getByTestId('list-usage')
 
-  await fakeList(page, 'retro_fan', 'owned', games('owned'), {
-    libraryCount: 3001,
-  })
+  const owned = Array.from({ length: 3001 }, (_, i) => game(i + 1, 'owned'))
+  await fakeList(page, 'retro_fan', 'owned', owned)
   await page.goto('/u/retro_fan/shelf/owned')
-  await expect(usage).toHaveText('3,001 of 3,000 in your library')
+  await expect(usage).toHaveText('3,001 of 3,000 games')
   await expect(usage).toHaveClass(/text-destructive/)
 
   const wishlist = Array.from({ length: 201 }, (_, i) =>

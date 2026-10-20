@@ -148,9 +148,9 @@ export async function importIntoCollection(
     }
   }
 
-  // Within the plan: new games in the library, and games new to this
+  // Within the plan: new games (which are owned), and games new to this
   // collection (ones already in it only get their values updated).
-  await assertLibraryRoom(ownerId, toInsert.length, limits)
+  await assertOwnedRoom(ownerId, toInsert.length, limits)
   const alreadyIn = existing.length
     ? await db
         .select({ itemId: collectionItems.itemId })

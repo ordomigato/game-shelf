@@ -33,8 +33,6 @@ export async function fakeList(
     platforms?: { id: number; name: string }[]
     /** Held back this long before answering, per request number. */
     delay?: (request: number) => number
-    /** The library total sent with the list, when it differs from the list. */
-    libraryCount?: number
   } = {},
 ) {
   const fields = options.fields ?? []
@@ -123,7 +121,6 @@ export async function fakeList(
         json: {
           list,
           itemCount: state.items.length,
-          libraryCount: options.libraryCount ?? state.items.length,
           total: rows.length,
           page: current,
           size,

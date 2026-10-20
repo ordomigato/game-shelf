@@ -37,9 +37,10 @@ export default defineEventHandler(
     const limits = userLimits(user)
     const existingId = await itemIdForIgdb(user.id, game.igdbId)
     await assertRoomToAdd(user.id, existingId, collectionIds, limits)
-    // A game already in the library is checked when it joins the Wishlist.
-    if (list === 'wishlist' && !existingId) {
-      await assertListRoom(user.id, list, 1, limits)
+    // A game already in the library is checked when it joins a list.
+    if (!existingId) {
+      if (list === 'wishlist') await assertListRoom(user.id, list, 1, limits)
+      else await assertOwnedRoom(user.id, 1, limits)
     }
     // The catalog gets the game from IGDB, never the name and cover sent.
     const [catalogGame] =

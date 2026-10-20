@@ -76,10 +76,7 @@ export async function assertCollectionsRoom(
   }
 }
 
-/**
- * Room for `adding` more games on the Wishlist. Owned has no cap of its
- * own: it can grow to the library's.
- */
+/** Room for `adding` more games on the Wishlist (Owned has assertOwnedRoom). */
 export async function assertListRoom(
   ownerId: string,
   list: ListName,
@@ -98,8 +95,13 @@ export async function assertListRoom(
   }
 }
 
-/** Room for `adding` new games in the user's library (each game once). */
-export async function assertLibraryRoom(
+/**
+ * Room for `adding` more owned games. The account's games limit counts
+ * owned games only: wishlisted ones have the Wishlist's own cap, and a game
+ * both owned and wishlisted counts once toward each. Call it when a game
+ * becomes owned, not when an owned game joins a collection.
+ */
+export async function assertOwnedRoom(
   ownerId: string,
   adding: number,
   limits: PlanLimits,
@@ -108,7 +110,7 @@ export async function assertLibraryRoom(
   const [row] = await useDb()
     .select({ n: count() })
     .from(libraryItems)
-    .where(eq(libraryItems.ownerId, ownerId))
+    .where(and(eq(libraryItems.ownerId, ownerId), eq(libraryItems.owned, true)))
   if ((row?.n ?? 0) + adding > limits.games) {
     limitReached('games', limits.games)
   }
@@ -137,7 +139,7 @@ export function assertChartCount(charts: number, limits: PlanLimits): void {
   }
 }
 
-/** The user's counts, for Settings. */
+/** The user's counts, for Settings. `games` is owned games only. */
 export async function usage(ownerId: string) {
   const db = useDb()
   const [[owned], [games], [wishlist], [account]] = await Promise.all([
@@ -148,7 +150,9 @@ export async function usage(ownerId: string) {
     db
       .select({ n: count() })
       .from(libraryItems)
-      .where(eq(libraryItems.ownerId, ownerId)),
+      .where(
+        and(eq(libraryItems.ownerId, ownerId), eq(libraryItems.owned, true)),
+      ),
     db
       .select({ n: count() })
       .from(libraryItems)
@@ -173,8 +177,7 @@ export async function usage(ownerId: string) {
 
 /**
  * Room to put a game into these collections: in each collection it isn't
- * already in, and in the library when it's a new game (no `itemId` yet).
- * The collections must be the user's (404), which is checked first so a
+ * already in. The collections must be the user's (404), which is checked first so a
  * stranger's collection never answers with a limit.
  */
 export async function assertRoomToAdd(
@@ -184,7 +187,6 @@ export async function assertRoomToAdd(
   limits: PlanLimits,
 ): Promise<void> {
   await assertOwnsCollections(ownerId, collectionIds)
-  if (!itemId) await assertLibraryRoom(ownerId, 1, limits)
   const already = itemId ? await collectionIdsForItem(itemId) : []
   await assertCollectionsRoom(
     collectionIds.filter((id) => !already.includes(id)),

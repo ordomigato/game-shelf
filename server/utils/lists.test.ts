@@ -33,7 +33,15 @@ vi.mock('./collections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./collections')>()),
   getOwnedItem: async () => reads.shift(),
 }))
-vi.mock('./limits', () => ({ assertListRoom: async () => {} }))
+const ownedRooms: number[] = []
+vi.mock('./limits', () => ({
+  assertListRoom: async () => {},
+  assertOwnedRoom: async (_owner: string, adding: number) => {
+    ownedRooms.push(adding)
+    if (refuseOwned) throw new Error('Plan limit reached')
+  },
+}))
+let refuseOwned = false
 
 const { changeItemLists } = await import('./lists')
 
@@ -60,6 +68,8 @@ beforeEach(() => {
   updateResults.length = 0
   written.length = 0
   deletes = 0
+  ownedRooms.length = 0
+  refuseOwned = false
 })
 
 describe('changeItemLists', () => {
@@ -97,5 +107,30 @@ describe('changeItemLists', () => {
       changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }], limits),
     ).rejects.toMatchObject({ statusCode: 409 })
     expect(written).toHaveLength(2)
+  })
+
+  it('checks owned room when Got it makes a wishlisted game owned', async () => {
+    reads.push(wishlistedRow)
+    updateResults.push([ownedRow])
+    await changeItemLists('o', wishlistedRow.id, [{ type: 'gotIt' }], limits)
+    expect(ownedRooms).toEqual([1])
+  })
+
+  it('refuses Got it at the owned limit and saves nothing', async () => {
+    refuseOwned = true
+    reads.push(wishlistedRow)
+    await expect(
+      changeItemLists('o', wishlistedRow.id, [{ type: 'gotIt' }], limits),
+    ).rejects.toThrow('Plan limit reached')
+    expect(written).toHaveLength(0)
+  })
+
+  it('needs no owned room for a game that is already owned, or for the Wishlist', async () => {
+    refuseOwned = true
+    reads.push(ownedRow, ownedRow)
+    updateResults.push([ownedRow], [ownedRow])
+    await changeItemLists('o', ownedRow.id, [{ type: 'own' }], limits)
+    await changeItemLists('o', ownedRow.id, [{ type: 'want' }], limits)
+    expect(ownedRooms).toEqual([])
   })
 })

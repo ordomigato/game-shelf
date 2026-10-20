@@ -135,7 +135,7 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
   await expect(
     free.getByText('10 collections, plus Owned and the Wishlist'),
   ).toBeVisible()
-  await expect(free.getByText('3,000 games in total')).toBeVisible()
+  await expect(free.getByText('3,000 owned games')).toBeVisible()
   const pro = page.getByRole('region', { name: 'Pro' })
   await expect(
     pro.getByText('100 collections, plus Owned and the Wishlist'),

@@ -182,15 +182,21 @@ export async function getListPage(
   }
 }
 
-/** Saves the columns the owner hides on a list, keeping the other list's. */
+/**
+ * Saves the columns the owner hides on a list. Only that list's key is
+ * written, in one statement, so saves for Owned and the Wishlist that run
+ * at once don't overwrite each other.
+ */
 export async function setListColumns(
-  owner: { id: string; listColumns: Partial<Record<ListName, string[]>> },
+  owner: { id: string },
   list: ListName,
   hidden: string[],
 ): Promise<string[]> {
   await useDb()
     .update(users)
-    .set({ listColumns: { ...owner.listColumns, [list]: hidden } })
+    .set({
+      listColumns: sql`jsonb_set(${users.listColumns}, array[${list}]::text[], ${JSON.stringify(hidden)}::jsonb, true)`,
+    })
     .where(eq(users.id, owner.id))
   return hidden
 }

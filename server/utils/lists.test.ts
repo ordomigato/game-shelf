@@ -1,9 +1,11 @@
+import { PgDialect } from 'drizzle-orm/pg-core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const reads: unknown[] = []
 const deleteResults: unknown[][] = []
 const updateResults: unknown[][] = []
 const written: unknown[] = []
+const columnWrites: unknown[] = []
 let deletes = 0
 
 vi.mock('./db', () => ({
@@ -18,12 +20,18 @@ vi.mock('./db', () => ({
     }),
     update: () => ({
       set: (values: unknown) => ({
-        where: () => ({
-          returning: async () => {
-            written.push(values)
-            return updateResults.shift() ?? []
-          },
-        }),
+        where: () =>
+          Object.assign(
+            Promise.resolve().then(() => {
+              columnWrites.push(values)
+            }),
+            {
+              returning: async () => {
+                written.push(values)
+                return updateResults.shift() ?? []
+              },
+            },
+          ),
       }),
     }),
   }),
@@ -42,7 +50,7 @@ vi.mock('./limits', () => ({
   },
 }))
 
-const { changeItemLists } = await import('./lists')
+const { changeItemLists, setListColumns } = await import('./lists')
 
 const row = (state: { owned: boolean; wishlisted: boolean }) => ({
   id: '30000000-0000-4000-8000-000000000001',
@@ -117,5 +125,18 @@ describe('changeItemLists', () => {
     await changeItemLists('o', ownedRow.id, [{ type: 'want' }])
     await changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }])
     expect(libraryRooms).toEqual([])
+  })
+})
+
+describe('setListColumns', () => {
+  it("writes only that list's key, in one statement", async () => {
+    columnWrites.length = 0
+    const saved = await setListColumns({ id: 'user-1' }, 'wishlist', ['rating'])
+    expect(saved).toEqual(['rating'])
+    expect(columnWrites).toHaveLength(1)
+    const { listColumns } = columnWrites[0] as { listColumns: never }
+    const { sql, params } = new PgDialect().sqlToQuery(listColumns)
+    expect(sql).toContain('jsonb_set(')
+    expect(params).toEqual(['wishlist', '["rating"]'])
   })
 })

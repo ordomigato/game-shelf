@@ -6,6 +6,7 @@ import {
   Ellipsis,
   LayoutGrid,
   PenLine,
+  ListPlus,
   Pencil,
   Pin,
   PinOff,
@@ -523,7 +524,7 @@ async function deleteCollection() {
                   </template>
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="editingFields = true">
-                  <Pencil /> {{ $t('collection.editFields') }}
+                  <ListPlus /> {{ $t('collection.editFields') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="importing = true">
                   <Upload /> {{ $t('collection.importCsv') }}

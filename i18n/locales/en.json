@@ -517,7 +517,6 @@
     "searchGames": "Search games",
     "filter": "Filter",
     "columns": "Columns",
-    "editFields": "Edit fields",
     "showAllColumns": "Show all",
     "columnsSaveFailed": "Couldn't save your columns. Try again.",
     "clearFilters": "Clear",

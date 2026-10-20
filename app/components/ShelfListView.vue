@@ -4,7 +4,7 @@ import {
   Download,
   Ellipsis,
   Lock,
-  Pencil,
+  ListPlus,
   PenLine,
   Plus,
 } from '@lucide/vue'
@@ -479,7 +479,7 @@ function onRenamed(saved: LibraryItem) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="w-max">
               <DropdownMenuItem @select="editingFields = true">
-                <Pencil /> {{ $t('table.editFields') }}
+                <ListPlus /> {{ $t('collection.editFields') }}
               </DropdownMenuItem>
               <DropdownMenuItem :disabled="exporting" @select="exportCsv">
                 <Download /> {{ $t('lists.exportAll', data.itemCount) }}

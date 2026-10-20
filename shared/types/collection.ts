@@ -123,10 +123,27 @@ export interface CollectionEntry extends Omit<
   platforms?: string[]
 }
 
-/** Owned or the Wishlist, as its owner sees it. */
+/**
+ * One page of Owned or the Wishlist, as its owner sees it. The server sorts,
+ * searches and filters, so `items` holds only the rows of this page.
+ */
 export interface ListDetail {
   list: ListName
+  /** Every game on the list, whatever the search and filters. */
   itemCount: number
+  /** Every game in the library, owned or wishlisted, each once. */
+  libraryCount: number
+  /** The games matching the search and filters. */
+  total: number
+  /** The page these items are, from 1. The server keeps it in range. */
+  page: number
+  size: number
+  /** All the owner's fields, hidden ones included. */
+  fields: FieldDefinition[]
+  /** The platforms some game on this list is on, for the filter. */
+  platforms: { id: number; name: string }[]
+  /** Keys of the columns the owner hides on this list. */
+  hiddenColumns: string[]
   items: OwnerEntry[]
 }
 
@@ -151,6 +168,8 @@ export interface CollectionDetail extends CollectionSummary {
   items: CollectionEntry[]
   /** The charts on its dashboard, in order. */
   dashboard: ChartWidget[]
+  /** Keys of the columns the owner hides in the table (shared/utils/columns.ts). */
+  hiddenColumns: string[]
   /** Whether the person viewing is the owner (and can edit). */
   isOwner: boolean
 }

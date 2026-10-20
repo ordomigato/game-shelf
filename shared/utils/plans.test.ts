@@ -25,23 +25,20 @@ describe('limitsFor', () => {
     expect(limits.importRows).toBe(5000)
   })
 
-  it('sizes games for one collection, the Wishlist and the library', () => {
+  it('sizes games for one collection and the library', () => {
     const { free, pro } = PLAN_LIMITS
     expect([free.gamesPerCollection, pro.gamesPerCollection]).toEqual([
       100, 1000,
     ])
-    expect([free.wishlist, pro.wishlist]).toEqual([200, 2000])
     expect([free.games, pro.games]).toEqual([3000, 10_000])
   })
 
   it('keeps hand-set game limits within the app maximums', () => {
     const limits = limitsFor('max', {
       gamesPerCollection: 20_000,
-      wishlist: 50_000,
       games: 25_000,
     })
     expect(limits.gamesPerCollection).toBe(1000)
-    expect(limits.wishlist).toBe(2000)
     expect(limits.games).toBe(10_000)
     expect(
       limitsFor('max', { gamesPerCollection: 400 }).gamesPerCollection,
@@ -51,6 +48,12 @@ describe('limitsFor', () => {
   it('ignores custom keys that are not limits', () => {
     const custom = { fieldsPerCollection: 90 } as unknown as { games: number }
     expect(limitsFor('free', custom)).toEqual(PLAN_LIMITS.free)
+  })
+
+  it('ignores a hand-set wishlist limit, which no longer exists', () => {
+    const custom = { wishlist: 5 } as unknown as { games: number }
+    expect(limitsFor('free', custom)).toEqual(PLAN_LIMITS.free)
+    expect(limitsFor('max', custom)).not.toHaveProperty('wishlist')
   })
 
   it('ignores custom values that are not numbers', () => {

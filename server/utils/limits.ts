@@ -1,4 +1,4 @@
-import { and, count, eq, inArray } from 'drizzle-orm'
+import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import {
   type CustomLimits,
@@ -6,7 +6,6 @@ import {
   type Plan,
   type PlanLimits,
 } from '../../shared/utils/plans'
-import type { ListName } from '../../shared/types/collection'
 import { collectionItems, collections, libraryItems, users } from '../db/schema'
 import { assertOwnsCollections, collectionIdsForItem } from './collections'
 
@@ -77,28 +76,11 @@ export async function assertCollectionsRoom(
 }
 
 /**
- * Room for `adding` more games on the Wishlist. Owned has no cap of its
- * own: it can grow to the library's.
+ * Room for `adding` more games in the library. The account's games limit
+ * counts every library row, owned or wishlisted, and a game on both lists
+ * counts once. Call it only when a new library row is created, never when a
+ * game moves between lists or joins a collection.
  */
-export async function assertListRoom(
-  ownerId: string,
-  list: ListName,
-  adding: number,
-  limits: PlanLimits,
-): Promise<void> {
-  if (list !== 'wishlist' || adding <= 0) return
-  const [row] = await useDb()
-    .select({ n: count() })
-    .from(libraryItems)
-    .where(
-      and(eq(libraryItems.ownerId, ownerId), eq(libraryItems.wishlisted, true)),
-    )
-  if ((row?.n ?? 0) + adding > limits.wishlist) {
-    limitReached('wishlist', limits.wishlist)
-  }
-}
-
-/** Room for `adding` new games in the user's library (each game once). */
 export async function assertLibraryRoom(
   ownerId: string,
   adding: number,
@@ -137,44 +119,39 @@ export function assertChartCount(charts: number, limits: PlanLimits): void {
   }
 }
 
-/** The user's counts, for Settings. */
+/** The user's counts, for Settings. `games` counts each game once. */
 export async function usage(ownerId: string) {
   const db = useDb()
-  const [[owned], [games], [wishlist], [account]] = await Promise.all([
+  const [[collectionRow], [library], [account]] = await Promise.all([
     db
       .select({ n: count() })
       .from(collections)
       .where(eq(collections.ownerId, ownerId)),
     db
-      .select({ n: count() })
+      .select({
+        games: sql<number>`count(*)::int`,
+        owned: sql<number>`count(*) filter (where ${libraryItems.owned})::int`,
+        wishlist: sql<number>`count(*) filter (where ${libraryItems.wishlisted})::int`,
+      })
       .from(libraryItems)
       .where(eq(libraryItems.ownerId, ownerId)),
-    db
-      .select({ n: count() })
-      .from(libraryItems)
-      .where(
-        and(
-          eq(libraryItems.ownerId, ownerId),
-          eq(libraryItems.wishlisted, true),
-        ),
-      ),
     db
       .select({ fields: users.fields })
       .from(users)
       .where(eq(users.id, ownerId)),
   ])
   return {
-    collections: owned?.n ?? 0,
-    games: games?.n ?? 0,
-    wishlist: wishlist?.n ?? 0,
+    collections: collectionRow?.n ?? 0,
+    games: library?.games ?? 0,
+    owned: library?.owned ?? 0,
+    wishlist: library?.wishlist ?? 0,
     fields: account?.fields.length ?? 0,
   }
 }
 
 /**
  * Room to put a game into these collections: in each collection it isn't
- * already in, and in the library when it's a new game (no `itemId` yet).
- * The collections must be the user's (404), which is checked first so a
+ * already in. The collections must be the user's (404), which is checked first so a
  * stranger's collection never answers with a limit.
  */
 export async function assertRoomToAdd(
@@ -184,7 +161,6 @@ export async function assertRoomToAdd(
   limits: PlanLimits,
 ): Promise<void> {
   await assertOwnsCollections(ownerId, collectionIds)
-  if (!itemId) await assertLibraryRoom(ownerId, 1, limits)
   const already = itemId ? await collectionIdsForItem(itemId) : []
   await assertCollectionsRoom(
     collectionIds.filter((id) => !already.includes(id)),

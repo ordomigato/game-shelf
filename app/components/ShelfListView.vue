@@ -1,10 +1,28 @@
 <script setup lang="ts">
-import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
+import {
+  ArrowLeft,
+  Download,
+  Ellipsis,
+  Lock,
+  Pencil,
+  PenLine,
+  Plus,
+} from '@lucide/vue'
+import { FetchError } from 'ofetch'
 import { toast } from 'vue-sonner'
-import { PLAN_LIMITS } from '#shared/utils/plans'
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  LIST_PAGE_SIZES,
+  viewFromQuery,
+  viewToQuery,
+  pruneView,
+  type ListView,
+} from '#shared/utils/list-view'
 import type {
   CollectionEntry,
   CollectionLink,
+  FieldValue,
+  ListDetail,
   OwnerEntry,
   LibraryItem,
   ListName,
@@ -18,7 +36,7 @@ import type {
 const props = defineProps<{ list: ListName }>()
 
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t, n } = useI18n()
 const { limits } = usePlan()
 const collections = useCollections()
 const leaving = useUnownConfirm()
@@ -34,32 +52,171 @@ const shelfName = computed(() =>
     : t('shelf.userTitle', { username: username.value }),
 )
 
+// Rows per page is remembered on this device. The address names it only
+// once someone has chosen one.
+const SIZE_KEY = 'gameshelf:list-page-size'
+const savedSize = ref(DEFAULT_LIST_PAGE_SIZE)
+if (import.meta.client) {
+  try {
+    const stored = Number(localStorage.getItem(SIZE_KEY))
+    if ((LIST_PAGE_SIZES as readonly number[]).includes(stored)) {
+      savedSize.value = stored
+    }
+  } catch {
+    // Storage can be blocked. The default is fine.
+  }
+}
+
+// The page, rows per page, sort, search and filters are the address's query,
+// so the back button and a reload land in the same place.
+const view = computed(() => viewFromQuery(route.query, savedSize.value))
+const viewKey = computed(() =>
+  JSON.stringify(viewToQuery(view.value, { withSize: true })),
+)
+
+// Value saves in flight. An answer that was read while one started or
+// finished may predate it, so it is read again rather than shown.
+let valueSaves = 0
+let valueEdits = 0
+
+// The server sorts, searches and filters, so each change asks for one page.
+// The rows on screen stay until the new page arrives, and a newer request
+// cancels an older one so a slow answer never replaces a fresher one.
 const { data, status, error, refresh } = useAsyncData(
   () => `list-${username.value}-${props.list}`,
-  () => collections.getList(username.value, props.list),
-  { watch: [username, () => props.list] },
+  (_nuxt, { signal }) => fetchPage(signal),
+  { server: false, watch: [username, () => props.list, viewKey] },
 )
 const notFound = computed(() => error.value?.statusCode === 404)
 
-// Only the Wishlist has a cap of its own. Over it, games can be kept and
-// removed but not added.
-const capped = computed(() => props.list === 'wishlist')
-const count = computed(() => data.value?.itemCount ?? 0)
-const overCap = computed(
-  () => capped.value && count.value > limits.value.wishlist,
+async function fetchPage(signal: AbortSignal): Promise<ListDetail> {
+  const requested = view.value
+  const key = viewKey.value
+  for (let attempt = 0; ; attempt++) {
+    const mark = valueEdits
+    const page = await collections.getList(
+      username.value,
+      props.list,
+      requested,
+      signal,
+    )
+    if ((mark !== valueEdits || valueSaves) && attempt < 3) continue
+    // Only a finished request for what's still asked for may move the
+    // address, never an edit made to the rows on screen.
+    if (key === viewKey.value) settleView(requested, page)
+    return page
+  }
+}
+
+/**
+ * Brings the address in line with the answer: the last page when the page
+ * asked for is past the end, and no sort or filter on a field that's gone.
+ */
+function settleView(requested: ListView, page: ListDetail) {
+  const settled = {
+    ...pruneView(requested, new Set(page.fields.map((field) => field.id))),
+    page: page.page,
+  }
+  const asQuery = (v: ListView) =>
+    JSON.stringify(viewToQuery(v, { withSize: true }))
+  if (asQuery(settled) !== asQuery(requested)) showView(settled, true)
+}
+
+// Refetching after a change made here fills the gap without dimming. The
+// flag belongs to the address it was set for, so moving elsewhere loads
+// with the usual dimming.
+const quietFor = ref<string | null>(null)
+async function refetchQuietly() {
+  const key = viewKey.value
+  quietFor.value = key
+  try {
+    await refresh()
+  } finally {
+    if (quietFor.value === key) quietFor.value = null
+  }
+}
+const loading = computed(
+  () =>
+    status.value === 'pending' &&
+    Boolean(data.value) &&
+    quietFor.value !== viewKey.value,
 )
-const fullCap = computed(
-  () => capped.value && count.value >= limits.value.wishlist,
+
+/** Changes what the list shows, by changing the address. */
+function showView(change: Partial<ListView>, replace = false) {
+  if (change.size !== undefined) {
+    savedSize.value = change.size
+    try {
+      localStorage.setItem(SIZE_KEY, String(change.size))
+    } catch {
+      // Not remembered, which is fine.
+    }
+  }
+  const next = { ...view.value, ...change }
+  void navigateTo(
+    {
+      path: route.path,
+      query: viewToQuery(next, {
+        withSize: 'size' in route.query || change.size !== undefined,
+      }),
+    },
+    { replace },
+  )
+}
+// Typing a search shouldn't fill the history with every pause.
+const onView = (change: Partial<ListView>) =>
+  showView(
+    change,
+    'q' in change &&
+      Object.keys(change).every((key) => key === 'q' || key === 'page'),
+  )
+
+const tableServer = computed(() =>
+  data.value
+    ? {
+        view: view.value,
+        total: data.value.total,
+        listSize: data.value.itemCount,
+        loading: loading.value,
+        platforms: data.value.platforms,
+      }
+    : undefined,
 )
-const proWishlist = PLAN_LIMITS.pro.wishlist
+
+// The games limit counts the whole library, owned and wishlisted, so both
+// headers show the library total first, then this list's own count.
+// How each header words the count of its own list.
+const usageKey = {
+  owned: { key: 'limits.ownedUsage' },
+  wishlist: { key: 'limits.wishlistUsage' },
+}
+const total = computed(() => data.value?.libraryCount ?? 0)
+const overLimit = computed(() => total.value > limits.value.games)
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
-// The loaded list is held shallowly, so changes replace it rather than
+// The loaded page is held shallowly, so changes replace it rather than
 // editing it in place.
 function setItems(items: OwnerEntry[]) {
   if (!data.value) return
-  data.value = { ...data.value, items, itemCount: items.length }
+  data.value = { ...data.value, items }
+}
+
+/**
+ * Takes a game off the page at once and from the counts, then asks for the
+ * page again so the next game takes its place.
+ */
+function leaveView(itemId: string) {
+  if (!data.value) return
+  const items = data.value.items.filter((entry) => entry.id !== itemId)
+  if (items.length === data.value.items.length) return
+  data.value = {
+    ...data.value,
+    items,
+    itemCount: data.value.itemCount - 1,
+    total: data.value.total - 1,
+  }
+  void refetchQuietly()
 }
 
 /** Whether a game is still on this list after a change. */
@@ -85,7 +242,7 @@ const offeringCollections = ref(false)
 async function gotIt(itemId: string) {
   const item = data.value?.items.find((entry) => entry.id === itemId)
   if (!(await moves.gotIt(itemId)) || !item) return
-  setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
+  leaveView(itemId)
   const alreadyIn = item.inCollections?.map(({ id }) => id) ?? []
   // The list may still be loading, or have failed to when the page opened.
   const owned = await sidebar.load().catch(() => mine.value)
@@ -102,12 +259,85 @@ function collectionsChanged(itemId: string, links: CollectionLink[]) {
       entry.id === itemId ? { ...entry, inCollections: links } : entry,
     ),
   )
+  // A collection filter or sort may now put the game elsewhere.
+  void refetchQuietly()
 }
 
 /** Moves an owned game to the Wishlist. It leaves Owned. */
 async function toWishlist(itemId: string) {
   if (!(await moves.toWishlist(itemId))) return
-  setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
+  leaveView(itemId)
+}
+
+/** Saves the hidden columns, showing the change straight away. */
+async function saveHiddenColumns(hidden: string[]) {
+  if (!data.value) return
+  const before = data.value.hiddenColumns
+  data.value = { ...data.value, hiddenColumns: hidden }
+  try {
+    await collections.saveListColumns(props.list, hidden)
+  } catch {
+    if (data.value) data.value = { ...data.value, hiddenColumns: before }
+    toast.error(t('table.columnsSaveFailed'))
+  }
+}
+
+/** Saves one value straight away in the table, undoing it if saving fails. */
+async function saveValue(
+  itemId: string,
+  fieldId: string,
+  value: FieldValue | null,
+) {
+  const item = data.value?.items.find((entry) => entry.id === itemId)
+  if (!item) return
+  const before = item.data[fieldId]
+  /** Sets or clears one field on one row, leaving the rest as they are. */
+  const setField = (next: FieldValue | undefined) =>
+    setItems(
+      (data.value?.items ?? []).map((entry) => {
+        if (entry.id !== itemId) return entry
+        const { [fieldId]: _old, ...rest } = entry.data
+        return {
+          ...entry,
+          data: next === undefined ? rest : { ...rest, [fieldId]: next },
+        }
+      }),
+    )
+  setField(value ?? undefined)
+  valueSaves += 1
+  valueEdits += 1
+  try {
+    const saved = await collections.updateItemValues(itemId, {
+      [fieldId]: value,
+    })
+    setField(saved.data[fieldId])
+  } catch {
+    setField(before)
+    toast.error(t('table.saveFailed'))
+  } finally {
+    valueSaves -= 1
+    valueEdits += 1
+  }
+  // Sorting and filtering by this field may now put the row elsewhere.
+  void refetchQuietly()
+}
+
+const exporting = ref(false)
+
+/** Downloads the whole list as CSV, whatever the search and filters. */
+async function exportCsv() {
+  exporting.value = true
+  try {
+    saveFile(await collections.exportList(props.list), `${props.list}.csv`)
+  } catch (e) {
+    toast.error(
+      e instanceof FetchError && e.statusCode === 429
+        ? t('account.settings.exportTooSoon')
+        : t('lists.exportFailed'),
+    )
+  } finally {
+    exporting.value = false
+  }
 }
 
 /**
@@ -120,15 +350,14 @@ async function removeItem(itemId: string) {
   try {
     const saved = await leaving.leave(item, props.list)
     if (!saved) return
-    if (!saved.item || !onList(saved.item)) {
-      setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
-    }
+    if (!saved.item || !onList(saved.item)) leaveView(itemId)
   } catch {
     toast.error(t('table.removeFailed'))
   }
 }
 
 const addingByHand = ref(false)
+const editingFields = ref(false)
 const renaming = ref(false)
 const renamingItem = ref<CollectionEntry | null>(null)
 
@@ -144,6 +373,7 @@ function onRenamed(saved: LibraryItem) {
       entry.id === saved.id ? { ...entry, name: saved.name } : entry,
     ),
   )
+  void refetchQuietly()
 }
 </script>
 
@@ -164,7 +394,7 @@ function onRenamed(saved: LibraryItem) {
     </div>
 
     <div
-      v-else-if="status === 'pending' && !data"
+      v-else-if="!data && !error"
       class="flex flex-col gap-4"
       aria-hidden="true"
     >
@@ -184,11 +414,26 @@ function onRenamed(saved: LibraryItem) {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span>{{ $t('shelf.gameCount', data.itemCount) }}</span>
-            <Badge variant="outline" class="gap-1 text-muted-foreground">
-              <Lock class="size-3" aria-hidden="true" />
-              {{ $t('lists.onlyYou') }}
-            </Badge>
+            <i18n-t
+              scope="global"
+              :keypath="usageKey[list].key"
+              tag="span"
+              data-testid="list-usage"
+            >
+              <template #used>
+                <span
+                  data-testid="list-total"
+                  :class="{ 'font-medium text-destructive': overLimit }"
+                  >{{
+                    $t('limits.usedOf', {
+                      used: n(total),
+                      limit: n(limits.games),
+                    })
+                  }}</span
+                >
+              </template>
+              <template #count>{{ n(data.itemCount) }}</template>
+            </i18n-t>
           </div>
           <p class="max-w-prose text-sm text-muted-foreground">
             {{
@@ -199,19 +444,19 @@ function onRenamed(saved: LibraryItem) {
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <Button v-if="!fullCap" as-child>
+          <Badge variant="outline" class="gap-1 text-muted-foreground">
+            <Lock class="size-3" aria-hidden="true" />
+            {{ $t('lists.onlyYou') }}
+          </Badge>
+          <Button as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
               {{ $t('collection.addGames') }}
             </NuxtLink>
           </Button>
-          <Button v-else disabled>
-            <Plus />
-            {{ $t('collection.addGames') }}
-          </Button>
           <Button
+            v-if="ADD_BY_HAND"
             variant="outline"
-            :disabled="fullCap"
             @click="addingByHand = true"
           >
             <PenLine />
@@ -222,28 +467,30 @@ function onRenamed(saved: LibraryItem) {
               $t('collection.addByHand')
             }}</span>
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="outline"
+                size="icon"
+                :aria-label="$t('lists.actions')"
+              >
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-max">
+              <DropdownMenuItem @select="editingFields = true">
+                <Pencil /> {{ $t('table.editFields') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem :disabled="exporting" @select="exportCsv">
+                <Download /> {{ $t('lists.exportAll', data.itemCount) }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <Alert v-if="overCap" variant="destructive" data-testid="over-limit">
-        <AlertTitle>{{
-          $t('limits.overWishlist', {
-            used: data.itemCount,
-            limit: limits.wishlist,
-          })
-        }}</AlertTitle>
-        <AlertDescription>
-          {{ $t('limits.overGamesHelp', { limit: limits.wishlist }) }}
-          <NuxtLink v-if="proWishlist > limits.wishlist" to="/pricing">{{
-            $t('limits.proAllows', {
-              limit: new Intl.NumberFormat(locale).format(proWishlist),
-            })
-          }}</NuxtLink>
-        </AlertDescription>
-      </Alert>
-
       <div
-        v-if="!data.items.length"
+        v-if="!data.itemCount"
         class="rounded-lg border border-dashed py-12 text-center"
       >
         <p class="font-medium">{{ $t('collection.empty') }}</p>
@@ -265,12 +512,17 @@ function onRenamed(saved: LibraryItem) {
 
       <CollectionTable
         v-else
-        :fields="[]"
+        :fields="data.fields"
         :items="data.items"
         :mode="list"
         :add-targets="mine"
+        :server="tableServer"
         editable
+        :hidden-columns="data.hiddenColumns"
         :shelf-path="shelfPath"
+        @view="onView"
+        @hide-columns="saveHiddenColumns"
+        @save="saveValue"
         @remove="removeItem"
         @rename="startRenaming"
         @collections-changed="collectionsChanged"
@@ -279,7 +531,13 @@ function onRenamed(saved: LibraryItem) {
         @to-wishlist="toWishlist"
       />
 
+      <FieldsEditorDialog
+        v-model:open="editingFields"
+        :fields="data.fields"
+        @saved="refresh()"
+      />
       <AddByHandDialog
+        v-if="ADD_BY_HAND"
         v-model:open="addingByHand"
         :title="title"
         :target="{ list }"

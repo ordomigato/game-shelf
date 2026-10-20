@@ -2,7 +2,6 @@
 import {
   ArrowLeft,
   ChartColumn,
-  Columns3,
   Download,
   Ellipsis,
   LayoutGrid,
@@ -31,7 +30,7 @@ import type {
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t, n, locale } = useI18n()
 const { limits } = usePlan()
 const proGames = PLAN_LIMITS.pro.gamesPerCollection
 // Over the limit, games can be kept and removed but not added.
@@ -128,6 +127,19 @@ async function saveDashboard(dashboard: ChartWidget[]) {
   } catch (error) {
     if (data.value) data.value = { ...data.value, dashboard: before }
     toast.error(limitMessage(error, t) ?? t('charts.saveFailed'))
+  }
+}
+
+/** Saves the hidden columns, showing the change straight away. */
+async function saveHiddenColumns(hiddenColumns: string[]) {
+  if (!data.value) return
+  const before = data.value.hiddenColumns
+  data.value = { ...data.value, hiddenColumns }
+  try {
+    await collections.saveHiddenColumns(data.value.id, hiddenColumns)
+  } catch {
+    if (data.value) data.value = { ...data.value, hiddenColumns: before }
+    toast.error(t('table.columnsSaveFailed'))
   }
 }
 
@@ -437,55 +449,25 @@ async function deleteCollection() {
               }"
               >{{
                 $t('limits.gamesUsed', {
-                  used: data.itemCount,
-                  limit: limits.gamesPerCollection,
+                  used: n(data.itemCount),
+                  limit: n(limits.gamesPerCollection),
                 })
               }}</span
             >
             <span v-else>{{ $t('shelf.gameCount', data.itemCount) }}</span>
-            <VisibilityMenu
-              v-if="data.isOwner"
-              :visibility="data.visibility"
-              :disabled="changingVisibility"
-              @change="setVisibility"
-            />
           </div>
           <p v-if="data.description" class="max-w-prose whitespace-pre-line">
             {{ data.description }}
           </p>
-          <p class="text-sm text-muted-foreground">
-            {{
-              data.fields.length
-                ? $t('collection.columns', {
-                    fields: data.fields.map((field) => field.name).join(', '),
-                  })
-                : $t('collection.noColumns')
-            }}
-            <template v-if="data.isOwner">
-              <span
-                :class="{
-                  'font-medium text-destructive':
-                    data.fields.length > limits.fields,
-                }"
-                >{{
-                  $t('limits.fieldsUsed', {
-                    used: data.fields.length,
-                    limit: limits.fields,
-                  })
-                }}</span
-              >
-              <button
-                type="button"
-                class="ml-1 font-medium text-primary underline-offset-4 hover:underline"
-                @click="editingFields = true"
-              >
-                {{ $t('collection.editFields') }}
-              </button>
-            </template>
-          </p>
         </div>
 
         <div class="flex items-center gap-2">
+          <VisibilityMenu
+            v-if="data.isOwner"
+            :visibility="data.visibility"
+            :disabled="changingVisibility"
+            @change="setVisibility"
+          />
           <ShareButton
             v-if="data.isOwner || data.visibility === 'public'"
             :path="`${shelfPath}/${data.slug}`"
@@ -505,7 +487,7 @@ async function deleteCollection() {
               {{ $t('collection.addGames') }}
             </Button>
             <Button
-              v-if="data.items.length"
+              v-if="ADD_BY_HAND && data.items.length"
               variant="outline"
               :disabled="fullGames"
               @click="addingByHand = true"
@@ -532,9 +514,6 @@ async function deleteCollection() {
                 <DropdownMenuItem @select="editing = true">
                   <Pencil /> {{ $t('collection.edit') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem @select="editingFields = true">
-                  <Columns3 /> {{ $t('collection.editFields') }}
-                </DropdownMenuItem>
                 <DropdownMenuItem v-if="sidebarEntry" @select="togglePin">
                   <template v-if="sidebarEntry.pinnedPosition == null">
                     <Pin /> {{ $t('collection.pin') }}
@@ -543,12 +522,19 @@ async function deleteCollection() {
                     <PinOff /> {{ $t('collection.unpin') }}
                   </template>
                 </DropdownMenuItem>
+                <DropdownMenuItem @select="editingFields = true">
+                  <Pencil /> {{ $t('collection.editFields') }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @select="importing = true">
                   <Upload /> {{ $t('collection.importCsv') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem @select="exportCsv">
+                <DropdownMenuItem
+                  :disabled="!data.items.length"
+                  @select="exportCsv"
+                >
                   <Download /> {{ $t('collection.exportCsv') }}
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   class="text-destructive focus:text-destructive"
                   @select="confirmingDelete = true"
@@ -597,11 +583,12 @@ async function deleteCollection() {
                 $t('collection.searchGames')
               }}</NuxtLink>
             </Button>
-            <Button variant="outline" @click="addingByHand = true">
+            <Button
+              v-if="ADD_BY_HAND"
+              variant="outline"
+              @click="addingByHand = true"
+            >
               <PenLine /> {{ $t('collection.addByHand') }}
-            </Button>
-            <Button variant="outline" @click="importing = true">
-              <Upload /> {{ $t('collection.importCsv') }}
             </Button>
           </div>
         </template>
@@ -648,8 +635,10 @@ async function deleteCollection() {
           :fields="data.fields"
           :items="data.items"
           :editable="data.isOwner"
+          :hidden-columns="data.hiddenColumns"
           :add-targets="mine"
           :shelf-path="shelfPath"
+          @hide-columns="saveHiddenColumns"
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"
@@ -729,7 +718,7 @@ async function deleteCollection() {
         @imported="refresh()"
       />
       <AddByHandDialog
-        v-if="data.isOwner"
+        v-if="ADD_BY_HAND && data.isOwner"
         v-model:open="addingByHand"
         :title="data.title"
         :target="{ collectionId: data.id }"

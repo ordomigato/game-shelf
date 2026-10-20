@@ -6,8 +6,11 @@ import {
   useVueTable,
   type ColumnDef,
   type PaginationState,
+  type VisibilityState,
   type SortingState,
+  type Updater,
 } from '@tanstack/vue-table'
+import { watchDebounced } from '@vueuse/core'
 import {
   ArrowDown,
   ArrowUp,
@@ -18,6 +21,7 @@ import {
   PackageCheck,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   Ellipsis,
   GripVertical,
   ListFilter,
@@ -39,6 +43,14 @@ import type {
   FieldDefinition,
   FieldValue,
 } from '#shared/types/collection'
+import {
+  COLLECTIONS_FILTER,
+  columnOfSortKey,
+  LIST_PAGE_SIZES,
+  PLATFORMS_FILTER,
+  sortKeyOf,
+  type ListView,
+} from '#shared/utils/list-view'
 
 /**
  * A collection's games as a table: one column per field the user keeps.
@@ -49,7 +61,12 @@ import type {
  *
  * The same table shows Owned and the Wishlist (`mode`), which have no
  * fields and no order of their own: they list which collections each game
- * is in and the platforms for that list.
+ * is in and the platforms for that list. For those, `server` hands the
+ * sorting, search, filters and paging to the server: `items` is then one
+ * page, and the table asks for changes with `view` instead of making them.
+ *
+ * The owner can hide columns (all but the name). `hiddenColumns` holds the
+ * keys of the hidden ones and `hideColumns` asks the page to save a new set.
  */
 const props = defineProps<{
   fields: FieldDefinition[]
@@ -63,8 +80,22 @@ const props = defineProps<{
   addTargets?: CollectionSummary[]
   /** A collection, or one of the owner's two lists. */
   mode?: 'collection' | 'owned' | 'wishlist'
+  /** Keys of the hidden columns (shared/utils/columns.ts). */
+  hiddenColumns?: string[]
   /** The owner's shelf, for links to the collections in `inCollections`. */
   shelfPath?: string
+  /** Set on a list whose server does the sorting, search and filtering. */
+  server?: {
+    view: ListView
+    /** The games matching the search and filters. */
+    total: number
+    /** Every game on the list. */
+    listSize: number
+    /** Whether a new page is on its way. The current rows stay visible. */
+    loading: boolean
+    /** The platforms to filter by. */
+    platforms: { id: number; name: string }[]
+  }
 }>()
 const emit = defineEmits<{
   save: [itemId: string, fieldId: string, value: FieldValue | null]
@@ -80,6 +111,10 @@ const emit = defineEmits<{
   toWishlist: [itemId: string]
   /** Place `itemId` right after `afterItemId`, or first when null. */
   move: [itemId: string, afterItemId: string | null]
+  /** The owner chose which columns to hide: all the hidden keys. */
+  hideColumns: [hidden: string[]]
+  /** On a server list: the person changed the page, sort, search or filters. */
+  view: [change: Partial<ListView>]
 }>()
 
 const { t, locale } = useI18n()
@@ -87,9 +122,35 @@ const NuxtLink = resolveComponent('NuxtLink')
 
 // Search and filters
 
-const query = ref('')
+const query = ref(props.server?.view.q ?? '')
 /** Field id to the values to keep: select options, or "yes"/"no". */
-const filters = ref<Record<string, string[]>>({})
+const clientFilters = ref<Record<string, string[]>>({})
+const filters = computed(
+  () => props.server?.view.filters ?? clientFilters.value,
+)
+
+// A server list asks for a new search once typing pauses, and follows the
+// address when it changes by itself (the back button).
+let lastEmittedQuery: string | null = null
+watchDebounced(
+  query,
+  (text) => {
+    if (props.server && text.trim() !== props.server.view.q) {
+      lastEmittedQuery = text.trim()
+      emit('view', { q: lastEmittedQuery, page: 1 })
+    }
+  },
+  { debounce: 300 },
+)
+// The address echoing what was typed must not overwrite letters typed since.
+watch(
+  () => props.server?.view.q,
+  (text) => {
+    if (text === undefined || text === lastEmittedQuery) return
+    lastEmittedQuery = null
+    if (text !== query.value.trim()) query.value = text
+  },
+)
 
 const tableMode = computed(() => props.mode ?? 'collection')
 const isList = computed(() => tableMode.value !== 'collection')
@@ -172,6 +233,18 @@ async function saveEditing(change: { add: string[]; remove: string[] }) {
 const collectionTitles = (item: CollectionEntry) =>
   (item.inCollections ?? []).map((collection) => collection.title)
 
+const platformChoices = computed(() =>
+  (props.server?.platforms ?? []).map(({ id, name }) => ({
+    value: String(id),
+    label: name,
+  })),
+)
+const collectionChoices = computed(() =>
+  props.server
+    ? targets.value.map(({ id, title }) => ({ value: id, label: title }))
+    : [],
+)
+
 const filterableFields = computed(() =>
   props.fields.filter(
     (field) =>
@@ -200,17 +273,20 @@ const stateChoices = computed(() => [
 
 function toggleFilter(fieldId: string, value: string, on: boolean) {
   const current = filters.value[fieldId] ?? []
-  filters.value = {
+  const next = {
     ...filters.value,
     [fieldId]: on
       ? [...current, value]
       : current.filter((existing) => existing !== value),
   }
+  if (props.server) emit('view', { filters: next, page: 1 })
+  else clientFilters.value = next
 }
 
 function clearFilters() {
   query.value = ''
-  filters.value = {}
+  if (props.server) emit('view', { q: '', filters: {}, page: 1 })
+  else clientFilters.value = {}
 }
 
 function matchesFilters(item: CollectionEntry) {
@@ -253,13 +329,39 @@ function matchesQuery(item: CollectionEntry) {
   return words.split(/\s+/).every((word) => haystack.includes(word))
 }
 
+// A server list's items already match the search and filters.
 const visibleItems = computed(() =>
-  props.items.filter((item) => matchesFilters(item) && matchesQuery(item)),
+  props.server
+    ? props.items
+    : props.items.filter((item) => matchesFilters(item) && matchesQuery(item)),
 )
 
 // Table
 
-const sorting = ref<SortingState>([])
+const clientSorting = ref<SortingState>([])
+const sorting = computed<SortingState>(() => {
+  const view = props.server?.view
+  if (!view) return clientSorting.value
+  return view.sort
+    ? [{ id: columnOfSortKey(view.sort), desc: view.dir === 'desc' }]
+    : []
+})
+function setSorting(next: SortingState) {
+  const first = next[0]
+  if (props.server) {
+    emit('view', {
+      sort: first ? sortKeyOf(first.id) : null,
+      dir: first?.desc ? 'desc' : 'asc',
+      page: 1,
+    })
+  } else {
+    clientSorting.value = next
+  }
+}
+
+const columnVisibility = computed<VisibilityState>(() =>
+  Object.fromEntries((props.hiddenColumns ?? []).map((id) => [id, false])),
+)
 
 const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
   {
@@ -326,16 +428,64 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
   },
 ])
 
+// The columns the owner can hide: all but the name.
+const hideable = computed(() =>
+  columns.value
+    .filter((column) => column.id !== 'name')
+    .map((column) => ({
+      id: column.id!,
+      label: (column.header as () => string)(),
+    })),
+)
+const hiddenCount = computed(
+  () => hideable.value.filter(({ id }) => id in columnVisibility.value).length,
+)
+
+// The page already says how many games there are, so the table only
+// reports a count when filters or search narrow it.
+const filtered = computed(
+  () => matchCount.value !== (props.server?.listSize ?? props.items.length),
+)
+
+function setColumnHidden(columnId: string, hidden: boolean) {
+  const others = (props.hiddenColumns ?? []).filter((id) => id !== columnId)
+  const next = hidden ? [...others, columnId] : others
+  // Sorting by a column that is gone would leave the order unexplained.
+  if (hidden && sorting.value[0]?.id === columnId) setSorting([])
+  emit('hideColumns', next)
+}
+
+function showAllColumns() {
+  emit('hideColumns', [])
+}
+
 // Pages of the loaded list. Kept on the current page while editing values
 // (which changes the data), back to the first when the search, filters or
 // sort change, and pulled back when removing games empties the last page.
-const PAGE_SIZES = [25, 50, 100]
-const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 25 })
+const PAGE_SIZES: readonly number[] = LIST_PAGE_SIZES
+const clientPagination = ref<PaginationState>({ pageIndex: 0, pageSize: 25 })
+const pagination = computed<PaginationState>(() =>
+  props.server
+    ? {
+        pageIndex: props.server.view.page - 1,
+        pageSize: props.server.view.size,
+      }
+    : clientPagination.value,
+)
+function setPagination(next: PaginationState) {
+  if (!props.server) {
+    clientPagination.value = next
+  } else if (next.pageSize !== props.server.view.size) {
+    emit('view', { size: next.pageSize, page: 1 })
+  } else {
+    emit('view', { page: next.pageIndex + 1 })
+  }
+}
 
 watch(
-  [query, filters, sorting],
+  [query, clientFilters, clientSorting],
   () => {
-    pagination.value = { ...pagination.value, pageIndex: 0 }
+    clientPagination.value = { ...clientPagination.value, pageIndex: 0 }
   },
   { deep: true },
 )
@@ -343,6 +493,17 @@ watch(
 const table = useVueTable({
   get data() {
     return visibleItems.value
+  },
+  get manualSorting() {
+    return Boolean(props.server)
+  },
+  get manualPagination() {
+    return Boolean(props.server)
+  },
+  get pageCount() {
+    return props.server
+      ? Math.max(1, Math.ceil(props.server.total / props.server.view.size))
+      : undefined
   },
   get columns() {
     return columns.value
@@ -354,14 +515,17 @@ const table = useVueTable({
     get pagination() {
       return pagination.value
     },
+    get columnVisibility() {
+      return columnVisibility.value
+    },
   },
-  onSortingChange: (updater) => {
-    sorting.value =
-      typeof updater === 'function' ? updater(sorting.value) : updater
+  onSortingChange: (updater: Updater<SortingState>) => {
+    setSorting(typeof updater === 'function' ? updater(sorting.value) : updater)
   },
-  onPaginationChange: (updater) => {
-    pagination.value =
-      typeof updater === 'function' ? updater(pagination.value) : updater
+  onPaginationChange: (updater: Updater<PaginationState>) => {
+    setPagination(
+      typeof updater === 'function' ? updater(pagination.value) : updater,
+    )
   },
   autoResetPageIndex: false,
   getRowId: (item) => item.id,
@@ -372,29 +536,27 @@ const table = useVueTable({
 
 const pageCount = computed(() => table.getPageCount())
 watch(pageCount, (count) => {
-  if (pagination.value.pageIndex >= count) {
-    pagination.value = {
-      ...pagination.value,
-      pageIndex: Math.max(count - 1, 0),
-    }
+  if (!props.server && pagination.value.pageIndex >= count) {
+    setPagination({ ...pagination.value, pageIndex: Math.max(count - 1, 0) })
   }
 })
 
+const matchCount = computed(() =>
+  props.server ? props.server.total : visibleItems.value.length,
+)
 const pageRange = computed(() => {
   const { pageIndex, pageSize } = pagination.value
   const first = pageIndex * pageSize + 1
   return {
     first,
-    last: Math.min(first + pageSize - 1, visibleItems.value.length),
-    total: visibleItems.value.length,
+    last: Math.min(first + pageSize - 1, matchCount.value),
+    total: matchCount.value,
   }
 })
 
 function setPageSize(size: unknown) {
   const pageSize = Number(size)
-  if (PAGE_SIZES.includes(pageSize)) {
-    pagination.value = { pageIndex: 0, pageSize }
-  }
+  if (PAGE_SIZES.includes(pageSize)) setPagination({ pageIndex: 0, pageSize })
 }
 
 // Ordering. Only while the table shows the owner's own order: no sort,
@@ -468,12 +630,19 @@ const addedFormat = computed(
         <Input
           v-model="query"
           type="search"
-          :aria-label="$t('table.search')"
-          :placeholder="$t('table.search')"
+          :aria-label="server ? $t('table.searchGames') : $t('table.search')"
+          :placeholder="server ? $t('table.searchGames') : $t('table.search')"
           class="pl-8"
         />
       </div>
-      <DropdownMenu v-if="filterableFields.length || showWanted">
+      <DropdownMenu
+        v-if="
+          filterableFields.length ||
+          showWanted ||
+          collectionChoices.length ||
+          platformChoices.length
+        "
+      >
         <DropdownMenuTrigger as-child>
           <Button variant="outline">
             <ListFilter />
@@ -504,6 +673,50 @@ const addedFormat = computed(
               </DropdownMenuCheckboxItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          <DropdownMenuSub v-if="collectionChoices.length">
+            <DropdownMenuSubTrigger>{{
+              $t('table.inCollections')
+            }}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuCheckboxItem
+                v-for="choice in collectionChoices"
+                :key="choice.value"
+                :model-value="
+                  (filters[COLLECTIONS_FILTER] ?? []).includes(choice.value)
+                "
+                @update:model-value="
+                  toggleFilter(
+                    COLLECTIONS_FILTER,
+                    choice.value,
+                    $event === true,
+                  )
+                "
+                @select.prevent
+              >
+                {{ choice.label }}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSub v-if="platformChoices.length">
+            <DropdownMenuSubTrigger>{{
+              $t('table.platforms')
+            }}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuCheckboxItem
+                v-for="choice in platformChoices"
+                :key="choice.value"
+                :model-value="
+                  (filters[PLATFORMS_FILTER] ?? []).includes(choice.value)
+                "
+                @update:model-value="
+                  toggleFilter(PLATFORMS_FILTER, choice.value, $event === true)
+                "
+                @select.prevent
+              >
+                {{ choice.label }}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuSub v-for="field in filterableFields" :key="field.id">
             <DropdownMenuSubTrigger>{{ field.name }}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -522,7 +735,7 @@ const addedFormat = computed(
           </DropdownMenuSub>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button v-if="sorting.length" variant="ghost" @click="sorting = []">
+      <Button v-if="sorting.length" variant="ghost" @click="setSorting([])">
         <X />
         {{ $t('table.yourOrder') }}
       </Button>
@@ -534,19 +747,64 @@ const addedFormat = computed(
         <X />
         {{ $t('table.clearFilters') }}
       </Button>
-      <p class="ml-auto text-sm text-muted-foreground" aria-live="polite">
+      <p
+        v-if="filtered"
+        class="ml-auto text-sm text-muted-foreground"
+        aria-live="polite"
+      >
         {{
-          visibleItems.length === items.length
-            ? $t('shelf.gameCount', items.length)
-            : $t('table.showing', {
-                shown: visibleItems.length,
-                total: items.length,
-              })
+          $t('table.showing', {
+            shown: matchCount,
+            total: server?.listSize ?? items.length,
+          })
         }}
       </p>
+      <Popover v-if="editable">
+        <PopoverTrigger as-child>
+          <Button
+            variant="outline"
+            size="icon"
+            :class="{ 'ml-auto': !filtered }"
+            :title="$t('table.columns')"
+            :aria-label="$t('table.columns')"
+          >
+            <Columns3 />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="w-56 p-2">
+          <ul class="flex flex-col">
+            <li v-for="column in hideable" :key="column.id">
+              <Label
+                class="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 font-normal hover:bg-accent"
+              >
+                <Checkbox
+                  :model-value="!(column.id in columnVisibility)"
+                  @update:model-value="
+                    setColumnHidden(column.id, $event !== true)
+                  "
+                />
+                {{ column.label }}
+              </Label>
+            </li>
+          </ul>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="mt-1 w-full justify-start"
+            :disabled="!hiddenCount"
+            @click="showAllColumns"
+          >
+            {{ $t('table.showAllColumns') }}
+          </Button>
+        </PopoverContent>
+      </Popover>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border bg-card">
+    <div
+      class="overflow-x-auto rounded-lg border bg-card transition-opacity"
+      :class="{ 'opacity-60': server?.loading }"
+      :aria-busy="server?.loading || undefined"
+    >
       <Table>
         <TableHeader>
           <!-- Header cells don't react to hover like the rows below. -->
@@ -822,10 +1080,7 @@ const addedFormat = computed(
           <TableRow v-if="!visibleItems.length">
             <TableCell
               :colspan="
-                fields.length +
-                2 +
-                Number(showCollections) +
-                Number(showPlatforms) +
+                table.getVisibleLeafColumns().length +
                 Number(editable) +
                 Number(reorderable)
               "
@@ -839,7 +1094,7 @@ const addedFormat = computed(
     </div>
 
     <nav
-      v-if="visibleItems.length > PAGE_SIZES[0]!"
+      v-if="matchCount > PAGE_SIZES[0]!"
       class="flex flex-wrap items-center justify-between gap-3 text-sm"
       :aria-label="$t('table.pages')"
     >

@@ -72,7 +72,8 @@ async function openCollection(page: Page, matches: unknown[] = []) {
     })
   })
   await page.goto('/u/retro_fan/shelf/nes-games')
-  await page.getByRole('button', { name: 'Import CSV' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('menuitem', { name: 'Import CSV' }).click()
   return sent
 }
 

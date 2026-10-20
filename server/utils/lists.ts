@@ -1,8 +1,18 @@
-import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  sql,
+  type SQL,
+} from 'drizzle-orm'
 import { createError } from 'h3'
 import type {
   OwnerEntry,
   CollectionLink,
+  FieldDefinition,
   LibraryItem,
   ListDetail,
   ListName,
@@ -12,16 +22,23 @@ import {
   type ListAction,
   type ListState,
 } from '../../shared/utils/lists'
-import type { PlanLimits } from '../../shared/utils/plans'
-import { games as catalogGames, libraryItems, platforms } from '../db/schema'
+import { knownHiddenColumns } from '../../shared/utils/columns'
+import type { ExportItem } from '../../shared/utils/csv'
+import {
+  games as catalogGames,
+  libraryItems,
+  platforms,
+  users,
+} from '../db/schema'
 import { useDb } from './db'
 import {
   catalogJoin,
   customCollectionsOf,
   getOwnedItem,
+  itemName,
   toLibraryItem,
 } from './collections'
-import { assertListRoom } from './limits'
+import { isFiltered, listOrder, listWhere, type ListQuery } from './list-query'
 
 type ItemRow = typeof libraryItems.$inferSelect
 
@@ -49,18 +66,16 @@ async function platformNames(ids: number[]): Promise<Map<number, string>> {
   return new Map(rows.map((row) => [row.id, row.name]))
 }
 
-/**
- * Owned or the Wishlist: the user's games on that list, newest first, with
- * the custom collections each is in and the platforms for that list.
- */
-export async function getList(
+/** The platforms some game on the list is on, for the filter. */
+async function platformChoices(
   ownerId: string,
   list: ListName,
-): Promise<ListDetail> {
-  const rows = await useDb()
-    .select({ item: libraryItems, game: catalogGames })
+): Promise<{ id: number; name: string }[]> {
+  const db = useDb()
+  const column = list === 'owned' ? libraryItems.ownedOn : libraryItems.wantedOn
+  const onList = db
+    .select({ id: sql<number>`unnest(${column})` })
     .from(libraryItems)
-    .leftJoin(catalogGames, catalogJoin)
     .where(
       and(
         eq(libraryItems.ownerId, ownerId),
@@ -70,7 +85,69 @@ export async function getList(
         ),
       ),
     )
-    .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
+  const rows = await db
+    .select({
+      id: platforms.igdbId,
+      name: sql<string>`coalesce(${platforms.abbreviation}, ${platforms.name})`,
+    })
+    .from(platforms)
+    .where(inArray(platforms.igdbId, onList))
+  return rows.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * One page of Owned or the Wishlist: the user's games on that list that
+ * match the search and filters, in the asked order, with the custom
+ * collections each is in and the platforms for that list. A page past the
+ * end comes back as the last one. The sort, search and filters run in SQL
+ * (see `list-query.ts`), so only this page's rows leave the database.
+ */
+export async function getListPage(
+  ownerId: string,
+  list: ListName,
+  query: ListQuery,
+  fields: FieldDefinition[],
+  listColumns: Partial<Record<ListName, string[]>> = {},
+): Promise<ListDetail> {
+  const db = useDb()
+  const where = listWhere(ownerId, list, query)
+  const order = listOrder(ownerId, list, query)
+  const onList = and(
+    eq(libraryItems.ownerId, ownerId),
+    eq(list === 'owned' ? libraryItems.owned : libraryItems.wishlisted, true),
+  )
+  const countWhere = (condition: SQL | undefined) =>
+    db
+      .select({ value: count() })
+      .from(libraryItems)
+      .leftJoin(catalogGames, catalogJoin)
+      .where(condition)
+  const pageOf = (page: number) =>
+    db
+      .select({ item: libraryItems, game: catalogGames })
+      .from(libraryItems)
+      .leftJoin(catalogGames, catalogJoin)
+      .where(where)
+      .orderBy(...order)
+      .limit(query.size)
+      .offset((page - 1) * query.size)
+
+  const [matching, listSize, firstTry, platformOptions, library] =
+    await Promise.all([
+      countWhere(where),
+      isFiltered(query) ? countWhere(onList) : null,
+      pageOf(query.page),
+      platformChoices(ownerId, list),
+      db
+        .select({ value: count() })
+        .from(libraryItems)
+        .where(eq(libraryItems.ownerId, ownerId)),
+    ])
+  const total = matching[0]?.value ?? 0
+  const itemCount = listSize ? (listSize[0]?.value ?? 0) : total
+  const page = Math.min(query.page, Math.max(1, Math.ceil(total / query.size)))
+  const rows = page === query.page ? firstTry : await pageOf(page)
+
   const platformIdsOf = (item: ItemRow) =>
     list === 'owned' ? item.ownedOn : item.wantedOn
   const [inCollections, names] = await Promise.all([
@@ -87,7 +164,62 @@ export async function getList(
     inCollections: inCollections.get(item.id) ?? [],
     platforms: platformIdsOf(item).flatMap((id) => names.get(id) ?? []),
   }))
-  return { list, itemCount: items.length, items }
+  return {
+    list,
+    itemCount,
+    libraryCount: library[0]?.value ?? 0,
+    total,
+    page,
+    size: query.size,
+    fields,
+    platforms: platformOptions,
+    hiddenColumns: knownHiddenColumns(
+      listColumns[list],
+      'list',
+      fields.map((field) => field.id),
+    ),
+    items,
+  }
+}
+
+/** Saves the columns the owner hides on a list, keeping the other list's. */
+export async function setListColumns(
+  owner: { id: string; listColumns: Partial<Record<ListName, string[]>> },
+  list: ListName,
+  hidden: string[],
+): Promise<string[]> {
+  await useDb()
+    .update(users)
+    .set({ listColumns: { ...owner.listColumns, [list]: hidden } })
+    .where(eq(users.id, owner.id))
+  return hidden
+}
+
+/** Every game on a list, newest first, with what an export needs. */
+export async function listForExport(
+  ownerId: string,
+  list: ListName,
+): Promise<ExportItem[]> {
+  const rows = await useDb()
+    .select({
+      igdbId: libraryItems.igdbId,
+      name: itemName,
+      addedAt: libraryItems.createdAt,
+      data: libraryItems.data,
+    })
+    .from(libraryItems)
+    .leftJoin(catalogGames, catalogJoin)
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        eq(
+          list === 'owned' ? libraryItems.owned : libraryItems.wishlisted,
+          true,
+        ),
+      ),
+    )
+    .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
+  return rows.map((row) => ({ ...row, addedAt: row.addedAt.toISOString() }))
 }
 
 /** How many games are on each list, for the sidebar. */
@@ -155,8 +287,8 @@ const stillIn = (id: string, ownerId: string, read: ListState) =>
 /**
  * Changes a game's place on the lists, one action after another, and
  * saves the result once. A game left on neither list is deleted with its
- * values and collection links, and the answer is null. The Wishlist's room
- * is checked when the game joins it.
+ * values and collection links, and the answer is null. A game only moves
+ * between the lists here, so it never needs room in the library.
  *
  * The write only happens if the game is still in the state it was read in,
  * so a change made from a stale page can't undo another one (or delete a
@@ -167,7 +299,6 @@ export async function changeItemLists(
   ownerId: string,
   itemId: string,
   actions: ListAction[],
-  limits: PlanLimits,
 ): Promise<LibraryItem | null> {
   const db = useDb()
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -188,9 +319,6 @@ export async function changeItemLists(
         .returning({ id: libraryItems.id })
       if (deleted.length) return null
       continue
-    }
-    if (state.wishlisted && !before.wishlisted) {
-      await assertListRoom(ownerId, 'wishlist', 1, limits)
     }
     const [updated] = await db
       .update(libraryItems)

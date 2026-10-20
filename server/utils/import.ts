@@ -148,7 +148,7 @@ export async function importIntoCollection(
     }
   }
 
-  // Within the plan: new games in the library, and games new to this
+  // Within the plan: new games, and games new to this
   // collection (ones already in it only get their values updated).
   await assertLibraryRoom(ownerId, toInsert.length, limits)
   const alreadyIn = existing.length

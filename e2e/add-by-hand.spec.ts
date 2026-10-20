@@ -31,7 +31,9 @@ async function stubAdd(page: Page) {
   return sent
 }
 
-test('adds a game by hand from the collection page', async ({ page }) => {
+// Adding by hand is hidden (ADD_BY_HAND in app/utils/features.ts). Drop the
+// skips when it comes back.
+test.skip('adds a game by hand from the collection page', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) =>
     route.fulfill({ json: [nes] }),
@@ -76,7 +78,7 @@ test('adds a game by hand from the collection page', async ({ page }) => {
   await expect(row.getByRole('link')).toHaveCount(0)
 })
 
-test('offers it when searching for a collection', async ({ page }) => {
+test.skip('offers it when searching for a collection', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) =>
     route.fulfill({ json: [nes] }),

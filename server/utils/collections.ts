@@ -26,6 +26,7 @@ import {
   fieldsFor,
 } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
+import { knownHiddenColumns } from '../../shared/utils/columns'
 import type { ListState } from '../../shared/utils/lists'
 import {
   collectionItems,
@@ -264,6 +265,12 @@ export async function getCollectionBySlug(
     fields,
     items,
     dashboard,
+    // A visitor's table has only the fields they can see.
+    hiddenColumns: knownHiddenColumns(
+      found.collection.hiddenColumns,
+      'collection',
+      fields.map((field) => field.id),
+    ),
     isOwner: viewerIsOwner,
   }
 }
@@ -318,6 +325,7 @@ export async function updateCollection(
     description?: string | null
     color?: string | null
     visibility?: 'private' | 'public'
+    hiddenColumns?: string[]
   },
 ): Promise<CollectionSummary> {
   const current = await getOwnedCollection(ownerId, collectionId)
@@ -335,6 +343,9 @@ export async function updateCollection(
         }),
         ...(changes.visibility !== undefined && {
           visibility: changes.visibility,
+        }),
+        ...(changes.hiddenColumns !== undefined && {
+          hiddenColumns: changes.hiddenColumns,
         }),
       })
       .where(eq(collections.id, current.id))
@@ -588,8 +599,39 @@ export async function updateItemValues(
       ),
     )
   if (!found) throw notFound()
+  return saveItemValues(found.item, found.game, found.fields, changes)
+}
 
-  const result = applyFieldValues(found.item.data, found.fields, changes)
+/**
+ * Sets the values of one of the user's games for their fields, wherever it
+ * is listed (a list or a collection). Same rules as `updateItemValues`.
+ */
+export async function updateLibraryItemValues(
+  ownerId: string,
+  itemId: string,
+  changes: Record<string, unknown>,
+): Promise<LibraryItem> {
+  const [found] = await useDb()
+    .select({
+      item: libraryItems,
+      game: catalogGames,
+      fields: users.fields,
+    })
+    .from(libraryItems)
+    .innerJoin(users, eq(users.id, libraryItems.ownerId))
+    .leftJoin(catalogGames, catalogJoin)
+    .where(and(eq(libraryItems.id, itemId), eq(libraryItems.ownerId, ownerId)))
+  if (!found) throw notFound()
+  return saveItemValues(found.item, found.game, found.fields, changes)
+}
+
+async function saveItemValues(
+  item: ItemRow,
+  game: CatalogGameRow | null,
+  fields: FieldDefinition[],
+  changes: Record<string, unknown>,
+): Promise<LibraryItem> {
+  const result = applyFieldValues(item.data, fields, changes)
   if ('invalidFieldIds' in result) {
     throw createError({
       statusCode: 400,
@@ -597,12 +639,14 @@ export async function updateItemValues(
       data: { invalidFieldIds: result.invalidFieldIds },
     })
   }
-  const [updated] = await db
+  const [updated] = await useDb()
     .update(libraryItems)
     .set({ data: result.data })
-    .where(eq(libraryItems.id, itemId))
+    .where(
+      and(eq(libraryItems.id, item.id), eq(libraryItems.ownerId, item.ownerId)),
+    )
     .returning()
-  return toLibraryItem(updated!, found.game)
+  return toLibraryItem(updated!, game)
 }
 
 /**

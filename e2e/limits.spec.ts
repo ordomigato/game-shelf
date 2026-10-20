@@ -106,7 +106,15 @@ test('the Usage tab shows the plan and what is used', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/me/usage', (route) =>
-    route.fulfill({ json: { plan: 'free', collections: 3, games: 214 } }),
+    route.fulfill({
+      json: {
+        plan: 'free',
+        collections: 3,
+        games: 214,
+        owned: 200,
+        wishlist: 20,
+      },
+    }),
   )
   await page.goto('/account/usage')
   await expect(
@@ -120,7 +128,9 @@ test('the Usage tab shows the plan and what is used', async ({ page }) => {
   await expect(
     page.getByRole('progressbar', { name: 'Collections' }),
   ).toHaveAttribute('aria-valuenow', '3')
-  await expect(page.getByText('214 of 3,000')).toBeVisible()
+  await expect(
+    page.getByText('Games: 214 of 3,000 (200 owned, 20 wishlisted)'),
+  ).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'See plans and pricing' }),
   ).toHaveAttribute('href', '/pricing')
@@ -135,7 +145,7 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
   await expect(
     free.getByText('10 collections, plus Owned and the Wishlist'),
   ).toBeVisible()
-  await expect(free.getByText('3,000 games in total')).toBeVisible()
+  await expect(free.getByText('3,000 games, owned or wishlisted')).toBeVisible()
   const pro = page.getByRole('region', { name: 'Pro' })
   await expect(
     pro.getByText('100 collections, plus Owned and the Wishlist'),

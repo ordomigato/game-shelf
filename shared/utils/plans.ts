@@ -22,9 +22,7 @@ export interface PlanLimits {
   fields: number
   /** Games in one collection. */
   gamesPerCollection: number
-  /** Games on the Wishlist. */
-  wishlist: number
-  /** Games owned or wishlisted (each game once). */
+  /** Games in the library: owned or wishlisted, a game on both counting once. */
   games: number
   /** Characters in one text field. */
   textLength: number
@@ -41,7 +39,6 @@ export const PLAN_LIMITS: Record<'free' | 'pro', PlanLimits> = {
     collections: 10,
     fields: 5,
     gamesPerCollection: 100,
-    wishlist: 200,
     games: 3000,
     textLength: 500,
     chartsPerCollection: 4,
@@ -53,7 +50,6 @@ export const PLAN_LIMITS: Record<'free' | 'pro', PlanLimits> = {
     collections: 100,
     fields: 20,
     gamesPerCollection: 1000,
-    wishlist: 2000,
     games: 10_000,
     textLength: 2000,
     chartsPerCollection: 20,
@@ -69,7 +65,6 @@ const APP_MAXIMUMS: Partial<PlanLimits> = {
   fields: MAX_FIELDS,
   // A full collection is sent in one response, which Lambda caps at 6 MB.
   gamesPerCollection: 1000,
-  wishlist: 2000,
   games: 10_000,
   chartsPerCollection: MAX_CHARTS,
   importRows: MAX_IMPORT_ROWS,
@@ -104,7 +99,6 @@ export const LIMIT_REACHED: Record<keyof PlanLimits, { key: string }> = {
   collections: { key: 'limits.reached.collections' },
   fields: { key: 'limits.reached.fields' },
   gamesPerCollection: { key: 'limits.reached.gamesPerCollection' },
-  wishlist: { key: 'limits.reached.wishlist' },
   games: { key: 'limits.reached.games' },
   textLength: { key: 'limits.reached.textLength' },
   chartsPerCollection: { key: 'limits.reached.chartsPerCollection' },

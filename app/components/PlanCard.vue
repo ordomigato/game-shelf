@@ -5,7 +5,7 @@ import { PLAN_LIMITS } from '#shared/utils/plans'
 /** The account's plan and how much of it is used, in Settings. */
 const auth = useAuth()
 const { plan, limits } = usePlan()
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 
 const { data: usage, status } = useAsyncData(
   'plan-usage',
@@ -28,11 +28,13 @@ const meters = computed(() =>
           labelKey: 'limits.games',
           used: usage.value.games,
           limit: limits.value.games,
-        },
-        {
-          labelKey: 'limits.wishlist',
-          used: usage.value.wishlist ?? 0,
-          limit: limits.value.wishlist,
+          // One meter for the whole library, with how it splits.
+          text: t('limits.gamesMeter', {
+            total: number(usage.value.games),
+            limit: number(limits.value.games),
+            owned: number(usage.value.owned),
+            wishlisted: number(usage.value.wishlist),
+          }),
         },
         {
           labelKey: 'limits.fields',
@@ -53,7 +55,6 @@ const overOf = (labelKey: string) => {
   return meter && meter.used > meter.limit ? meter : null
 }
 const overGames = computed(() => overOf('limits.games'))
-const overWishlist = computed(() => overOf('limits.wishlist'))
 const pro = PLAN_LIMITS.pro
 </script>
 
@@ -84,8 +85,15 @@ const pro = PLAN_LIMITS.pro
         class="flex flex-col gap-1.5"
       >
         <div class="flex justify-between text-sm">
-          <span class="font-medium">{{ $t(meter.labelKey) }}</span>
           <span
+            class="font-medium"
+            :class="{
+              'text-destructive': meter.text && meter.used > meter.limit,
+            }"
+            >{{ meter.text ?? $t(meter.labelKey) }}</span
+          >
+          <span
+            v-if="!meter.text"
             class="tabular-nums"
             :class="
               meter.used > meter.limit
@@ -140,22 +148,6 @@ const pro = PLAN_LIMITS.pro
           {{ $t('limits.overLibraryHelp', { limit: number(overGames.limit) }) }}
           <NuxtLink v-if="pro.games > overGames.limit" to="/pricing">{{
             $t('limits.proAllows', { limit: number(pro.games) })
-          }}</NuxtLink>
-        </AlertDescription>
-      </Alert>
-      <Alert v-if="overWishlist" variant="destructive">
-        <AlertTitle>{{
-          $t('limits.overWishlist', {
-            used: number(overWishlist.used),
-            limit: number(overWishlist.limit),
-          })
-        }}</AlertTitle>
-        <AlertDescription>
-          {{
-            $t('limits.overGamesHelp', { limit: number(overWishlist.limit) })
-          }}
-          <NuxtLink v-if="pro.wishlist > overWishlist.limit" to="/pricing">{{
-            $t('limits.proAllows', { limit: number(pro.wishlist) })
           }}</NuxtLink>
         </AlertDescription>
       </Alert>

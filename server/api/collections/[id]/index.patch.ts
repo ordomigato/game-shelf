@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import type { CollectionSummary } from '../../../../shared/types/collection'
 import { HEX_COLOUR } from '../../../../shared/utils/collection-colours'
+import {
+  allColumnsKnown,
+  MAX_HIDDEN_COLUMNS,
+} from '../../../../shared/utils/columns'
 
 const paramsSchema = z.object({ id: z.uuid() })
 const bodySchema = z
@@ -27,6 +31,10 @@ const bodySchema = z
       .nullable()
       .optional(),
     visibility: z.enum(['private', 'public']).optional(),
+    hiddenColumns: z
+      .array(z.string().regex(/^[A-Za-z0-9_-]{1,64}$/))
+      .max(MAX_HIDDEN_COLUMNS)
+      .optional(),
   })
   .refine((body) => Object.values(body).some((value) => value !== undefined))
 
@@ -35,5 +43,20 @@ export default defineEventHandler(async (event): Promise<CollectionSummary> => {
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const body = await readValidatedBody(event, bodySchema.parse)
   const user = await findOrCreateUser(sub)
-  return updateCollection(user.id, id, body)
+  if (
+    body.hiddenColumns &&
+    !allColumnsKnown(
+      body.hiddenColumns,
+      'collection',
+      user.fields.map((field) => field.id),
+    )
+  ) {
+    throw createError({ statusCode: 400, statusMessage: 'Unknown column' })
+  }
+  return updateCollection(user.id, id, {
+    ...body,
+    ...(body.hiddenColumns && {
+      hiddenColumns: [...new Set(body.hiddenColumns)],
+    }),
+  })
 })

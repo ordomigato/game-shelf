@@ -3,7 +3,11 @@ import { strToU8, zipSync } from 'fflate'
 import { collectionCsv, FIXED_COLUMNS } from '../../shared/utils/csv'
 import { collectionItems, collections, games, libraryItems } from '../db/schema'
 import { catalogJoin, getUserFields, itemName } from './collections'
-import { getList } from './lists'
+import { listForExport } from './lists'
+
+/** The first three column names of an export, in English. */
+export const exportColumns = () =>
+  FIXED_COLUMNS.map((column) => translate(column)) as [string, string, string]
 
 /**
  * Everything the user has as CSV files in one zip: every collection, built
@@ -13,11 +17,7 @@ import { getList } from './lists'
  */
 export async function exportEverything(ownerId: string): Promise<Buffer> {
   const db = useDb()
-  const columns = FIXED_COLUMNS.map((column) => translate(column)) as [
-    string,
-    string,
-    string,
-  ]
+  const columns = exportColumns()
   const fields = await getUserFields(ownerId)
   const mine = await db
     .select()
@@ -26,18 +26,8 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
     .orderBy(asc(collections.createdAt))
   const files: Record<string, Uint8Array> = {}
   for (const list of ['owned', 'wishlist'] as const) {
-    const { items } = await getList(ownerId, list)
     files[`${list}.csv`] = strToU8(
-      collectionCsv(
-        fields,
-        items.map((item) => ({
-          name: item.name,
-          igdbId: item.igdbId,
-          addedAt: item.addedAt,
-          data: item.data,
-        })),
-        columns,
-      ),
+      collectionCsv(fields, await listForExport(ownerId, list), columns),
     )
   }
   for (const collection of mine) {

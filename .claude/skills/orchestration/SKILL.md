@@ -122,7 +122,8 @@ Every agent prompt includes:
 - **Files it owns**, and files it must not touch.
 - **Project rules to follow:** read `CLAUDE.md` if present and the relevant
   skills under `.claude/skills/` (always `release-gate`,
-  `commit-conventions`, `plain-language`, `i18n`, `ui-conventions`; plus
+  `commit-conventions`, `plain-language`, `i18n`, `ui-conventions`, and
+  `ux-qa` for UI work; plus
   `postgres-change`, `auth`, `igdb`, `aws-infra` when they apply). Match the
   surrounding code's style and comment density.
 - **How to verify:** smoke tests while working (see `release-gate`, "When

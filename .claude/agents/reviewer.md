@@ -18,7 +18,8 @@ or run anything that changes state (no installs, builds into the repo,
 2. Read the skills that apply under `.claude/skills/` (always
    `plain-language` and `release-gate`; `postgres-change` for schema and
    SQL, `auth` for anything about users, `i18n` and `ui-conventions` for UI,
-   `igdb` for IGDB calls).
+   `igdb` for IGDB calls). For any branch that changes UI or user-facing
+   text, also apply `ux-qa`.
 3. Check, in this order:
    - **Correctness:** does it do what the brief says, including edge
      cases? Write out a concrete input that breaks it, or don't report it.

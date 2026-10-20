@@ -2,6 +2,7 @@
 import {
   ArrowLeft,
   ChartColumn,
+  Download,
   Ellipsis,
   LayoutGrid,
   PenLine,
@@ -454,49 +455,19 @@ async function deleteCollection() {
               }}</span
             >
             <span v-else>{{ $t('shelf.gameCount', data.itemCount) }}</span>
-            <VisibilityMenu
-              v-if="data.isOwner"
-              :visibility="data.visibility"
-              :disabled="changingVisibility"
-              @change="setVisibility"
-            />
           </div>
           <p v-if="data.description" class="max-w-prose whitespace-pre-line">
             {{ data.description }}
           </p>
-          <p class="text-sm text-muted-foreground">
-            {{
-              data.fields.length
-                ? $t('collection.columns', {
-                    fields: data.fields.map((field) => field.name).join(', '),
-                  })
-                : $t('collection.noColumns')
-            }}
-            <template v-if="data.isOwner">
-              <span
-                :class="{
-                  'font-medium text-destructive':
-                    data.fields.length > limits.fields,
-                }"
-                >{{
-                  $t('limits.fieldsUsed', {
-                    used: data.fields.length,
-                    limit: limits.fields,
-                  })
-                }}</span
-              >
-              <button
-                type="button"
-                class="ml-1 font-medium text-primary underline-offset-4 hover:underline"
-                @click="editingFields = true"
-              >
-                {{ $t('collection.editFields') }}
-              </button>
-            </template>
-          </p>
         </div>
 
         <div class="flex items-center gap-2">
+          <VisibilityMenu
+            v-if="data.isOwner"
+            :visibility="data.visibility"
+            :disabled="changingVisibility"
+            @change="setVisibility"
+          />
           <ShareButton
             v-if="data.isOwner || data.visibility === 'public'"
             :path="`${shelfPath}/${data.slug}`"
@@ -551,9 +522,19 @@ async function deleteCollection() {
                     <PinOff /> {{ $t('collection.unpin') }}
                   </template>
                 </DropdownMenuItem>
+                <DropdownMenuItem @select="editingFields = true">
+                  <Pencil /> {{ $t('collection.editFields') }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @select="importing = true">
                   <Upload /> {{ $t('collection.importCsv') }}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  :disabled="!data.items.length"
+                  @select="exportCsv"
+                >
+                  <Download /> {{ $t('collection.exportCsv') }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   class="text-destructive focus:text-destructive"
                   @select="confirmingDelete = true"
@@ -609,9 +590,6 @@ async function deleteCollection() {
             >
               <PenLine /> {{ $t('collection.addByHand') }}
             </Button>
-            <Button variant="outline" @click="importing = true">
-              <Upload /> {{ $t('collection.importCsv') }}
-            </Button>
           </div>
         </template>
       </div>
@@ -660,9 +638,6 @@ async function deleteCollection() {
           :hidden-columns="data.hiddenColumns"
           :add-targets="mine"
           :shelf-path="shelfPath"
-          :export-label="$t('collection.exportCsv')"
-          @edit-fields="editingFields = true"
-          @export-data="exportCsv"
           @hide-columns="saveHiddenColumns"
           @save="saveValue"
           @remove="removeItem"

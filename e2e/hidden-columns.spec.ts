@@ -13,32 +13,17 @@ const fields = [
   },
 ]
 
-// The open menu hides the page from the accessibility tree, so look past it.
 const header = (page: Page, name: string) =>
-  page.getByRole('columnheader', { name, includeHidden: true })
+  page.getByRole('columnheader', { name })
 
 async function openColumns(page: Page) {
-  await page.getByRole('button', { name: 'Table options' }).click()
-  await page.getByRole('menuitem', { name: 'Columns' }).click()
+  await page.getByRole('button', { name: 'Columns', exact: true }).click()
 }
 
-/** Clicks an item of the open Columns menu, moving the pointer across like a person. */
-async function clickColumnItem(
-  page: Page,
-  role: 'menuitem' | 'menuitemcheckbox',
-  name: string,
-) {
-  const item = page.getByRole(role, { name })
-  const box = (await item.boundingBox())!
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
-    steps: 15,
-  })
-  await item.click()
-}
 const toggleColumn = (page: Page, name: string) =>
-  clickColumnItem(page, 'menuitemcheckbox', name)
+  page.getByRole('checkbox', { name }).click()
 const showAllColumns = (page: Page) =>
-  clickColumnItem(page, 'menuitem', 'Show all')
+  page.getByRole('button', { name: 'Show all' }).click()
 
 test.describe('in a collection', () => {
   const collectionId = '10000000-0000-4000-8000-000000000003'
@@ -95,18 +80,14 @@ test.describe('in a collection', () => {
     await openColumns(page)
     await toggleColumn(page, 'Status')
     await expect(header(page, 'Status')).toBeHidden()
-    // The menu stays open for the next tick.
-    await expect(
-      page.getByRole('menuitemcheckbox', { name: 'Score' }),
-    ).toBeVisible()
+    // The popover stays open for the next tick.
+    await expect(page.getByRole('checkbox', { name: 'Score' })).toBeVisible()
     await toggleColumn(page, 'Added')
     await expect(header(page, 'Added')).toBeHidden()
     await expect(header(page, 'Score')).toBeVisible()
     expect(saves.at(-1)).toEqual(['status', 'addedAt'])
     // The name is not in the list.
-    await expect(
-      page.getByRole('menuitemcheckbox', { name: 'Name' }),
-    ).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: 'Name' })).toHaveCount(0)
 
     await page.keyboard.press('Escape')
     await page.reload()
@@ -149,17 +130,36 @@ test.describe('in a collection', () => {
     await expect(header(page, 'Status')).toBeVisible()
   })
 
-  test('the table menu opens the fields editor', async ({ page }) => {
+  test('the page menu opens the fields editor', async ({ page }) => {
     await open(page, true)
-    await page.getByRole('button', { name: 'Table options' }).click()
+    await page.getByRole('button', { name: 'Collection actions' }).click()
     await page.getByRole('menuitem', { name: 'Edit fields' }).click()
     await expect(page.getByRole('dialog', { name: 'Fields' })).toBeVisible()
   })
 
-  test('visitors see the layout but get no table menu', async ({ page }) => {
+  test('the page menu holds each page action once', async ({ page }) => {
+    await open(page, true)
+    await expect(page.getByRole('button', { name: 'Edit fields' })).toHaveCount(
+      0,
+    )
+    await page.getByRole('button', { name: 'Collection actions' }).click()
+    await expect(page.getByRole('menuitem')).toHaveText([
+      'Edit details',
+      'Edit fields',
+      'Import CSV',
+      'Export CSV',
+      'Delete collection',
+    ])
+    await expect(page.getByText('extra fields per game')).toHaveCount(0)
+    await expect(page.getByText(/^Columns:/)).toHaveCount(0)
+  })
+
+  test('visitors see the layout but get no columns button', async ({
+    page,
+  }) => {
     await open(page, false)
     await expect(
-      page.getByRole('button', { name: 'Table options' }),
+      page.getByRole('button', { name: 'Columns', exact: true }),
     ).toHaveCount(0)
   })
 })

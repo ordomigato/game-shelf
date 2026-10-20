@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
+import {
+  ArrowLeft,
+  Download,
+  Ellipsis,
+  Lock,
+  Pencil,
+  PenLine,
+  Plus,
+} from '@lucide/vue'
 import { FetchError } from 'ofetch'
 import { toast } from 'vue-sonner'
 import { PLAN_LIMITS } from '#shared/utils/plans'
@@ -410,10 +418,6 @@ function onRenamed(saved: LibraryItem) {
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
             <span>{{ $t('shelf.gameCount', data.itemCount) }}</span>
-            <Badge variant="outline" class="gap-1 text-muted-foreground">
-              <Lock class="size-3" aria-hidden="true" />
-              {{ $t('lists.onlyYou') }}
-            </Badge>
           </div>
           <p class="max-w-prose text-sm text-muted-foreground">
             {{
@@ -424,6 +428,10 @@ function onRenamed(saved: LibraryItem) {
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <Badge variant="outline" class="gap-1 text-muted-foreground">
+            <Lock class="size-3" aria-hidden="true" />
+            {{ $t('lists.onlyYou') }}
+          </Badge>
           <Button v-if="!fullCap" as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
@@ -448,6 +456,25 @@ function onRenamed(saved: LibraryItem) {
               $t('collection.addByHand')
             }}</span>
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="outline"
+                size="icon"
+                :aria-label="$t('lists.actions')"
+              >
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-max">
+              <DropdownMenuItem @select="editingFields = true">
+                <Pencil /> {{ $t('table.editFields') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem :disabled="exporting" @select="exportCsv">
+                <Download /> {{ $t('lists.exportAll', data.itemCount) }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -499,9 +526,6 @@ function onRenamed(saved: LibraryItem) {
         editable
         :hidden-columns="data.hiddenColumns"
         :shelf-path="shelfPath"
-        :export-label="$t('lists.exportAll', data.itemCount)"
-        @edit-fields="editingFields = true"
-        @export-data="exportCsv"
         @view="onView"
         @hide-columns="saveHiddenColumns"
         @save="saveValue"

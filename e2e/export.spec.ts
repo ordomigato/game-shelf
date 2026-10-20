@@ -40,7 +40,7 @@ test('exports a collection as CSV from the table menu', async ({ page }) => {
     return route.fulfill({ status: 404 })
   })
   await page.goto('/u/retro_fan/shelf/nes-games')
-  await page.getByRole('button', { name: 'Table options' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
   const download = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: 'Export CSV' }).click()
 

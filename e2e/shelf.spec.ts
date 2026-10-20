@@ -69,7 +69,6 @@ test.describe('as a visitor', () => {
 
     await page.getByRole('link', { name: /Zelda Games/ }).click()
     await expect(page.getByText('Every Zelda I own.')).toBeVisible()
-    await expect(page.getByText('Columns: Condition, Price paid')).toBeVisible()
     await expect(
       page.getByRole('link', { name: /A Link to the Past/ }),
     ).toHaveAttribute('href', '/games/1026')

@@ -82,7 +82,8 @@ async function openEditor(page: Page, impact?: Impact) {
   )
   await page.goto('/u/retro_fan/shelf/snes-games')
   await expect(page.getByRole('table')).toBeVisible()
-  await page.getByRole('button', { name: 'Edit fields' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('menuitem', { name: 'Edit fields' }).click()
   await expect(page.getByRole('dialog', { name: 'Fields' })).toBeVisible()
   return stub.saved
 }
@@ -189,7 +190,8 @@ test('removing an empty field still asks, without the warning', async ({
     route.fulfill({ json: detail(withExtra) }),
   )
   await page.goto('/u/retro_fan/shelf/snes-games')
-  await page.getByRole('button', { name: 'Edit fields' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('menuitem', { name: 'Edit fields' }).click()
   const dialog = page.getByRole('dialog', { name: 'Fields' })
 
   await dialog.getByRole('button', { name: 'Remove Shelf' }).click()
@@ -236,7 +238,8 @@ test('scores out of 10 edit like numbers and keep their place', async ({
     page.getByRole('group', { name: 'Score for Chrono Trigger' }),
   ).toBeVisible()
 
-  await page.getByRole('button', { name: 'Edit fields' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('menuitem', { name: 'Edit fields' }).click()
   const dialog = page.getByRole('dialog', { name: 'Fields' })
   await dialog.getByRole('combobox', { name: 'What Score is out of' }).click()
   await page.getByRole('option', { name: '10', exact: true }).click()

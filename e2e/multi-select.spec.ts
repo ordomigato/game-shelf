@@ -106,7 +106,8 @@ test('a choice list can allow more than one choice, and back', async ({
     route.fulfill({ json: { lost: [{ name: 'Genres', count: 1 }] } }),
   )
   await open(page)
-  await page.getByRole('button', { name: 'Edit fields' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('menuitem', { name: 'Edit fields' }).click()
   const dialog = page.getByRole('dialog', { name: 'Fields' })
   const checkboxes = dialog.getByRole('checkbox', {
     name: 'Allow more than one choice',

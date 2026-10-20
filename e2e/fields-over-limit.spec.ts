@@ -33,7 +33,8 @@ async function openEditor(page: Page, count: number) {
     }),
   )
   await page.goto('/u/retro_fan/shelf/snes-games')
-  await page.getByRole('button', { name: 'Edit fields' }).click()
+  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('menuitem', { name: 'Edit fields' }).click()
   return page.getByRole('dialog', { name: 'Fields' })
 }
 

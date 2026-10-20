@@ -258,16 +258,12 @@ test('"Got it" takes the game off the page at once, then fills the gap', async (
   await page.goto('/u/retro_fan/shelf/wishlist')
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(50)
-  await expect(
-    page.locator('p[aria-live="polite"]', { hasText: '120 games' }),
-  ).toBeVisible()
+  await expect(page.getByText('120 games', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Actions for Game 120' }).click()
   await page.getByRole('menuitem', { name: 'Got it' }).click()
   await expect(rows).toHaveCount(49)
-  await expect(
-    page.locator('p[aria-live="polite"]', { hasText: '119 games' }),
-  ).toBeVisible()
+  await expect(page.getByText('119 games', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Game 120' })).toHaveCount(0)
   // Not dimmed: it's a quiet refetch.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
@@ -294,7 +290,7 @@ test('exports the whole list from the server, not the rows on screen', async ({
     .fill('Game 010')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Table options' }).click()
+  await page.getByRole('button', { name: 'List actions' }).click()
   await page.getByRole('menuitem', { name: 'Export all 120 games' }).click()
   const file = await download
   expect(file.suggestedFilename()).toBe('owned.csv')

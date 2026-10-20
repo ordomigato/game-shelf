@@ -22,7 +22,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns3,
-  Download,
   Ellipsis,
   GripVertical,
   ListFilter,
@@ -81,8 +80,6 @@ const props = defineProps<{
   addTargets?: CollectionSummary[]
   /** A collection, or one of the owner's two lists. */
   mode?: 'collection' | 'owned' | 'wishlist'
-  /** The table menu's export item, when the owner can export. */
-  exportLabel?: string
   /** Keys of the hidden columns (shared/utils/columns.ts). */
   hiddenColumns?: string[]
   /** The owner's shelf, for links to the collections in `inCollections`. */
@@ -114,10 +111,6 @@ const emit = defineEmits<{
   toWishlist: [itemId: string]
   /** Place `itemId` right after `afterItemId`, or first when null. */
   move: [itemId: string, afterItemId: string | null]
-  /** The owner chose "Edit fields" from the table menu. */
-  editFields: []
-  /** The owner chose the export item of the table menu. */
-  exportData: []
   /** The owner chose which columns to hide: all the hidden keys. */
   hideColumns: [hidden: string[]]
   /** On a server list: the person changed the page, sort, search or filters. */
@@ -448,6 +441,12 @@ const hiddenCount = computed(
   () => hideable.value.filter(({ id }) => id in columnVisibility.value).length,
 )
 
+// The page already says how many games there are, so the table only
+// reports a count when filters or search narrow it.
+const filtered = computed(
+  () => matchCount.value !== (props.server?.listSize ?? props.items.length),
+)
+
 function setColumnHidden(columnId: string, hidden: boolean) {
   const others = (props.hiddenColumns ?? []).filter((id) => id !== columnId)
   const next = hidden ? [...others, columnId] : others
@@ -748,60 +747,57 @@ const addedFormat = computed(
         <X />
         {{ $t('table.clearFilters') }}
       </Button>
-      <p class="ml-auto text-sm text-muted-foreground" aria-live="polite">
+      <p
+        v-if="filtered"
+        class="ml-auto text-sm text-muted-foreground"
+        aria-live="polite"
+      >
         {{
-          matchCount === (server?.listSize ?? items.length)
-            ? $t('shelf.gameCount', matchCount)
-            : $t('table.showing', {
-                shown: matchCount,
-                total: server?.listSize ?? items.length,
-              })
+          $t('table.showing', {
+            shown: matchCount,
+            total: server?.listSize ?? items.length,
+          })
         }}
       </p>
-      <DropdownMenu v-if="editable">
-        <DropdownMenuTrigger as-child>
+      <Popover v-if="editable">
+        <PopoverTrigger as-child>
           <Button
             variant="outline"
             size="icon"
-            :aria-label="$t('table.options')"
+            :class="{ 'ml-auto': !filtered }"
+            :title="$t('table.columns')"
+            :aria-label="$t('table.columns')"
           >
-            <Ellipsis />
+            <Columns3 />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="w-max">
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Columns3 /> {{ $t('table.columns') }}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent class="w-56">
-              <DropdownMenuCheckboxItem
-                v-for="column in hideable"
-                :key="column.id"
-                :model-value="!(column.id in columnVisibility)"
-                @update:model-value="
-                  setColumnHidden(column.id, $event !== true)
-                "
-                @select.prevent
+        </PopoverTrigger>
+        <PopoverContent align="end" class="w-56 p-2">
+          <ul class="flex flex-col">
+            <li v-for="column in hideable" :key="column.id">
+              <Label
+                class="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 font-normal hover:bg-accent"
               >
+                <Checkbox
+                  :model-value="!(column.id in columnVisibility)"
+                  @update:model-value="
+                    setColumnHidden(column.id, $event !== true)
+                  "
+                />
                 {{ column.label }}
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                :disabled="!hiddenCount"
-                @select.prevent="showAllColumns"
-              >
-                {{ $t('table.showAllColumns') }}
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuItem @select="emit('editFields')">
-            <Pencil /> {{ $t('table.editFields') }}
-          </DropdownMenuItem>
-          <DropdownMenuItem v-if="exportLabel" @select="emit('exportData')">
-            <Download /> {{ exportLabel }}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+              </Label>
+            </li>
+          </ul>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="mt-1 w-full justify-start"
+            :disabled="!hiddenCount"
+            @click="showAllColumns"
+          >
+            {{ $t('table.showAllColumns') }}
+          </Button>
+        </PopoverContent>
+      </Popover>
     </div>
 
     <div

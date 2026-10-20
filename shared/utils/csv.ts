@@ -1,11 +1,24 @@
-import type { FieldDefinition, FieldValue, ItemData } from '../types/collection'
+import type {
+  CollectionEntry,
+  FieldDefinition,
+  FieldValue,
+} from '../types/collection'
 import type { Message } from '../types/message'
+import { platformsOf } from './platforms'
+import type { ReleasePrecision } from './release-date'
 
-/** The columns every export starts with, before the collection's fields. */
-export const FIXED_COLUMNS: [Message, Message, Message] = [
+/**
+ * The columns every export starts with, before the collection's fields. The
+ * last three are the core columns: IGDB's release date, genres, and the
+ * platforms the game is owned on.
+ */
+export const FIXED_COLUMNS: Message[] = [
   { key: 'export.columns.name' },
   { key: 'export.columns.igdbId' },
   { key: 'export.columns.added' },
+  { key: 'export.columns.released' },
+  { key: 'export.columns.genre' },
+  { key: 'export.columns.platforms' },
 ]
 
 /** Joins a multiple-choice value in a cell. Choices can contain commas. */
@@ -61,31 +74,73 @@ export function exportValue(
   }
 }
 
-/** A game as an export needs it. */
-export interface ExportItem {
-  name: string
+/**
+ * A game as an export needs it. The catalog's facts and the platforms are
+ * missing for a game added by hand, and a visitor gets no platforms.
+ */
+export interface ExportItem extends Pick<CollectionEntry, 'name' | 'data'> {
   igdbId: number | null
   /** ISO timestamp. */
   addedAt: string
-  data: ItemData
+  releaseDate?: string | null
+  releasePrecision?: ReleasePrecision | null
+  genres?: string[]
+  ownedOn?: number[]
+  catalogPlatforms?: CollectionEntry['catalogPlatforms']
 }
 
 /**
+ * A release date for a machine, at the precision IGDB knows: `2017`,
+ * `2017-03`, `2017-03-03`, `2017-Q1` for a quarter or `TBD`. Empty when
+ * there is no date. Never shifted by a time zone: dates are UTC days.
+ */
+export function releasedText(
+  date: string | null | undefined,
+  precision: ReleasePrecision | null | undefined,
+): string {
+  if (precision === 'tbd') return 'TBD'
+  const day = date?.slice(0, 10)
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return ''
+  switch (precision) {
+    case 'year':
+      return day.slice(0, 4)
+    case 'month':
+      return day.slice(0, 7)
+    case 'quarter':
+      return `${day.slice(0, 4)}-Q${Math.floor((Number(day.slice(5, 7)) - 1) / 3) + 1}`
+    default:
+      return day
+  }
+}
+
+/** The platforms a game is owned on, by their short names. */
+export const ownedPlatformNames = (item: ExportItem) =>
+  platformsOf({
+    catalogPlatforms: item.catalogPlatforms,
+    ownedOn: item.ownedOn,
+    wantedOn: [],
+  }).owned.map(({ name }) => name)
+
+/**
  * A collection as CSV: a row per game, in the order given, with its name,
- * IGDB id and date added, then a column per field. `columns` are the first
- * three column names, already in the reader's language. Used in the
- * browser for one collection and on the server for "Export all".
+ * IGDB id, date added, release date, genres and owned platforms, then a
+ * column per field. `columns` are the first six column names, already in
+ * the reader's language. Used in the browser for one collection and on the
+ * server for "Export all" and the lists.
  */
 export function collectionCsv(
   fields: FieldDefinition[],
   items: ExportItem[],
-  columns: [name: string, igdbId: string, added: string],
+  columns: string[],
 ): string {
   const header = [...columns, ...fields.map((field) => safeText(field.name))]
   const rows = items.map((item) => [
     safeText(item.name),
     item.igdbId === null ? '' : String(item.igdbId),
     item.addedAt.slice(0, 10),
+    releasedText(item.releaseDate, item.releasePrecision),
+    safeText((item.genres ?? []).join(CHOICE_SEPARATOR)),
+    safeText(ownedPlatformNames(item).join(CHOICE_SEPARATOR)),
     ...fields.map((field) => exportValue(field, item.data[field.id])),
   ])
   return toCsv([header, ...rows])

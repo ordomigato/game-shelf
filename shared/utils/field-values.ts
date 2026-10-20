@@ -111,7 +111,8 @@ function widgetFieldIds(widget: ChartWidget): string[] {
 
 /**
  * The charts a visitor may see: the owner gets all of them, and a visitor
- * gets none that read a hidden field.
+ * gets none that read a hidden field or the owner's platforms (which
+ * visitors aren't sent, so the chart would be empty).
  */
 export function chartsFor(
   viewerIsOwner: boolean,
@@ -121,7 +122,9 @@ export function chartsFor(
   if (viewerIsOwner) return dashboard
   const hidden = hiddenIds(fields)
   return dashboard.filter(
-    (widget) => !widgetFieldIds(widget).some((id) => hidden.has(id)),
+    (widget) =>
+      widget.groupBy !== 'platforms' &&
+      !widgetFieldIds(widget).some((id) => hidden.has(id)),
   )
 }
 

@@ -13,6 +13,9 @@ import { normalizeFieldValue } from './field-values'
 
 /** The most rows one import takes. */
 export const MAX_IMPORT_ROWS = 5000
+/** The most platforms taken from one row, and the longest name of one. */
+export const MAX_ROW_PLATFORMS = 50
+export const PLATFORM_NAME_MAX = 100
 /** Rows sent to the server per request while importing. */
 export const IMPORT_CHUNK_SIZE = 250
 
@@ -20,6 +23,8 @@ export const IMPORT_CHUNK_SIZE = 250
 export type ColumnTarget =
   | { kind: 'name' }
   | { kind: 'igdbId' }
+  /** The platforms the game is owned on, matched on the server. */
+  | { kind: 'platforms' }
   | { kind: 'skip' }
   | { kind: 'field'; fieldId: string }
   | { kind: 'new'; name: string; type: FieldType }
@@ -29,6 +34,25 @@ export interface ImportRow {
   name: string
   igdbId: number | null
   values: ItemData
+  /** Platform names from the file, to tick as owned. The server matches them. */
+  platforms?: string[]
+  /** The row in the file (see `ImportProblem.row`), for platform problems. */
+  row?: number
+}
+
+/**
+ * A platform cell the server couldn't use, for the person to see with the
+ * other problems. Found while importing, because the platforms a game can
+ * be on come from the catalog.
+ */
+export interface PlatformProblem {
+  row: number
+  value: string
+  reason:
+    | 'unknownPlatform'
+    | 'handAddedPlatforms'
+    | 'notOwnedPlatforms'
+    | 'wantedPlatforms'
 }
 
 /** A cell that couldn't be imported, for the person to see. */
@@ -59,6 +83,9 @@ const normalize = (text: string) =>
 
 const NAME_HEADERS = ['name', 'title', 'game', 'game name', 'game title']
 const IGDB_HEADERS = ['igdb id', 'igdb', 'igdbid']
+/** Columns that come from IGDB, so the file's values are never used. */
+const IGDB_FACT_HEADERS = ['released', 'release date', 'genre', 'genres']
+const PLATFORM_HEADERS = ['platforms', 'platform']
 /** ThisPlayShelf sets the date a game joins a collection itself. */
 const SKIPPED_HEADERS = ['added', 'date added', 'added at']
 
@@ -203,8 +230,11 @@ export function guessType(values: string[]): {
 
 /**
  * Where each column goes, guessed from its header: the game's name, its
- * IGDB id, a field with the same name, or a new field with a guessed type.
- * A date-added column is skipped: ThisPlayShelf sets that itself.
+ * IGDB id, the platforms it's owned on, a field with the same name, or a
+ * new field with a guessed type. A date-added column is skipped:
+ * ThisPlayShelf sets that itself. So are the first Released and Genre
+ * columns, which come from IGDB. Our own exports put these core columns
+ * first, so a field of the same name later in the file still gets its values.
  */
 export function autoMap(
   headers: string[],
@@ -213,6 +243,8 @@ export function autoMap(
 ): ColumnTarget[] {
   let hasName = false
   let hasIgdb = false
+  let hasPlatforms = false
+  const seenFacts = new Set<string>()
   return headers.map((header, index): ColumnTarget => {
     const key = normalize(header)
     if (!hasName && NAME_HEADERS.includes(key)) {
@@ -224,6 +256,18 @@ export function autoMap(
       return { kind: 'igdbId' }
     }
     if (SKIPPED_HEADERS.includes(key)) return { kind: 'skip' }
+    if (!hasPlatforms && PLATFORM_HEADERS.includes(key)) {
+      hasPlatforms = true
+      return { kind: 'platforms' }
+    }
+    if (IGDB_FACT_HEADERS.includes(key)) {
+      // Released and Release date are one column, and so are Genre and Genres.
+      const fact = key.startsWith('genre') ? 'genre' : 'released'
+      if (!seenFacts.has(fact)) {
+        seenFacts.add(fact)
+        return { kind: 'skip' }
+      }
+    }
     const field = fields.find((candidate) => normalize(candidate.name) === key)
     if (field) return { kind: 'field', fieldId: field.id }
     if (!header.trim()) return { kind: 'skip' }
@@ -303,6 +347,9 @@ export function planImport(
 
   const nameColumn = targets.findIndex((target) => target.kind === 'name')
   const igdbColumn = targets.findIndex((target) => target.kind === 'igdbId')
+  const platformsColumn = targets.findIndex(
+    (target) => target.kind === 'platforms',
+  )
   const problems: ImportProblem[] = []
   const planned: ImportRow[] = []
   rows.slice(0, MAX_IMPORT_ROWS).forEach((row, rowIndex) => {
@@ -347,7 +394,18 @@ export function planImport(
         values[field.id] = value
       }
     }
-    planned.push({ name, igdbId, values })
+    const platforms =
+      platformsColumn >= 0
+        ? splitChoices(unguard((row[platformsColumn] ?? '').trim()))
+            .slice(0, MAX_ROW_PLATFORMS)
+            .map((platform) => platform.slice(0, PLATFORM_NAME_MAX))
+        : []
+    planned.push({
+      name,
+      igdbId,
+      values,
+      ...(platforms.length && { platforms, row: spreadsheetRow }),
+    })
   })
 
   return { fields, newFields, addedOptions, rows: planned, problems }

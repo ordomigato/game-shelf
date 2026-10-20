@@ -14,6 +14,7 @@ import {
   planImport,
   type ColumnTarget,
   type ImportProblem,
+  type PlatformProblem,
 } from '#shared/utils/csv-import'
 
 /**
@@ -52,6 +53,8 @@ const targets = ref<ColumnTarget[]>([])
 const progress = ref(0)
 const importError = ref('')
 const result = ref({ added: 0, updated: 0, linked: 0, handAdded: 0 })
+/** Platform cells the server couldn't use, found while importing. */
+const platformProblems = ref<PlatformProblem[]>([])
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
@@ -96,7 +99,7 @@ async function readFile(event: Event) {
   }
 }
 
-// Column targets as select values: name, igdbId, skip, field:<id>, new.
+// Column targets as select values: name, igdbId, platforms, skip, field:<id>, new.
 function targetValue(target: ColumnTarget): string {
   return target.kind === 'field' ? `field:${target.fieldId}` : target.kind
 }
@@ -105,7 +108,10 @@ function setTarget(index: number, value: unknown) {
   if (typeof value !== 'string') return
   const header = headers.value[index] ?? ''
   const next: ColumnTarget =
-    value === 'name' || value === 'igdbId' || value === 'skip'
+    value === 'name' ||
+    value === 'igdbId' ||
+    value === 'platforms' ||
+    value === 'skip'
       ? { kind: value }
       : value.startsWith('field:')
         ? { kind: 'field', fieldId: value.slice(6) }
@@ -114,11 +120,13 @@ function setTarget(index: number, value: unknown) {
             name: header.slice(0, 60) || t('import.newField'),
             type: 'text',
           }
-  // One column holds the name, and one the IGDB id.
+  // One column holds the name, one the IGDB id, and one the platforms.
   targets.value = targets.value.map((target, i) =>
     i === index
       ? next
-      : (next.kind === 'name' || next.kind === 'igdbId') &&
+      : (next.kind === 'name' ||
+            next.kind === 'igdbId' ||
+            next.kind === 'platforms') &&
           target.kind === next.kind
         ? { kind: 'skip' }
         : target,
@@ -341,6 +349,19 @@ const reasons: Record<ImportProblem['reason'], { key: string }> = {
   badIgdbId: { key: 'import.problems.badIgdbId' },
   doesNotFit: { key: 'import.problems.doesNotFit' },
 }
+const platformReasons: Record<PlatformProblem['reason'], { key: string }> = {
+  unknownPlatform: { key: 'import.platformProblems.unknownPlatform' },
+  handAddedPlatforms: { key: 'import.platformProblems.handAddedPlatforms' },
+  notOwnedPlatforms: { key: 'import.platformProblems.notOwnedPlatforms' },
+  wantedPlatforms: { key: 'import.platformProblems.wantedPlatforms' },
+}
+/** The heading of the column the platforms are read from. */
+const platformsHeader = computed(
+  () =>
+    headers.value[
+      targets.value.findIndex((target) => target.kind === 'platforms')
+    ] ?? '',
+)
 
 async function runImport() {
   const current = plan.value
@@ -350,24 +371,25 @@ async function runImport() {
   progress.value = 0
   importError.value = ''
   const totals = { added: 0, updated: 0, linked: 0, handAdded: 0 }
+  platformProblems.value = []
   const fieldsChanged =
     current.newFields.length > 0 || Object.keys(current.addedOptions).length > 0
   try {
     for (let start = 0; start < rows.length; start += IMPORT_CHUNK_SIZE) {
-      const chunk = await auth.apiFetch<typeof totals>(
-        `/api/collections/${props.collectionId}/import`,
-        {
-          method: 'POST',
-          body: {
-            ...(start === 0 && fieldsChanged && { fields: current.fields }),
-            rows: rows.slice(start, start + IMPORT_CHUNK_SIZE),
-          },
+      const chunk = await auth.apiFetch<
+        typeof totals & { platformProblems: PlatformProblem[] }
+      >(`/api/collections/${props.collectionId}/import`, {
+        method: 'POST',
+        body: {
+          ...(start === 0 && fieldsChanged && { fields: current.fields }),
+          rows: rows.slice(start, start + IMPORT_CHUNK_SIZE),
         },
-      )
+      })
       totals.added += chunk.added
       totals.updated += chunk.updated
       totals.linked += chunk.linked
       totals.handAdded += chunk.handAdded
+      platformProblems.value.push(...chunk.platformProblems)
       progress.value = Math.min(start + IMPORT_CHUNK_SIZE, rows.length)
     }
     result.value = totals
@@ -468,6 +490,9 @@ async function runImport() {
                 }}</SelectItem>
                 <SelectItem value="igdbId">{{
                   $t('import.targets.igdbId')
+                }}</SelectItem>
+                <SelectItem value="platforms">{{
+                  $t('import.targets.platforms')
                 }}</SelectItem>
                 <SelectItem
                   v-for="field in fields"
@@ -737,6 +762,44 @@ async function runImport() {
             }}
           </li>
         </ul>
+        <div v-if="platformProblems.length" class="flex flex-col gap-2">
+          <p class="text-sm font-medium">
+            {{
+              $t(
+                'import.platformProblemsTitle',
+                { count: platformProblems.length },
+                platformProblems.length,
+              )
+            }}
+          </p>
+          <div class="max-h-56 overflow-y-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow class="hover:bg-transparent">
+                  <TableHead>{{ $t('import.row') }}</TableHead>
+                  <TableHead>{{ $t('import.column') }}</TableHead>
+                  <TableHead>{{ $t('import.value') }}</TableHead>
+                  <TableHead>{{ $t('import.why') }}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow
+                  v-for="(problem, index) in platformProblems.slice(0, 100)"
+                  :key="index"
+                >
+                  <TableCell class="tabular-nums">{{ problem.row }}</TableCell>
+                  <TableCell>{{ platformsHeader }}</TableCell>
+                  <TableCell class="max-w-40 truncate">{{
+                    problem.value
+                  }}</TableCell>
+                  <TableCell>{{
+                    $t(platformReasons[problem.reason].key)
+                  }}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
 
       <DialogFooter>

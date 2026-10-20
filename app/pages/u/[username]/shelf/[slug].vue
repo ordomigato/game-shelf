@@ -355,12 +355,11 @@ function togglePin() {
  */
 function exportCsv() {
   if (!data.value) return
-  const [name, igdbId, added] = FIXED_COLUMNS.map((column) => t(column.key))
-  const csv = collectionCsv(data.value.fields, data.value.items, [
-    name!,
-    igdbId!,
-    added!,
-  ])
+  const csv = collectionCsv(
+    data.value.fields,
+    data.value.items,
+    FIXED_COLUMNS.map((column) => t(column.key)),
+  )
   saveFile(
     new Blob([csv], { type: 'text/csv;charset=utf-8' }),
     `${data.value.slug}.csv`,

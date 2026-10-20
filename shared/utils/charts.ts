@@ -1,17 +1,58 @@
 import type { ChartMeasure, ChartTimeline, ChartWidget } from '../types/charts'
 import type {
+  CollectionEntry,
   FieldDefinition,
   FieldType,
   FieldValue,
-  ItemData,
 } from '../types/collection'
 import type { Message } from '../types/message'
+import { platformsOf } from './platforms'
 
-/** A game as charts see it: its values, and when it joined the collection. */
-export interface ChartItem {
-  data: ItemData
-  addedAt: string
+/**
+ * A game as charts see it: its values, and when it joined the collection.
+ * The rest is the catalog's facts and the owner's platforms, which a game
+ * added by hand doesn't have (and a visitor doesn't get, for the platforms).
+ */
+export interface ChartItem
+  extends
+    Pick<CollectionEntry, 'data' | 'addedAt'>,
+    Partial<
+      Pick<
+        CollectionEntry,
+        | 'releaseDate'
+        | 'releasePrecision'
+        | 'genres'
+        | 'ownedOn'
+        | 'catalogPlatforms'
+      >
+    > {}
+
+/**
+ * The core columns a bar or pie chart can split by, beside the fields. They
+ * name no field, and a field's id is a UUID, so the two can't collide.
+ * `genre` and `platforms` are the table's column keys (see `columns.ts`).
+ * The release year is worked out from the Released column.
+ */
+export const CORE_GROUPS = ['genre', 'platforms', 'releaseYear'] as const
+export type CoreGroup = (typeof CORE_GROUPS)[number]
+
+/** A line chart's timeline source for IGDB's release date. */
+export const RELEASED_SOURCE = 'released'
+
+export const isCoreGroup = (id: string | undefined): id is CoreGroup =>
+  CORE_GROUPS.includes(id as CoreGroup)
+
+// Spelled out, so every message key is written somewhere (see i18n).
+const CORE_LABELS: Record<CoreGroup | typeof RELEASED_SOURCE, Message> = {
+  genre: { key: 'charts.core.genre' },
+  platforms: { key: 'charts.core.platforms' },
+  releaseYear: { key: 'charts.core.releaseYear' },
+  released: { key: 'charts.core.released' },
 }
+
+/** The name of a core column, as a message for the screen to translate. */
+export const coreLabel = (id: CoreGroup | typeof RELEASED_SOURCE): Message =>
+  CORE_LABELS[id]
 
 export const MAX_CHARTS = 24
 /** Bar and pie charts show this many groups, then lump the rest as "Other". */
@@ -66,7 +107,10 @@ export function chartProblem(
   }
   if (widget.kind === 'bar' || widget.kind === 'pie') {
     const group = byId(fields, widget.groupBy)
-    if (!group || !GROUPABLE.includes(group.type)) {
+    if (
+      !isCoreGroup(widget.groupBy) &&
+      (!group || !GROUPABLE.includes(group.type))
+    ) {
       return { key: 'charts.problems.fieldGone' }
     }
   }
@@ -74,7 +118,9 @@ export function chartProblem(
     const source = widget.timeline?.source
     if (
       !source ||
-      (source !== 'addedAt' && byId(fields, source)?.type !== 'date')
+      (source !== 'addedAt' &&
+        source !== RELEASED_SOURCE &&
+        byId(fields, source)?.type !== 'date')
     ) {
       return { key: 'charts.problems.fieldGone' }
     }
@@ -129,6 +175,29 @@ function groupKeys(field: FieldDefinition, value: FieldValue | undefined) {
   return [String(value)]
 }
 
+/** The date a game was released, when it's known well enough to place. */
+function releasedOn(item: ChartItem) {
+  return item.releaseDate && item.releasePrecision !== 'tbd'
+    ? item.releaseDate
+    : undefined
+}
+
+/** The groups a game falls in for a core column. Games added by hand have none. */
+function coreKeys(core: CoreGroup, item: ChartItem): string[] {
+  const keys =
+    core === 'genre'
+      ? (item.genres ?? [])
+      : core === 'platforms'
+        ? platformsOf({
+            catalogPlatforms: item.catalogPlatforms,
+            ownedOn: item.ownedOn,
+            wantedOn: [],
+          }).owned.map(({ name }) => name)
+        : [releasedOn(item)?.slice(0, 4) ?? '']
+  const named = keys.filter(Boolean)
+  return named.length ? named : ['\u0000none']
+}
+
 function labelFor(key: string): GroupLabel {
   if (key === '\u0000none') return { kind: 'none' }
   if (key === '\u0000yes') return { kind: 'yes' }
@@ -137,9 +206,11 @@ function labelFor(key: string): GroupLabel {
 }
 
 /**
- * Bar and pie data: the games split by a field's values, each group
- * measured. A game with several choices counts in each. Choices keep the
- * field's order, scores go low to high, text goes largest first. Past
+ * Bar and pie data: the games split by a field's values or a core column,
+ * each group measured. A game with several choices (or genres, or
+ * platforms) counts in each. Choices keep the field's order, scores and
+ * release years go low to high, text, genres and platforms go largest
+ * first. Past
  * MAX_GROUPS, the smallest groups become "Other". Games with no value come
  * last, as "Not set".
  */
@@ -148,11 +219,15 @@ export function groupValues(
   fields: FieldDefinition[],
   widget: ChartWidget,
 ): ChartGroup[] {
-  const field = byId(fields, widget.groupBy)
-  if (!field) return []
+  const core = isCoreGroup(widget.groupBy) ? widget.groupBy : null
+  const field = core ? undefined : byId(fields, widget.groupBy)
+  if (!core && !field) return []
   const groups = new Map<string, ChartItem[]>()
   for (const item of items) {
-    for (const key of groupKeys(field, item.data[field.id])) {
+    const itemKeys = core
+      ? coreKeys(core, item)
+      : groupKeys(field!, item.data[field!.id])
+    for (const key of itemKeys) {
       groups.set(key, [...(groups.get(key) ?? []), item])
     }
   }
@@ -160,12 +235,13 @@ export function groupValues(
   groups.delete('\u0000none')
 
   const keys = [...groups.keys()]
-  if (field.type === 'select' || field.type === 'multiselect') {
+  const bySize = core ? core !== 'releaseYear' : field!.type === 'text'
+  if (field?.type === 'select' || field?.type === 'multiselect') {
     const order = field.options ?? []
     keys.sort((a, b) => order.indexOf(a) - order.indexOf(b))
-  } else if (field.type === 'rating') {
+  } else if (field?.type === 'rating' || core === 'releaseYear') {
     keys.sort((a, b) => Number(a) - Number(b))
-  } else if (field.type === 'checkbox') {
+  } else if (field?.type === 'checkbox') {
     keys.sort((a) => (a === '\u0000yes' ? -1 : 1))
   }
 
@@ -189,7 +265,7 @@ export function groupValues(
     label: labelFor(key),
     value: measureValue(groups.get(key)!, widget.measure) ?? 0,
   }))
-  if (field.type === 'text') result.sort((a, b) => b.value - a.value)
+  if (bySize) result.sort((a, b) => b.value - a.value)
   if (kept.length < keys.length) {
     const keptSet = new Set(kept)
     const rest = new Set(
@@ -231,7 +307,7 @@ function nextBucket(current: string, bucket: ChartTimeline['bucket']) {
 
 /**
  * Line data: the games spread over months or years, by when they were
- * added or by a date field, each period measured. Empty periods between
+ * added, when they were released or by a date field, each period measured. Empty periods between
  * the first and last are filled in, so the line doesn't skip time. Games
  * without a date are left out.
  */
@@ -245,7 +321,12 @@ export function timeSeries(
     const raw =
       timeline.source === 'addedAt'
         ? item.addedAt.slice(0, 10)
-        : item.data[timeline.source]
+        : timeline.source === RELEASED_SOURCE
+          ? // A game known only to its year has no month to place it in.
+            item.releasePrecision === 'year' && timeline.bucket === 'month'
+            ? undefined
+            : releasedOn(item)
+          : item.data[timeline.source]
     return typeof raw === 'string' && /^\d{4}-\d{2}/.test(raw)
       ? [{ item, bucket: bucketOf(raw, timeline.bucket) }]
       : []
@@ -311,8 +392,11 @@ const TITLES: Record<
 export function defaultTitle(
   widget: ChartWidget,
   fields: FieldDefinition[],
+  /** The translated name of a core column. */
+  coreName: (core: CoreGroup) => string = (core) => core,
 ): Message {
-  const fieldName = (id: string | undefined) => byId(fields, id)?.name ?? '?'
+  const fieldName = (id: string | undefined) =>
+    isCoreGroup(id) ? coreName(id) : (byId(fields, id)?.name ?? '?')
   const { measure } = widget
   const shape =
     widget.kind === 'bar' || widget.kind === 'pie'
@@ -343,7 +427,8 @@ function chartSignature(widget: ChartWidget): string {
  * Charts that suit a collection's fields, leaving out ones already on its
  * dashboard: the game count, totals of amounts, averages of scores and
  * percentages, the share of boxes ticked, games split by each choice list
- * (a pie for a few choices, bars for more), and growth over time.
+ * (a pie for a few choices, bars for more), growth over time, and games by
+ * genre.
  */
 export function suggestCharts(
   fields: FieldDefinition[],
@@ -395,6 +480,13 @@ export function suggestCharts(
     size: 'large',
     measure: { op: 'count' },
     timeline: { source: 'addedAt', bucket: 'month', cumulative: true },
+  })
+  ideas.push({
+    ...base,
+    kind: 'bar',
+    size: 'medium',
+    measure: { op: 'count' },
+    groupBy: 'genre',
   })
 
   const taken = new Set(existing.map(chartSignature))

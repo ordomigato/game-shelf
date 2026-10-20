@@ -17,10 +17,10 @@ export type ChartMeasure =
   | { op: 'sum' | 'average' | 'min' | 'max'; fieldId: string }
   | { op: 'percent'; fieldId: string }
 
-/** Over time: by when games were added, or by a date field. */
+/** Over time: by when games were added, were released, or by a date field. */
 export interface ChartTimeline {
-  /** `addedAt`, or a date field's id. */
-  source: 'addedAt' | string
+  /** `addedAt`, `released` (IGDB's release date), or a date field's id. */
+  source: 'addedAt' | 'released' | string
   bucket: 'month' | 'year'
   /** A running total instead of each month or year on its own. */
   cumulative: boolean
@@ -33,7 +33,11 @@ export interface ChartWidget {
   title: string
   size: ChartSize
   measure: ChartMeasure
-  /** Bar and pie: the field whose values split the games into groups. */
+  /**
+   * Bar and pie: what splits the games into groups. A field's id, or one
+   * of the core columns `genre`, `platforms` and `releaseYear`
+   * (see `CORE_GROUPS`).
+   */
   groupBy?: string
   /** Line: how the games spread over time. */
   timeline?: ChartTimeline

@@ -27,6 +27,11 @@ test('exports a collection as CSV from the table menu', async ({ page }) => {
             coverId: null,
             data: { c: 'Boxed' },
             addedAt: '2026-01-01T00:00:00.000Z',
+            releaseDate: '1986-02-21',
+            releasePrecision: 'month',
+            genres: ['Adventure', 'Puzzle'],
+            ownedOn: [18],
+            catalogPlatforms: [{ id: 18, name: 'NES' }],
           },
         ],
         dashboard: [],
@@ -47,7 +52,8 @@ test('exports a collection as CSV from the table menu', async ({ page }) => {
   const file = await download
   expect(file.suggestedFilename()).toBe('nes-games.csv')
   expect(await readFile((await file.path())!, 'utf8')).toBe(
-    '\uFEFFName,IGDB ID,Added,Condition\r\nThe Legend of Zelda,1022,2026-01-01,Boxed\r\n',
+    '\uFEFFName,IGDB ID,Added,Released,Genre,Platforms,Condition\r\n' +
+      'The Legend of Zelda,1022,2026-01-01,1986-02,Adventure; Puzzle,NES,Boxed\r\n',
   )
   expect(requested).toBe(false)
 })

@@ -210,6 +210,16 @@ describe('hidden fields', () => {
     expect(chartsFor(true, all, dashboard)).toEqual(dashboard)
   })
 
+  it("keeps the owner's platforms charts from visitors", () => {
+    const byPlatform = widget({ id: '5', kind: 'bar', groupBy: 'platforms' })
+    const byGenre = widget({ id: '6', kind: 'bar', groupBy: 'genre' })
+    expect(chartsFor(false, all, [byPlatform, byGenre])).toEqual([byGenre])
+    expect(chartsFor(true, all, [byPlatform, byGenre])).toEqual([
+      byPlatform,
+      byGenre,
+    ])
+  })
+
   it('strips item data down to the visible fields for a visitor', () => {
     const visible = fieldsFor(false, all, items, [])
     expect(dataFor(false, visible, { a: 'hi', p: 60, gone: 'x' })).toEqual({

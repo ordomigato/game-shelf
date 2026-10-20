@@ -4,6 +4,7 @@ import type { ChartSize, ChartWidget } from '#shared/types/charts'
 import type { FieldDefinition } from '#shared/types/collection'
 import {
   chartProblem,
+  coreLabel,
   defaultTitle,
   groupValues,
   measureValue,
@@ -34,7 +35,9 @@ const { t, locale } = useI18n()
 const problem = computed(() => chartProblem(props.widget, props.fields))
 const title = computed(() => {
   if (props.widget.title) return props.widget.title
-  const message = defaultTitle(props.widget, props.fields)
+  const message = defaultTitle(props.widget, props.fields, (core) =>
+    t(coreLabel(core).key),
+  )
   return t(message.key, message.params ?? {})
 })
 

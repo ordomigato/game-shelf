@@ -729,6 +729,12 @@
     },
     "notSet": "Not set",
     "other": "Other",
+    "core": {
+      "genre": "Genre",
+      "platforms": "Platforms",
+      "releaseYear": "Release year",
+      "released": "Release date"
+    },
     "noData": "No games to show yet.",
     "saveFailed": "Couldn't save the charts. Try again.",
     "problems": {
@@ -776,7 +782,6 @@
       "measure": "Measure",
       "measureField": "Field to measure",
       "groupBy": "Split by",
-      "noGroupable": "Add a choice list, checkbox, score or text field to split games by.",
       "over": "Over time, by",
       "whenAdded": "When games were added",
       "bucket": "Period",
@@ -805,7 +810,10 @@
     "columns": {
       "name": "Name",
       "igdbId": "IGDB ID",
-      "added": "Added"
+      "added": "Added",
+      "released": "Released",
+      "genre": "Genre",
+      "platforms": "Platforms"
     }
   },
   "import": {
@@ -833,6 +841,7 @@
       "name": "Game name",
       "igdbId": "IGDB ID",
       "new": "New field",
+      "platforms": "Owned platforms",
       "skip": "Don't import"
     },
     "needsName": "Choose which column holds the game's name.",
@@ -851,6 +860,13 @@
       "noName": "No game name",
       "badIgdbId": "Not an IGDB ID, so the game is added by hand",
       "doesNotFit": "Doesn't fit the field"
+    },
+    "platformProblemsTitle": "{count} platform wasn't ticked | {count} platforms weren't ticked",
+    "platformProblems": {
+      "unknownPlatform": "Not a platform this game is on in IGDB",
+      "handAddedPlatforms": "Games added by hand have no platforms",
+      "notOwnedPlatforms": "This game is on your Wishlist, not Owned",
+      "wantedPlatforms": "Already on your Wishlist for this platform"
     },
     "progress": "Imported {done} of {total} games…",
     "failed": "The import stopped after {done} games. Those are saved: import the file again to finish, and they'll be updated rather than added twice.",

@@ -1,10 +1,16 @@
 import { and, eq, inArray, max, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
-import type { ImportRow } from '../../shared/utils/csv-import'
+import type { ImportRow, PlatformProblem } from '../../shared/utils/csv-import'
 import { cleanFields, fieldsProblem } from '../../shared/utils/field-changes'
 import { normalizeFieldValue } from '../../shared/utils/field-values'
-import { collectionItems, collections, libraryItems, users } from '../db/schema'
+import {
+  collectionItems,
+  collections,
+  libraryItems,
+  platforms,
+  users,
+} from '../db/schema'
 import type { PlanLimits } from '../../shared/utils/plans'
 
 export interface ImportResult {
@@ -18,7 +24,21 @@ export interface ImportResult {
   handAdded: number
   /** Values the server refused (the browser checks first, so rarely any). */
   rejectedValues: number
+  /** Platform cells it couldn't use, for the person to see. */
+  platformProblems: PlatformProblem[]
 }
+
+const sameName = (a: string, b: string) =>
+  a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
+
+/** An integer[] value in SQL. */
+const intArray = (ids: number[]) =>
+  ids.length
+    ? sql`ARRAY[${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::integer[]`
+    : sql`'{}'::integer[]`
 
 /**
  * The fields after import must keep every current field, with the same
@@ -60,6 +80,12 @@ function validValues(fields: FieldDefinition[], values: ItemData) {
  * Games with an IGDB id the user already has are updated, not duplicated,
  * and only with the values the file has: empty cells never erase anything.
  * Every game ends up in the collection, at the end, in file order.
+ *
+ * Platform names in the file are matched, by name or short name, to the
+ * platforms the catalog knows the game on, and ticked as owned. Names that
+ * don't match, and platforms on a game that has none, come back as
+ * `platformProblems`. A game on the Wishlist only isn't owned, so its
+ * platforms are left alone and reported too.
  */
 export async function importIntoCollection(
   ownerId: string,
@@ -110,6 +136,9 @@ export async function importIntoCollection(
           id: libraryItems.id,
           igdbId: libraryItems.igdbId,
           data: libraryItems.data,
+          owned: libraryItems.owned,
+          ownedOn: libraryItems.ownedOn,
+          wantedOn: libraryItems.wantedOn,
         })
         .from(libraryItems)
         .where(
@@ -121,9 +150,82 @@ export async function importIntoCollection(
     : []
   const existingByIgdb = new Map(existing.map((item) => [item.igdbId!, item]))
 
+  // The platforms the file names, matched to each game's catalog platforms.
+  const platformProblems: PlatformProblem[] = []
+  const ownedOnAdd = new Map<number, Set<number>>()
+  const asked = input.rows.filter((row) => row.platforms?.length)
+  const catalogPlatforms = asked.length
+    ? await db
+        .select()
+        .from(platforms)
+        .where(
+          inArray(platforms.igdbId, [
+            ...new Set(catalog.flatMap((game) => game.platformIds)),
+          ]),
+        )
+    : []
+  for (const row of asked) {
+    const names = row.platforms!
+    const at = row.row ?? 0
+    const game = known(row)
+      ? catalog.find((candidate) => candidate.igdbId === row.igdbId)
+      : undefined
+    if (!game) {
+      platformProblems.push({
+        row: at,
+        value: names.join('; '),
+        reason: 'handAddedPlatforms',
+      })
+      continue
+    }
+    const onGame = catalogPlatforms.filter((platform) =>
+      game.platformIds.includes(platform.igdbId),
+    )
+    const ids: number[] = []
+    for (const name of names) {
+      const found = onGame.find(
+        (platform) =>
+          sameName(platform.name, name) ||
+          (platform.abbreviation !== null &&
+            sameName(platform.abbreviation, name)),
+      )
+      if (found) ids.push(found.igdbId)
+      else {
+        platformProblems.push({
+          row: at,
+          value: name,
+          reason: 'unknownPlatform',
+        })
+      }
+    }
+    // A game already in the library only takes platforms it can own.
+    const have = existingByIgdb.get(game.igdbId)
+    const wanted = new Set(have?.wantedOn)
+    const usable =
+      have && !have.owned ? [] : ids.filter((id) => !wanted.has(id))
+    if (ids.length && have && !have.owned) {
+      platformProblems.push({
+        row: at,
+        value: names.join('; '),
+        reason: 'notOwnedPlatforms',
+      })
+    } else if (usable.length < ids.length) {
+      platformProblems.push({
+        row: at,
+        value: names.join('; '),
+        reason: 'wantedPlatforms',
+      })
+    }
+    if (usable.length) {
+      const set = ownedOnAdd.get(game.igdbId) ?? new Set<number>()
+      usable.forEach((id) => set.add(id))
+      ownedOnAdd.set(game.igdbId, set)
+    }
+  }
+
   let rejectedValues = 0
   const toInsert: (typeof libraryItems.$inferInsert)[] = []
-  const toUpdate: { id: string; data: ItemData }[] = []
+  const toUpdate: { id: string; data: ItemData; ownedOn: number[] }[] = []
   // The library item each row ends up as, filled in below, in file order.
   const order: (string | { pending: number })[] = []
 
@@ -131,9 +233,17 @@ export async function importIntoCollection(
     const { valid, rejected } = validValues(fields, row.values)
     rejectedValues += rejected
     const have = known(row) ? existingByIgdb.get(row.igdbId!) : undefined
+    const extra = known(row) ? ownedOnAdd.get(row.igdbId!) : undefined
     if (have) {
-      if (Object.keys(valid).length) {
-        toUpdate.push({ id: have.id, data: { ...have.data, ...valid } })
+      const ownedOn = [...new Set([...have.ownedOn, ...(extra ?? [])])].sort(
+        (a, b) => a - b,
+      )
+      if (Object.keys(valid).length || ownedOn.length !== have.ownedOn.length) {
+        toUpdate.push({
+          id: have.id,
+          data: { ...have.data, ...valid },
+          ownedOn,
+        })
       }
       order.push(have.id)
     } else {
@@ -144,6 +254,7 @@ export async function importIntoCollection(
         name: row.name,
         coverId: known(row) ? (covers.get(row.igdbId!) ?? null) : null,
         data: valid,
+        ownedOn: extra ? [...extra].sort((a, b) => a - b) : [],
       })
     }
   }
@@ -180,14 +291,14 @@ export async function importIntoCollection(
   if (toUpdate.length) {
     await db.execute(sql`
       update library_items as item
-      set data = changed.data
+      set data = changed.data, owned_on = changed.owned_on
       from (values ${sql.join(
         toUpdate.map(
           (update) =>
-            sql`(${update.id}::uuid, ${JSON.stringify(update.data)}::jsonb)`,
+            sql`(${update.id}::uuid, ${JSON.stringify(update.data)}::jsonb, ${intArray(update.ownedOn)})`,
         ),
         sql`, `,
-      )}) as changed(id, data)
+      )}) as changed(id, data, owned_on)
       where item.id = changed.id and item.owner_id = ${ownerId}
     `)
   }
@@ -227,5 +338,6 @@ export async function importIntoCollection(
     linked: rows.filter(known).length,
     handAdded: rows.filter((row) => !known(row)).length,
     rejectedValues,
+    platformProblems,
   }
 }

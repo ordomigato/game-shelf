@@ -271,7 +271,13 @@ test('a refusal partway says how many rows were already imported', async ({
     calls++
     if (calls === 1) {
       return route.fulfill({
-        json: { added: 250, updated: 0, linked: 0, handAdded: 250 },
+        json: {
+          added: 250,
+          updated: 0,
+          linked: 0,
+          handAdded: 250,
+          platformProblems: [],
+        },
       })
     }
     return route.fulfill({

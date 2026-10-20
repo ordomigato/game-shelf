@@ -134,12 +134,14 @@ export async function getListPage(
       .limit(query.size)
       .offset((page - 1) * query.size)
 
-  const [matching, listSize, firstTry, platformOptions] = await Promise.all([
-    countWhere(where),
-    isFiltered(query) ? countWhere(onList) : null,
-    pageOf(query.page),
-    platformChoices(ownerId, list),
-  ])
+  const [matching, listSize, firstTry, platformOptions, library] =
+    await Promise.all([
+      countWhere(where),
+      isFiltered(query) ? countWhere(onList) : null,
+      pageOf(query.page),
+      platformChoices(ownerId, list),
+      countWhere(eq(libraryItems.ownerId, ownerId)),
+    ])
   const total = matching[0]?.value ?? 0
   const itemCount = listSize ? (listSize[0]?.value ?? 0) : total
   const page = Math.min(query.page, Math.max(1, Math.ceil(total / query.size)))
@@ -164,6 +166,7 @@ export async function getListPage(
   return {
     list,
     itemCount,
+    libraryCount: library[0]?.value ?? 0,
     total,
     page,
     size: query.size,

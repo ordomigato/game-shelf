@@ -258,12 +258,12 @@ test('"Got it" takes the game off the page at once, then fills the gap', async (
   await page.goto('/u/retro_fan/shelf/wishlist')
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(50)
-  await expect(page.getByText('120 games', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('list-usage')).toHaveText('120 of 200 games')
 
   await page.getByRole('button', { name: 'Actions for Game 120' }).click()
   await page.getByRole('menuitem', { name: 'Got it' }).click()
   await expect(rows).toHaveCount(49)
-  await expect(page.getByText('119 games', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('list-usage')).toHaveText('119 of 200 games')
   await expect(page.getByRole('link', { name: 'Game 120' })).toHaveCount(0)
   // Not dimmed: it's a quiet refetch.
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
@@ -356,4 +356,52 @@ test('a value saved while moving to another page does not send you back', async 
   await expect(page.getByText('51–100 of 120')).toBeVisible()
   await expect(page).toHaveURL(/page=2/)
   await expect(page.locator('tbody tr').first()).toContainText('Game 070')
+})
+
+test('Owned and the Wishlist show how much of the plan they use', async ({
+  page,
+}) => {
+  await signInAs(page, { username: 'retro_fan' })
+  await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/lists', (route) =>
+    route.fulfill({ json: { owned: 120, wishlist: 120 } }),
+  )
+  const usage = page.getByTestId('list-usage')
+
+  // Owned counts the whole library, not only the owned games.
+  await fakeList(page, 'retro_fan', 'owned', games('owned'), {
+    libraryCount: 2500,
+  })
+  await page.goto('/u/retro_fan/shelf/owned')
+  await expect(usage).toHaveText('2,500 of 3,000 games')
+  await expect(usage).not.toHaveClass(/text-destructive/)
+
+  await fakeList(page, 'retro_fan', 'wishlist', games('wishlist'))
+  await page.goto('/u/retro_fan/shelf/wishlist')
+  await expect(usage).toHaveText('120 of 200 games')
+  await expect(usage).not.toHaveClass(/text-destructive/)
+})
+
+test('the usage turns red once a list is over its limit', async ({ page }) => {
+  await signInAs(page, { username: 'retro_fan' })
+  await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/lists', (route) =>
+    route.fulfill({ json: { owned: 120, wishlist: 201 } }),
+  )
+  const usage = page.getByTestId('list-usage')
+
+  await fakeList(page, 'retro_fan', 'owned', games('owned'), {
+    libraryCount: 3001,
+  })
+  await page.goto('/u/retro_fan/shelf/owned')
+  await expect(usage).toHaveText('3,001 of 3,000 games')
+  await expect(usage).toHaveClass(/text-destructive/)
+
+  const wishlist = Array.from({ length: 201 }, (_, i) =>
+    game(i + 1, 'wishlist'),
+  )
+  await fakeList(page, 'retro_fan', 'wishlist', wishlist)
+  await page.goto('/u/retro_fan/shelf/wishlist')
+  await expect(usage).toHaveText('201 of 200 games')
+  await expect(usage).toHaveClass(/text-destructive/)
 })

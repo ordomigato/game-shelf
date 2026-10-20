@@ -37,7 +37,7 @@ import type {
 const props = defineProps<{ list: ListName }>()
 
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t, n, locale } = useI18n()
 const { limits } = usePlan()
 const collections = useCollections()
 const leaving = useUnownConfirm()
@@ -194,6 +194,18 @@ const overCap = computed(
 const fullCap = computed(
   () => capped.value && count.value >= limits.value.wishlist,
 )
+// Owned counts against the account's games limit (every game in the
+// library), the Wishlist against its own.
+const usage = computed(() =>
+  props.list === 'owned'
+    ? { used: data.value?.libraryCount ?? 0, limit: limits.value.games }
+    : { used: count.value, limit: limits.value.wishlist },
+)
+// Thousands get a separator in the reader's language.
+const shown = computed(() => ({
+  used: n(usage.value.used),
+  limit: n(usage.value.limit),
+}))
 const proWishlist = PLAN_LIMITS.pro.wishlist
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
@@ -417,7 +429,13 @@ function onRenamed(saved: LibraryItem) {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
-            <span>{{ $t('shelf.gameCount', data.itemCount) }}</span>
+            <span
+              data-testid="list-usage"
+              :class="{
+                'font-medium text-destructive': usage.used > usage.limit,
+              }"
+              >{{ $t('limits.gamesUsed', shown) }}</span
+            >
           </div>
           <p class="max-w-prose text-sm text-muted-foreground">
             {{

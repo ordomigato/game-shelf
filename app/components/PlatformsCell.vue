@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { Plus, Star } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import type { CollectionEntry, LibraryItem } from '#shared/types/collection'
+import type {
+  CollectionEntry,
+  LibraryItem,
+  ListName,
+} from '#shared/types/collection'
 import { platformsOf } from '#shared/utils/platforms'
 
 /**
@@ -19,18 +22,17 @@ const emit = defineEmits<{
   changed: [saved: LibraryItem]
 }>()
 
-const { t } = useI18n()
 const collections = useCollections()
 
-const saving = ref(false)
-/** The platforms as ticked, until the save finishes. */
-const pending = ref<{ ownedOn: number[]; wantedOn: number[] } | null>(null)
-
-const ownedOn = computed(
-  () => pending.value?.ownedOn ?? props.item.ownedOn ?? [],
-)
-const wantedOn = computed(
-  () => pending.value?.wantedOn ?? props.item.wantedOn ?? [],
+const { ownedOn, wantedOn, toggle } = usePlatformToggle(
+  () => props.item,
+  async (list, platforms) => {
+    const { item } = await collections.changeLists(props.item.id, {
+      type: list === 'owned' ? 'setOwnedOn' : 'setWantedOn',
+      platforms,
+    })
+    return item
+  },
 )
 const options = computed(() => props.item.catalogPlatforms ?? [])
 const shown = computed(() =>
@@ -42,33 +44,9 @@ const shown = computed(() =>
 )
 const pickable = computed(() => props.editable && options.value.length > 0)
 
-type Group = 'owned' | 'wanted'
-
-async function toggle(platformId: number, group: Group, on: boolean) {
-  if (saving.value) return
-  const owned = new Set(ownedOn.value)
-  const wanted = new Set(wantedOn.value)
-  const [mine, other] = group === 'owned' ? [owned, wanted] : [wanted, owned]
-  if (on) {
-    mine.add(platformId)
-    other.delete(platformId)
-  } else {
-    mine.delete(platformId)
-  }
-  pending.value = { ownedOn: [...owned], wantedOn: [...wanted] }
-  saving.value = true
-  try {
-    const { item } = await collections.changeLists(props.item.id, {
-      type: group === 'owned' ? 'setOwnedOn' : 'setWantedOn',
-      platforms: [...mine],
-    })
-    if (item) emit('changed', item)
-  } catch {
-    toast.error(t('table.platformsSaveFailed'))
-  } finally {
-    pending.value = null
-    saving.value = false
-  }
+async function tick(list: ListName, platformId: number, on: boolean) {
+  const saved = await toggle(list, platformId, on)
+  if (saved) emit('changed', saved)
 }
 </script>
 
@@ -112,10 +90,9 @@ async function toggle(platformId: number, group: Group, on: boolean) {
     <PopoverContent align="start" class="w-64 p-3">
       <div class="flex flex-col gap-3">
         <fieldset
-          v-for="group in ['owned', 'wanted'] as const"
+          v-for="group in ['owned', 'wishlist'] as const"
           :key="group"
           class="flex flex-col gap-1"
-          :disabled="saving"
         >
           <legend class="mb-1 text-xs font-medium text-muted-foreground">
             {{
@@ -127,14 +104,13 @@ async function toggle(platformId: number, group: Group, on: boolean) {
           <Label
             v-for="platform in options"
             :key="platform.id"
-            class="flex cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 font-normal hover:bg-accent"
+            class="flex cursor-pointer items-center gap-2 min-h-10 rounded-sm px-1.5 py-1 font-normal hover:bg-accent"
           >
             <Checkbox
               :model-value="
                 (group === 'owned' ? ownedOn : wantedOn).includes(platform.id)
               "
-              :disabled="saving"
-              @update:model-value="toggle(platform.id, group, $event === true)"
+              @update:model-value="tick(group, platform.id, $event === true)"
             />
             {{ platform.name }}
           </Label>

@@ -54,15 +54,19 @@ export function listStateOf(row: ItemRow): ListState {
   }
 }
 
-/** The platforms some game on the list is on, for the filter. */
+/**
+ * The platforms some game on the list is owned or wanted on, for the filter.
+ * Only ids with a `platforms` row count, the ones the cell can name.
+ */
 async function platformChoices(
   ownerId: string,
   list: ListName,
 ): Promise<{ id: number; name: string }[]> {
   const db = useDb()
-  const column = list === 'owned' ? libraryItems.ownedOn : libraryItems.wantedOn
   const onList = db
-    .select({ id: sql<number>`unnest(${column})` })
+    .select({
+      id: sql<number>`unnest(${libraryItems.ownedOn} || ${libraryItems.wantedOn})`,
+    })
     .from(libraryItems)
     .where(
       and(

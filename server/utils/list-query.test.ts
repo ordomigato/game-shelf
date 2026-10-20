@@ -193,7 +193,7 @@ describe('listWhere', () => {
       'coalesce(searched_platform.abbreviation, searched_platform.name)',
     )
     expect(sql).toContain(
-      'searched_platform.igdb_id = any(library_items.owned_on)',
+      'searched_platform.igdb_id = any(library_items.owned_on || library_items.wanted_on)',
     )
     expect(sql).toContain('searched_choice.name')
     // Text and select (Status, Note) and multiselect (Tags), not the others.
@@ -209,16 +209,16 @@ describe('listWhere', () => {
     const { sql } = where({ q: 'mario  snes' })
     expect(sql.match(/searched_collection\.title/g)).toHaveLength(2)
     expect(where({ q: 'x' }, 'wishlist').sql).toContain(
-      'any(library_items.wanted_on)',
+      'any(library_items.owned_on || library_items.wanted_on)',
     )
   })
 
-  it('filters platforms on the list being read', () => {
+  it('filters platforms on owned and wanted together, on either list', () => {
     expect(where({ platform: ['1', '2'] }).sql).toContain(
-      'library_items.owned_on && ARRAY[$3, $4]::integer[]',
+      '(library_items.owned_on || library_items.wanted_on) && ARRAY[$3, $4]::integer[]',
     )
     expect(where({ platform: '1' }, 'wishlist').sql).toContain(
-      'library_items.wanted_on &&',
+      '(library_items.owned_on || library_items.wanted_on) &&',
     )
   })
 
@@ -299,13 +299,11 @@ describe('listOrder', () => {
     )
   })
 
-  it('sorts platforms by the first platform of this list', () => {
-    expect(order({ sort: 'platforms' })[0]).toContain(
-      '(library_items.owned_on)[1]',
-    )
-    expect(order({ sort: 'platforms' }, 'wishlist')[0]).toContain(
-      '(library_items.wanted_on)[1]',
-    )
+  it('sorts platforms by the first owned platform, then the first wanted one', () => {
+    const expected =
+      'coalesce((library_items.owned_on)[1], (library_items.wanted_on)[1])'
+    expect(order({ sort: 'platforms' })[0]).toContain(expected)
+    expect(order({ sort: 'platforms' }, 'wishlist')[0]).toContain(expected)
   })
 
   it('sorts the year by the release date, empty last, without word order', () => {

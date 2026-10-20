@@ -164,6 +164,25 @@ for (const list of ['owned', 'wishlist'] as const) {
       platform: String(platform.id),
     })
   }
+  // Platforms read owned and wanted together: a search by platform name, a
+  // filter on two at once, and the sort by the first one.
+  const platforms = base?.platforms ?? []
+  if (platforms[0]) {
+    await run(list, `search platform name ${platforms[0].name}`, {
+      q: platforms[0].name,
+    })
+    await run(list, `filter platform ${platforms[0].name} + sort platforms`, {
+      platform: String(platforms[0].id),
+      sort: 'platforms',
+      dir: 'desc',
+      size: '25',
+    })
+  }
+  if (platforms.length > 1) {
+    await run(list, 'filter two platforms', {
+      platform: platforms.slice(0, 2).map(({ id }) => String(id)),
+    })
+  }
   // Genres: one, two together, a name that is not a genre, and one beside a
   // sort on the columns that read the same catalog row.
   const genres = base?.genres ?? []

@@ -147,10 +147,17 @@ export async function fakeList(
         if (sort === 'year') return item.year
         if (sort === 'genre') return item.genres?.[0]
         if (sort === 'platforms') {
-          const ids = (item.ownedOn ?? []) as number[]
-          return (item.catalogPlatforms as { id: number; name: string }[]).find(
-            ({ id }) => ids.includes(id),
-          )?.name
+          // The first owned platform, else the first wanted one.
+          const options = item.catalogPlatforms as {
+            id: number
+            name: string
+          }[]
+          const nameOf = (ids: number[] = []) =>
+            options.find(({ id }) => ids.includes(id))?.name
+          return (
+            nameOf(item.ownedOn as number[]) ??
+            nameOf(item.wantedOn as number[])
+          )
         }
         if (sort === 'inCollections') return item.inCollections?.length
         return item.data[String(sort).slice(2)]

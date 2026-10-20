@@ -137,11 +137,13 @@ export const isFiltered = (query: ListQuery) =>
     query.fieldFilters.length,
   )
 
-/** The column holding the platforms for a list. */
-const platformColumn = (list: ListName) =>
-  list === 'owned'
-    ? sql.raw('library_items.owned_on')
-    : sql.raw('library_items.wanted_on')
+/**
+ * Every platform the owner has the game on, owned and wanted together:
+ * what the platforms cell shows on both lists.
+ */
+const allPlatforms = sql.raw(
+  'library_items.owned_on || library_items.wanted_on',
+)
 
 const textList = (values: string[]) =>
   sql`ARRAY[${sql.join(
@@ -186,7 +188,6 @@ function fieldFilter(field: FieldDefinition, values: string[]): SQL | null {
 /** Whether a word appears in the parts of a game the search reads. */
 function wordMatch(
   ownerId: string,
-  list: ListName,
   searchFields: FieldDefinition[],
   word: string,
 ): SQL {
@@ -195,7 +196,7 @@ function wordMatch(
   const parts: SQL[] = [
     like(sql`${itemName}`),
     sql`exists (select 1 from collection_items as entry inner join collections as searched_collection on searched_collection.id = entry.collection_id where entry.item_id = library_items.id and searched_collection.owner_id = ${ownerId} and ${like(sql`searched_collection.title`)})`,
-    sql`exists (select 1 from platforms as searched_platform where searched_platform.igdb_id = any(${platformColumn(list)}) and ${like(sql`coalesce(searched_platform.abbreviation, searched_platform.name)`)})`,
+    sql`exists (select 1 from platforms as searched_platform where searched_platform.igdb_id = any(${allPlatforms}) and ${like(sql`coalesce(searched_platform.abbreviation, searched_platform.name)`)})`,
   ]
   for (const field of searchFields) {
     const value = valueOf(field)
@@ -224,7 +225,7 @@ export function listWhere(
   // Every word must be found somewhere: in the name, a text or choice value,
   // a collection title or a platform name.
   for (const word of query.q.split(/\s+/).filter(Boolean)) {
-    conditions.push(wordMatch(ownerId, list, query.searchFields, word))
+    conditions.push(wordMatch(ownerId, query.searchFields, word))
   }
   if (query.collectionIds.length) {
     conditions.push(
@@ -232,9 +233,7 @@ export function listWhere(
     )
   }
   if (query.platformIds.length) {
-    conditions.push(
-      sql`${platformColumn(list)} && ${intList(query.platformIds)}`,
-    )
+    conditions.push(sql`(${allPlatforms}) && ${intList(query.platformIds)}`)
   }
   if (query.genres.length) {
     // Games added by hand have no catalog row, so no genres: the guard keeps
@@ -272,7 +271,7 @@ function fieldSortValue(field: FieldDefinition): SQL {
   }
 }
 
-function sortValue(sort: ListSort, list: ListName, ownerId: string): SQL {
+function sortValue(sort: ListSort, ownerId: string): SQL {
   if ('field' in sort) return fieldSortValue(sort.field)
   switch (sort.column) {
     case 'name':
@@ -284,7 +283,8 @@ function sortValue(sort: ListSort, list: ListName, ownerId: string): SQL {
     case 'genre':
       return sql`lower((${catalogGames.genres})[1])`
     case 'platforms':
-      return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = (${platformColumn(list)})[1])`
+      // The first owned platform, else the first wanted one.
+      return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = coalesce((library_items.owned_on)[1], (library_items.wanted_on)[1]))`
     case 'inCollections':
       return sql`(select string_agg(lower(sorted_collection.title), ', ' order by lower(sorted_collection.title)) from collection_items as entry inner join collections as sorted_collection on sorted_collection.id = entry.collection_id where entry.item_id = library_items.id and sorted_collection.owner_id = ${ownerId})`
   }
@@ -324,7 +324,7 @@ export function listOrder(
     ? sql.raw(` collate "${NATURAL_COLLATION}"`)
     : sql.raw('')
   return [
-    sql`${sortValue(query.sort, list, ownerId)}${collation} ${direction} nulls last`,
+    sql`${sortValue(query.sort, ownerId)}${collation} ${direction} nulls last`,
     ...tiebreak,
   ]
 }

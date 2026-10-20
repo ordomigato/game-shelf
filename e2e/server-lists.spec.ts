@@ -416,3 +416,45 @@ test('the library total turns red once it is over the limit', async ({
   await expect(usage).toHaveText('3,001 of 3,000 games (120 wishlisted)')
   await expect(total).toHaveClass(/text-destructive/)
 })
+
+test('ticking Owned on a wanted game moves it off the Wishlist and says so', async ({
+  page,
+}) => {
+  await signInAs(page, { username: 'retro_fan' })
+  await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/lists', (route) =>
+    route.fulfill({ json: { owned: 0, wishlist: 1 } }),
+  )
+  const wanted = { ...game(1, 'wishlist'), platforms: ['SNES'] }
+  const list = await openList(page, 'wishlist')
+  list.items.splice(0, list.items.length, wanted)
+  const platform = (list.items[0] as FakeEntry & { platforms: string[] })
+    .platforms[0]!
+  expect(platform).toBe('SNES')
+  const sent: unknown[] = []
+  await page.route('**/api/library-items/*/lists', (route) => {
+    sent.push(route.request().postDataJSON())
+    list.remove(wanted.id)
+    const { platforms: _platforms, ...item } = wanted
+    return route.fulfill({
+      json: {
+        item: { ...item, owned: true, wishlisted: false, wanted: false },
+        collectionIds: [],
+      },
+    })
+  })
+  await page.goto('/u/retro_fan/shelf/wishlist')
+  const row = page.locator('tbody tr').filter({ hasText: 'Game 001' })
+  await row
+    .getByRole('button', { name: 'Choose platforms for Game 001' })
+    .click()
+  await page
+    .getByRole('group', { name: 'Owned on' })
+    .getByRole('checkbox', { name: 'SNES' })
+    .click()
+  await expect(page.getByText('Moved to Owned')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'View' })).toBeVisible()
+  expect(sent).toHaveLength(1)
+  await page.keyboard.press('Escape')
+  await expect(row).toHaveCount(0)
+})

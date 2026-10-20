@@ -140,6 +140,8 @@ export interface ListDetail {
   fields: FieldDefinition[]
   /** The platforms some game on this list is on, for the filter. */
   platforms: { id: number; name: string }[]
+  /** Keys of the columns the owner hides on this list. */
+  hiddenColumns: string[]
   items: OwnerEntry[]
 }
 
@@ -164,6 +166,8 @@ export interface CollectionDetail extends CollectionSummary {
   items: CollectionEntry[]
   /** The charts on its dashboard, in order. */
   dashboard: ChartWidget[]
+  /** Keys of the columns the owner hides in the table (shared/utils/columns.ts). */
+  hiddenColumns: string[]
   /** Whether the person viewing is the owner (and can edit). */
   isOwner: boolean
 }

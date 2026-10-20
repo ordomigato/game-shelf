@@ -4,7 +4,7 @@ import { signInAs } from './support/session'
 
 const collectionId = '10000000-0000-4000-8000-000000000041'
 
-test('exports a collection as CSV from its menu', async ({ page }) => {
+test('exports a collection as CSV from the table menu', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/u/retro_fan/collections/nes-games', (route) =>
@@ -40,7 +40,7 @@ test('exports a collection as CSV from its menu', async ({ page }) => {
     return route.fulfill({ status: 404 })
   })
   await page.goto('/u/retro_fan/shelf/nes-games')
-  await page.getByRole('button', { name: 'Collection actions' }).click()
+  await page.getByRole('button', { name: 'Table options' }).click()
   const download = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: 'Export CSV' }).click()
 

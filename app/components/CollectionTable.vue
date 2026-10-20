@@ -6,6 +6,7 @@ import {
   useVueTable,
   type ColumnDef,
   type PaginationState,
+  type VisibilityState,
   type SortingState,
   type Updater,
 } from '@tanstack/vue-table'
@@ -20,6 +21,8 @@ import {
   PackageCheck,
   ChevronLeft,
   ChevronRight,
+  Columns3,
+  Download,
   Ellipsis,
   GripVertical,
   ListFilter,
@@ -62,6 +65,9 @@ import {
  * is in and the platforms for that list. For those, `server` hands the
  * sorting, search, filters and paging to the server: `items` is then one
  * page, and the table asks for changes with `view` instead of making them.
+ *
+ * The owner can hide columns (all but the name). `hiddenColumns` holds the
+ * keys of the hidden ones and `hideColumns` asks the page to save a new set.
  */
 const props = defineProps<{
   fields: FieldDefinition[]
@@ -75,6 +81,10 @@ const props = defineProps<{
   addTargets?: CollectionSummary[]
   /** A collection, or one of the owner's two lists. */
   mode?: 'collection' | 'owned' | 'wishlist'
+  /** The table menu's export item, when the owner can export. */
+  exportLabel?: string
+  /** Keys of the hidden columns (shared/utils/columns.ts). */
+  hiddenColumns?: string[]
   /** The owner's shelf, for links to the collections in `inCollections`. */
   shelfPath?: string
   /** Set on a list whose server does the sorting, search and filtering. */
@@ -104,6 +114,12 @@ const emit = defineEmits<{
   toWishlist: [itemId: string]
   /** Place `itemId` right after `afterItemId`, or first when null. */
   move: [itemId: string, afterItemId: string | null]
+  /** The owner chose "Edit fields" from the table menu. */
+  editFields: []
+  /** The owner chose the export item of the table menu. */
+  exportData: []
+  /** The owner chose which columns to hide: all the hidden keys. */
+  hideColumns: [hidden: string[]]
   /** On a server list: the person changed the page, sort, search or filters. */
   view: [change: Partial<ListView>]
 }>()
@@ -350,6 +366,10 @@ function setSorting(next: SortingState) {
   }
 }
 
+const columnVisibility = computed<VisibilityState>(() =>
+  Object.fromEntries((props.hiddenColumns ?? []).map((id) => [id, false])),
+)
+
 const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
   {
     id: 'name',
@@ -415,6 +435,31 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
   },
 ])
 
+// The columns the owner can hide: all but the name.
+const hideable = computed(() =>
+  columns.value
+    .filter((column) => column.id !== 'name')
+    .map((column) => ({
+      id: column.id!,
+      label: (column.header as () => string)(),
+    })),
+)
+const hiddenCount = computed(
+  () => hideable.value.filter(({ id }) => id in columnVisibility.value).length,
+)
+
+function setColumnHidden(columnId: string, hidden: boolean) {
+  const others = (props.hiddenColumns ?? []).filter((id) => id !== columnId)
+  const next = hidden ? [...others, columnId] : others
+  // Sorting by a column that is gone would leave the order unexplained.
+  if (hidden && sorting.value[0]?.id === columnId) setSorting([])
+  emit('hideColumns', next)
+}
+
+function showAllColumns() {
+  emit('hideColumns', [])
+}
+
 // Pages of the loaded list. Kept on the current page while editing values
 // (which changes the data), back to the first when the search, filters or
 // sort change, and pulled back when removing games empties the last page.
@@ -470,6 +515,9 @@ const table = useVueTable({
     },
     get pagination() {
       return pagination.value
+    },
+    get columnVisibility() {
+      return columnVisibility.value
     },
   },
   onSortingChange: (updater: Updater<SortingState>) => {
@@ -710,6 +758,50 @@ const addedFormat = computed(
               })
         }}
       </p>
+      <DropdownMenu v-if="editable">
+        <DropdownMenuTrigger as-child>
+          <Button
+            variant="outline"
+            size="icon"
+            :aria-label="$t('table.options')"
+          >
+            <Ellipsis />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-max">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Columns3 /> {{ $t('table.columns') }}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent class="w-56">
+              <DropdownMenuCheckboxItem
+                v-for="column in hideable"
+                :key="column.id"
+                :model-value="!(column.id in columnVisibility)"
+                @update:model-value="
+                  setColumnHidden(column.id, $event !== true)
+                "
+                @select.prevent
+              >
+                {{ column.label }}
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                :disabled="!hiddenCount"
+                @select.prevent="showAllColumns"
+              >
+                {{ $t('table.showAllColumns') }}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem @select="emit('editFields')">
+            <Pencil /> {{ $t('table.editFields') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="exportLabel" @select="emit('exportData')">
+            <Download /> {{ exportLabel }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
 
     <div
@@ -992,10 +1084,7 @@ const addedFormat = computed(
           <TableRow v-if="!visibleItems.length">
             <TableCell
               :colspan="
-                fields.length +
-                2 +
-                Number(showCollections) +
-                Number(showPlatforms) +
+                table.getVisibleLeafColumns().length +
                 Number(editable) +
                 Number(reorderable)
               "

@@ -57,6 +57,14 @@ export const users = pgTable(
      * field id.
      */
     fields: jsonb('fields').$type<FieldDefinition[]>().notNull().default([]),
+    /**
+     * The columns the owner hides on Owned and the Wishlist, as column keys
+     * (shared/utils/columns.ts). A list with nothing saved shows them all.
+     */
+    listColumns: jsonb('list_columns')
+      .$type<Partial<Record<'owned' | 'wishlist', string[]>>>()
+      .notNull()
+      .default({}),
     ...timestamps,
   },
   (table) => [
@@ -84,6 +92,11 @@ export const collections = pgTable(
     visibility: visibility('visibility').notNull().default('private'),
     /** The charts on the collection's dashboard, in order. */
     dashboard: jsonb('dashboard').$type<ChartWidget[]>().notNull().default([]),
+    /** Column keys the owner hides in this collection's table. */
+    hiddenColumns: jsonb('hidden_columns')
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     ...timestamps,
   },
   (table) => [

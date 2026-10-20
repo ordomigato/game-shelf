@@ -22,9 +22,15 @@ import {
   type ListAction,
   type ListState,
 } from '../../shared/utils/lists'
+import { knownHiddenColumns } from '../../shared/utils/columns'
 import type { ExportItem } from '../../shared/utils/csv'
 import type { PlanLimits } from '../../shared/utils/plans'
-import { games as catalogGames, libraryItems, platforms } from '../db/schema'
+import {
+  games as catalogGames,
+  libraryItems,
+  platforms,
+  users,
+} from '../db/schema'
 import { useDb } from './db'
 import {
   catalogJoin,
@@ -103,6 +109,7 @@ export async function getListPage(
   list: ListName,
   query: ListQuery,
   fields: FieldDefinition[],
+  listColumns: Partial<Record<ListName, string[]>> = {},
 ): Promise<ListDetail> {
   const db = useDb()
   const where = listWhere(ownerId, list, query)
@@ -162,8 +169,26 @@ export async function getListPage(
     size: query.size,
     fields,
     platforms: platformOptions,
+    hiddenColumns: knownHiddenColumns(
+      listColumns[list],
+      'list',
+      fields.map((field) => field.id),
+    ),
     items,
   }
+}
+
+/** Saves the columns the owner hides on a list, keeping the other list's. */
+export async function setListColumns(
+  owner: { id: string; listColumns: Partial<Record<ListName, string[]>> },
+  list: ListName,
+  hidden: string[],
+): Promise<string[]> {
+  await useDb()
+    .update(users)
+    .set({ listColumns: { ...owner.listColumns, [list]: hidden } })
+    .where(eq(users.id, owner.id))
+  return hidden
 }
 
 /** Every game on a list, newest first, with what an export needs. */

@@ -26,6 +26,7 @@ import {
   fieldsFor,
 } from '../../shared/utils/field-values'
 import { slugify } from '../../shared/utils/slug'
+import { knownHiddenColumns } from '../../shared/utils/columns'
 import type { ListState } from '../../shared/utils/lists'
 import {
   collectionItems,
@@ -264,6 +265,12 @@ export async function getCollectionBySlug(
     fields,
     items,
     dashboard,
+    // A visitor's table has only the fields they can see.
+    hiddenColumns: knownHiddenColumns(
+      found.collection.hiddenColumns,
+      'collection',
+      fields.map((field) => field.id),
+    ),
     isOwner: viewerIsOwner,
   }
 }
@@ -318,6 +325,7 @@ export async function updateCollection(
     description?: string | null
     color?: string | null
     visibility?: 'private' | 'public'
+    hiddenColumns?: string[]
   },
 ): Promise<CollectionSummary> {
   const current = await getOwnedCollection(ownerId, collectionId)
@@ -335,6 +343,9 @@ export async function updateCollection(
         }),
         ...(changes.visibility !== undefined && {
           visibility: changes.visibility,
+        }),
+        ...(changes.hiddenColumns !== undefined && {
+          hiddenColumns: changes.hiddenColumns,
         }),
       })
       .where(eq(collections.id, current.id))

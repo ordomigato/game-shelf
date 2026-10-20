@@ -39,6 +39,10 @@ export async function fakeList(
   const state = {
     items: [...start],
     requests: [] as URL[],
+    /** The columns hidden on this list, as the server would keep them. */
+    hidden: [] as string[],
+    /** What each save of the hidden columns sent. */
+    columnSaves: [] as string[][],
     remove(id: string) {
       state.items = state.items.filter((item) => item.id !== id)
     },
@@ -57,6 +61,12 @@ export async function fakeList(
     return (x < y ? -1 : x > y ? 1 : 0) * dir
   }
 
+  await page.route(`**/api/me/list-columns/${list}`, (route) => {
+    const body = route.request().postDataJSON() as { hidden: string[] }
+    state.columnSaves.push(body.hidden)
+    state.hidden = body.hidden
+    return route.fulfill({ json: body.hidden })
+  })
   await page.route(
     new RegExp(`/api/u/${username}/lists/${list}(\\?.*)?$`),
     async (route) => {
@@ -116,6 +126,7 @@ export async function fakeList(
           size,
           fields,
           platforms: options.platforms ?? [],
+          hiddenColumns: state.hidden,
           items: rows.slice((current - 1) * size, current * size),
         },
       })

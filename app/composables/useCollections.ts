@@ -291,6 +291,20 @@ export function useCollections() {
         { method: 'PUT', body: { dashboard } },
       ),
 
+    /** Saves the columns hidden in a collection's table. */
+    saveHiddenColumns: (collectionId: string, hiddenColumns: string[]) =>
+      auth.apiFetch<CollectionSummary>(`/api/collections/${collectionId}`, {
+        method: 'PATCH',
+        body: { hiddenColumns },
+      }),
+
+    /** Saves the columns hidden on Owned or the Wishlist. */
+    saveListColumns: (list: ListName, hidden: string[]) =>
+      auth.apiFetch<string[]>(`/api/me/list-columns/${list}`, {
+        method: 'PUT',
+        body: { hidden },
+      }),
+
     /** Sets an item's values for the user's fields. `null` clears. */
     updateValues: (
       collectionId: string,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Download, Lock, PenLine, Plus } from '@lucide/vue'
+import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
 import { FetchError } from 'ofetch'
 import { toast } from 'vue-sonner'
 import { PLAN_LIMITS } from '#shared/utils/plans'
@@ -264,6 +264,19 @@ async function toWishlist(itemId: string) {
   leaveView(itemId)
 }
 
+/** Saves the hidden columns, showing the change straight away. */
+async function saveHiddenColumns(hidden: string[]) {
+  if (!data.value) return
+  const before = data.value.hiddenColumns
+  data.value = { ...data.value, hiddenColumns: hidden }
+  try {
+    await collections.saveListColumns(props.list, hidden)
+  } catch {
+    if (data.value) data.value = { ...data.value, hiddenColumns: before }
+    toast.error(t('table.columnsSaveFailed'))
+  }
+}
+
 /** Saves one value straight away in the table, undoing it if saving fails. */
 async function saveValue(
   itemId: string,
@@ -339,6 +352,7 @@ async function removeItem(itemId: string) {
 }
 
 const addingByHand = ref(false)
+const editingFields = ref(false)
 const renaming = ref(false)
 const renamingItem = ref<CollectionEntry | null>(null)
 
@@ -410,15 +424,6 @@ function onRenamed(saved: LibraryItem) {
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <Button variant="outline" :disabled="exporting" @click="exportCsv">
-            <Download />
-            <span class="hidden sm:inline">{{
-              $t('lists.exportAll', data.itemCount)
-            }}</span>
-            <span class="sr-only sm:hidden">{{
-              $t('lists.exportAll', data.itemCount)
-            }}</span>
-          </Button>
           <Button v-if="!fullCap" as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
@@ -430,6 +435,7 @@ function onRenamed(saved: LibraryItem) {
             {{ $t('collection.addGames') }}
           </Button>
           <Button
+            v-if="ADD_BY_HAND"
             variant="outline"
             :disabled="fullCap"
             @click="addingByHand = true"
@@ -491,8 +497,13 @@ function onRenamed(saved: LibraryItem) {
         :add-targets="mine"
         :server="tableServer"
         editable
+        :hidden-columns="data.hiddenColumns"
         :shelf-path="shelfPath"
+        :export-label="$t('lists.exportAll', data.itemCount)"
+        @edit-fields="editingFields = true"
+        @export-data="exportCsv"
         @view="onView"
+        @hide-columns="saveHiddenColumns"
         @save="saveValue"
         @remove="removeItem"
         @rename="startRenaming"
@@ -502,7 +513,13 @@ function onRenamed(saved: LibraryItem) {
         @to-wishlist="toWishlist"
       />
 
+      <FieldsEditorDialog
+        v-model:open="editingFields"
+        :fields="data.fields"
+        @saved="refresh()"
+      />
       <AddByHandDialog
+        v-if="ADD_BY_HAND"
         v-model:open="addingByHand"
         :title="title"
         :target="{ list }"

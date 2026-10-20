@@ -148,6 +148,13 @@
       "when": 1792455107567,
       "tag": "0020_natural_sort_collation",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792525992799,
+      "tag": "0021_column_visibility",
+      "breakpoints": true
     }
   ]
 }

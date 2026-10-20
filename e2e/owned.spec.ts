@@ -224,7 +224,9 @@ test('Owned shows the shared columns, with the collections and platforms', async
   await expect(rows).toHaveCount(3)
 
   // No fields, order, charts, import or sharing.
-  await expect(page.getByRole('button', { name: 'Table' })).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Table', exact: true }),
+  ).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Share' })).toHaveCount(0)
   await expect(
     page.getByRole('button', { name: 'Collection actions' }),

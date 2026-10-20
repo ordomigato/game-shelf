@@ -2,8 +2,6 @@
 import {
   ArrowLeft,
   ChartColumn,
-  Columns3,
-  Download,
   Ellipsis,
   LayoutGrid,
   PenLine,
@@ -128,6 +126,19 @@ async function saveDashboard(dashboard: ChartWidget[]) {
   } catch (error) {
     if (data.value) data.value = { ...data.value, dashboard: before }
     toast.error(limitMessage(error, t) ?? t('charts.saveFailed'))
+  }
+}
+
+/** Saves the hidden columns, showing the change straight away. */
+async function saveHiddenColumns(hiddenColumns: string[]) {
+  if (!data.value) return
+  const before = data.value.hiddenColumns
+  data.value = { ...data.value, hiddenColumns }
+  try {
+    await collections.saveHiddenColumns(data.value.id, hiddenColumns)
+  } catch {
+    if (data.value) data.value = { ...data.value, hiddenColumns: before }
+    toast.error(t('table.columnsSaveFailed'))
   }
 }
 
@@ -505,7 +516,7 @@ async function deleteCollection() {
               {{ $t('collection.addGames') }}
             </Button>
             <Button
-              v-if="data.items.length"
+              v-if="ADD_BY_HAND && data.items.length"
               variant="outline"
               :disabled="fullGames"
               @click="addingByHand = true"
@@ -532,9 +543,6 @@ async function deleteCollection() {
                 <DropdownMenuItem @select="editing = true">
                   <Pencil /> {{ $t('collection.edit') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem @select="editingFields = true">
-                  <Columns3 /> {{ $t('collection.editFields') }}
-                </DropdownMenuItem>
                 <DropdownMenuItem v-if="sidebarEntry" @select="togglePin">
                   <template v-if="sidebarEntry.pinnedPosition == null">
                     <Pin /> {{ $t('collection.pin') }}
@@ -545,9 +553,6 @@ async function deleteCollection() {
                 </DropdownMenuItem>
                 <DropdownMenuItem @select="importing = true">
                   <Upload /> {{ $t('collection.importCsv') }}
-                </DropdownMenuItem>
-                <DropdownMenuItem @select="exportCsv">
-                  <Download /> {{ $t('collection.exportCsv') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   class="text-destructive focus:text-destructive"
@@ -597,7 +602,11 @@ async function deleteCollection() {
                 $t('collection.searchGames')
               }}</NuxtLink>
             </Button>
-            <Button variant="outline" @click="addingByHand = true">
+            <Button
+              v-if="ADD_BY_HAND"
+              variant="outline"
+              @click="addingByHand = true"
+            >
               <PenLine /> {{ $t('collection.addByHand') }}
             </Button>
             <Button variant="outline" @click="importing = true">
@@ -648,8 +657,13 @@ async function deleteCollection() {
           :fields="data.fields"
           :items="data.items"
           :editable="data.isOwner"
+          :hidden-columns="data.hiddenColumns"
           :add-targets="mine"
           :shelf-path="shelfPath"
+          :export-label="$t('collection.exportCsv')"
+          @edit-fields="editingFields = true"
+          @export-data="exportCsv"
+          @hide-columns="saveHiddenColumns"
           @save="saveValue"
           @remove="removeItem"
           @move="moveItem"
@@ -729,7 +743,7 @@ async function deleteCollection() {
         @imported="refresh()"
       />
       <AddByHandDialog
-        v-if="data.isOwner"
+        v-if="ADD_BY_HAND && data.isOwner"
         v-model:open="addingByHand"
         :title="data.title"
         :target="{ collectionId: data.id }"

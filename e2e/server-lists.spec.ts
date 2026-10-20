@@ -294,7 +294,8 @@ test('exports the whole list from the server, not the rows on screen', async ({
     .fill('Game 010')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export all 120 games' }).click()
+  await page.getByRole('button', { name: 'Table options' }).click()
+  await page.getByRole('menuitem', { name: 'Export all 120 games' }).click()
   const file = await download
   expect(file.suggestedFilename()).toBe('owned.csv')
   expect(await readFile((await file.path())!, 'utf8')).toBe(csv)

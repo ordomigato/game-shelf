@@ -25,5 +25,5 @@ export default defineEventHandler(async (event): Promise<ListDetail> => {
   }
   const fields = await getUserFields(owner.id)
   const query = parseListQuery(getQuery(event), fields)
-  return getListPage(owner.id, list, query, fields)
+  return getListPage(owner.id, list, query, fields, owner.listColumns)
 })

@@ -306,7 +306,9 @@ const resultsLabel = computed(() => {
     </template>
 
     <!-- Searching for a collection: games IGDB doesn't have go in by hand. -->
-    <template v-if="target && isSearchable && status === 'success'">
+    <template
+      v-if="ADD_BY_HAND && target && isSearchable && status === 'success'"
+    >
       <p class="mt-10 text-center text-sm text-muted-foreground">
         {{ $t('byHand.notFound') }}
         <button

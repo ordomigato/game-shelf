@@ -82,7 +82,6 @@ test('a collection over the limit warns and stops adding', async ({ page }) => {
     alert.getByRole('link', { name: 'Pro allows 1,000. See plans.' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add games' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Add by hand' })).toBeDisabled()
 })
 
 test('a collection with room has no warning', async ({ page }) => {

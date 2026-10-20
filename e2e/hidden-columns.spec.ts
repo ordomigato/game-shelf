@@ -239,6 +239,8 @@ test.describe('on Owned', () => {
     await openColumns(page)
     await toggleColumn(page, 'Platforms')
     await expect(page).not.toHaveURL(/sort=/)
-    expect(list.requests.at(-1)!.searchParams.get('sort')).toBeNull()
+    await expect
+      .poll(() => list.requests.at(-1)!.searchParams.get('sort'))
+      .toBeNull()
   })
 })

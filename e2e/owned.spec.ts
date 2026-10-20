@@ -201,6 +201,8 @@ test('Owned shows the shared columns, with the collections and platforms', async
   await expect(table.getByRole('columnheader')).toHaveText([
     /Name/,
     /Collections/,
+    /Year/,
+    /Genre/,
     /Platforms/,
     /Added/,
     'Actions',

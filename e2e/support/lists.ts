@@ -14,7 +14,14 @@ export interface FakeEntry {
   addedAt: string
   data: Record<string, unknown>
   inCollections?: { id: string }[]
+  /**
+   * Short platform names for a game's own list. The fake turns them into
+   * catalog platforms and the platforms owned (or wanted) on, like the
+   * server does.
+   */
   platforms?: string[]
+  year?: number | null
+  genres?: string[]
   [key: string]: unknown
 }
 
@@ -31,6 +38,8 @@ export async function fakeList(
   options: {
     fields?: Field[]
     platforms?: { id: number; name: string }[]
+    /** Genres to filter by. Defaults to the ones the games have. */
+    genres?: string[]
     /** Held back this long before answering, per request number. */
     delay?: (request: number) => number
     /** Games in the whole library, owned and wishlisted. Defaults to this list's. */
@@ -53,6 +62,30 @@ export async function fakeList(
         item.id === id ? { ...item, ...change } : item,
       )
     },
+  }
+
+  /** An id for a platform name, the same every time. */
+  const platformId = (name: string) =>
+    [...name].reduce((sum, char) => sum * 31 + char.charCodeAt(0), 7) % 100_000
+
+  /** The game as the server sends it: with its year, genres and platforms. */
+  const served = (item: FakeEntry): FakeEntry => {
+    const { platforms: names = [], ...rest } = item
+    // The names are this list's platforms: the ids the fixture gives for
+    // them, else made-up ones.
+    const given = (list === 'owned' ? item.ownedOn : item.wantedOn) as
+      number[] | undefined
+    const ids = given?.length === names.length ? given : names.map(platformId)
+    const own = list === 'owned' ? 'ownedOn' : 'wantedOn'
+    return {
+      year: null,
+      genres: [],
+      catalogPlatforms: names.map((name, i) => ({ id: ids[i]!, name })),
+      ownedOn: [],
+      wantedOn: [],
+      ...rest,
+      ...(names.length && { [own]: ids }),
+    }
   }
 
   const emptyLast = (a: unknown, b: unknown, dir: number) => {
@@ -79,9 +112,15 @@ export async function fakeList(
       const q = url.searchParams
       const size = Number(q.get('size') ?? 50)
       const search = (q.get('q') ?? '').toLowerCase()
-      let rows = state.items.filter((item) =>
-        item.name.toLowerCase().includes(search),
-      )
+      let rows = state.items
+        .map(served)
+        .filter((item) => item.name.toLowerCase().includes(search))
+      const genres = q.getAll('genre')
+      if (genres.length) {
+        rows = rows.filter((item) =>
+          item.genres?.some((genre) => genres.includes(genre)),
+        )
+      }
       const collections = q.getAll('collection')
       if (collections.length) {
         rows = rows.filter((item) =>
@@ -105,7 +144,14 @@ export async function fakeList(
       const key = (item: FakeEntry): unknown => {
         if (sort === 'name') return item.name
         if (sort === 'addedAt') return item.addedAt
-        if (sort === 'platforms') return item.platforms?.[0]
+        if (sort === 'year') return item.year
+        if (sort === 'genre') return item.genres?.[0]
+        if (sort === 'platforms') {
+          const ids = (item.ownedOn ?? []) as number[]
+          return (item.catalogPlatforms as { id: number; name: string }[]).find(
+            ({ id }) => ids.includes(id),
+          )?.name
+        }
         if (sort === 'inCollections') return item.inCollections?.length
         return item.data[String(sort).slice(2)]
       }
@@ -129,6 +175,11 @@ export async function fakeList(
           size,
           fields,
           platforms: options.platforms ?? [],
+          genres:
+            options.genres ??
+            [
+              ...new Set(state.items.flatMap((item) => item.genres ?? [])),
+            ].sort(),
           hiddenColumns: state.hidden,
           items: rows.slice((current - 1) * size, current * size),
         },

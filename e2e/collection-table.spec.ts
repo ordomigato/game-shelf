@@ -71,6 +71,8 @@ test.describe('visitors', () => {
     await openCollection(page, false)
     await expect(page.getByRole('columnheader')).toHaveText([
       'Name',
+      'Year',
+      'Genre',
       'Status',
       'Hours played',
       'Rating',

@@ -42,15 +42,18 @@ import type {
   CollectionSummary,
   FieldDefinition,
   FieldValue,
+  LibraryItem,
 } from '#shared/types/collection'
 import {
   COLLECTIONS_FILTER,
   columnOfSortKey,
+  GENRES_FILTER,
   LIST_PAGE_SIZES,
   PLATFORMS_FILTER,
   sortKeyOf,
   type ListView,
 } from '#shared/utils/list-view'
+import { genresText, platformsOf } from '#shared/utils/platforms'
 
 /**
  * A collection's games as a table: one column per field the user keeps.
@@ -59,9 +62,13 @@ import {
  * hand, and put games in their own order by dragging or from the row menu.
  * Games the owner wants but doesn't have yet are marked and faded.
  *
+ * Every game shows its release year and genres from the catalog. The owner
+ * also sees the platforms the game is owned and wanted on, and can change
+ * them from the cell. Visitors don't get platforms.
+ *
  * The same table shows Owned and the Wishlist (`mode`), which have no
  * fields and no order of their own: they list which collections each game
- * is in and the platforms for that list. For those, `server` hands the
+ * is in. For those, `server` hands the
  * sorting, search, filters and paging to the server: `items` is then one
  * page, and the table asks for changes with `view` instead of making them.
  *
@@ -95,6 +102,8 @@ const props = defineProps<{
     loading: boolean
     /** The platforms to filter by. */
     platforms: { id: number; name: string }[]
+    /** The genres to filter by. */
+    genres: string[]
   }
 }>()
 const emit = defineEmits<{
@@ -113,6 +122,8 @@ const emit = defineEmits<{
   move: [itemId: string, afterItemId: string | null]
   /** The owner chose which columns to hide: all the hidden keys. */
   hideColumns: [hidden: string[]]
+  /** The owner changed the platforms of a game: its new place on the lists. */
+  platformsChanged: [saved: LibraryItem]
   /** On a server list: the person changed the page, sort, search or filters. */
   view: [change: Partial<ListView>]
 }>()
@@ -163,7 +174,8 @@ const STATE_FILTER = '__state'
 
 /** Whether rows list the collections each game is in (on the lists). */
 const showCollections = computed(() => isList.value)
-const showPlatforms = computed(() => isList.value)
+// Platforms are the owner's business, so visitors' tables have no such column.
+const showPlatforms = computed(() => props.editable)
 
 /** Whether a game is only wanted, so it's marked and faded. */
 const isWanted = (item: CollectionEntry) =>
@@ -233,11 +245,30 @@ async function saveEditing(change: { add: string[]; remove: string[] }) {
 const collectionTitles = (item: CollectionEntry) =>
   (item.inCollections ?? []).map((collection) => collection.title)
 
-const platformChoices = computed(() =>
-  (props.server?.platforms ?? []).map(({ id, name }) => ({
-    value: String(id),
-    label: name,
-  })),
+const platformChoices = computed(() => {
+  if (props.server) {
+    return props.server.platforms.map(({ id, name }) => ({
+      value: String(id),
+      label: name,
+    }))
+  }
+  // The platforms some game here is owned or wanted on.
+  const named = new Map<number, string>()
+  for (const item of props.items) {
+    const { owned, wanted } = platformsOf(item)
+    for (const { id, name } of [...owned, ...wanted]) named.set(id, name)
+  }
+  return [...named]
+    .map(([id, name]) => ({ value: String(id), label: name }))
+    .sort((a, b) => a.label.localeCompare(b.label, locale.value))
+})
+const genreChoices = computed(() =>
+  (props.server
+    ? props.server.genres
+    : [...new Set(props.items.flatMap((item) => item.genres))].sort((a, b) =>
+        a.localeCompare(b, locale.value),
+      )
+  ).map((genre) => ({ value: genre, label: genre })),
 )
 const collectionChoices = computed(() =>
   props.server
@@ -300,6 +331,19 @@ function matchesFilters(item: CollectionEntry) {
   ) {
     return false
   }
+  const genres = filters.value[GENRES_FILTER]
+  if (genres?.length && !item.genres.some((genre) => genres.includes(genre))) {
+    return false
+  }
+  const platformIds = filters.value[PLATFORMS_FILTER]
+  if (
+    platformIds?.length &&
+    ![...(item.ownedOn ?? []), ...(item.wantedOn ?? [])].some((id) =>
+      platformIds.includes(String(id)),
+    )
+  ) {
+    return false
+  }
   return props.fields.every((field) => {
     const wanted = filters.value[field.id]
     if (!wanted?.length) return true
@@ -313,13 +357,19 @@ function matchesFilters(item: CollectionEntry) {
   })
 }
 
+/** The names of every platform the game is owned or wanted on. */
+function platformNamesOf(item: CollectionEntry) {
+  const { owned, wanted } = platformsOf(item)
+  return [...owned, ...wanted].map(({ name }) => name)
+}
+
 function matchesQuery(item: CollectionEntry) {
   const words = query.value.trim().toLowerCase()
   if (!words) return true
   const haystack = [
     item.name,
     ...collectionTitles(item),
-    ...(item.platforms ?? []),
+    ...platformNamesOf(item),
     ...props.fields
       .filter((field) => ['text', 'select', 'multiselect'].includes(field.type))
       .map((field) => formatFieldValue(field, item.data[field.id])),
@@ -390,12 +440,33 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
         } satisfies ColumnDef<CollectionEntry>,
       ]
     : []),
+  {
+    id: 'year',
+    accessorFn: (item) => item.year ?? undefined,
+    header: () => t('table.year'),
+    sortUndefined: 'last',
+    sortDescFirst: false,
+  },
+  {
+    id: 'genre',
+    accessorFn: (item) => item.genres[0],
+    header: () => t('table.genre'),
+    sortUndefined: 'last',
+    sortingFn: (a, b, id) =>
+      a
+        .getValue<string>(id)
+        .localeCompare(b.getValue<string>(id), locale.value, {
+          sensitivity: 'base',
+          numeric: true,
+        }),
+  },
   ...(showPlatforms.value
     ? [
         {
           id: 'platforms',
-          accessorFn: (item) => (item.platforms ?? []).join(', '),
+          accessorFn: (item) => platformNamesOf(item).join(', ') || undefined,
           header: () => t('table.platforms'),
+          sortUndefined: 'last',
           sortingFn: (a, b, id) =>
             a
               .getValue<string>(id)
@@ -640,7 +711,8 @@ const addedFormat = computed(
           filterableFields.length ||
           showWanted ||
           collectionChoices.length ||
-          platformChoices.length
+          platformChoices.length ||
+          genreChoices.length
         "
       >
         <DropdownMenuTrigger as-child>
@@ -690,6 +762,26 @@ const addedFormat = computed(
                     choice.value,
                     $event === true,
                   )
+                "
+                @select.prevent
+              >
+                {{ choice.label }}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSub v-if="genreChoices.length">
+            <DropdownMenuSubTrigger>{{
+              $t('table.genre')
+            }}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuCheckboxItem
+                v-for="choice in genreChoices"
+                :key="choice.value"
+                :model-value="
+                  (filters[GENRES_FILTER] ?? []).includes(choice.value)
+                "
+                @update:model-value="
+                  toggleFilter(GENRES_FILTER, choice.value, $event === true)
                 "
                 @select.prevent
               >
@@ -947,14 +1039,25 @@ const addedFormat = computed(
                   <Plus />
                 </Button>
               </div>
-              <ul
-                v-else-if="cell.column.id === 'platforms'"
-                class="flex flex-wrap gap-1"
+              <span
+                v-else-if="cell.column.id === 'year'"
+                class="wanted-fade text-muted-foreground tabular-nums"
               >
-                <li v-for="platform in item.platforms" :key="platform">
-                  <PlatformPill :name="platform" />
-                </li>
-              </ul>
+                {{ item.year }}
+              </span>
+              <span
+                v-else-if="cell.column.id === 'genre'"
+                class="wanted-fade block max-w-48 truncate text-muted-foreground"
+                :title="genresText(item.genres) || undefined"
+              >
+                {{ genresText(item.genres) }}
+              </span>
+              <PlatformsCell
+                v-else-if="cell.column.id === 'platforms'"
+                :item="item"
+                :editable="editable"
+                @changed="emit('platformsChanged', $event)"
+              />
               <span
                 v-else-if="cell.column.id === 'addedAt'"
                 class="wanted-fade whitespace-nowrap text-muted-foreground"

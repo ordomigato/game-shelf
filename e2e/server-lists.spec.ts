@@ -143,6 +143,8 @@ test('shows the account fields as columns, hidden ones with a lock', async ({
   await expect(page.getByRole('columnheader')).toHaveText([
     /Name/,
     /Collections/,
+    /Year/,
+    /Genre/,
     /Platforms/,
     /Score/,
     /Status/,

@@ -11,14 +11,40 @@
  *
  *   npx sst shell --stage dev -- npx tsx scripts/check-list-queries.ts <username>
  */
+import { neon } from '@neondatabase/serverless'
 import { sql } from 'drizzle-orm'
-import { useDb } from '../server/utils/db'
-import { findUserByUsername } from '../server/utils/users'
-import { getUserFields } from '../server/utils/collections'
-import { getListPage } from '../server/utils/lists'
-import { parseListQuery } from '../server/utils/list-query'
+import { drizzle } from 'drizzle-orm/neon-http'
+import { Resource } from 'sst'
+import * as schema from '../server/db/schema'
+import { LIMIT_REACHED } from '../shared/utils/plans'
 import { LIST_SORT_COLUMNS } from '../shared/utils/list-view'
 import type { ListName } from '../shared/types/collection'
+
+// The server utils lean on Nitro's auto-imports, which don't exist under
+// tsx. Define the ones on their import chain (found by type-checking users,
+// collections, lists, list-query, limits, db-errors, positions and the
+// shared utils) before loading them. Their `h3` imports are real.
+let db: ReturnType<typeof createDb> | undefined
+function createDb() {
+  return drizzle({ client: neon(Resource.DatabaseUrl.value), schema })
+}
+function useDb() {
+  db ??= createDb()
+  return db
+}
+Object.assign(globalThis, { useDb, LIMIT_REACHED })
+
+// users.ts auto-imports `effectivePlan` and `userLimits`, which live in
+// limits.ts, so they can only be set once that file has loaded.
+const limits = await import('../server/utils/limits')
+Object.assign(globalThis, {
+  effectivePlan: limits.effectivePlan,
+  userLimits: limits.userLimits,
+})
+const { findUserByUsername } = await import('../server/utils/users')
+const { getUserFields } = await import('../server/utils/collections')
+const { getListPage } = await import('../server/utils/lists')
+const { parseListQuery } = await import('../server/utils/list-query')
 
 const username = process.argv[2]
 if (!username) {

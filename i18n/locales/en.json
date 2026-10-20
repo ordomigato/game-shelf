@@ -523,6 +523,7 @@
     "ticked": "Ticked",
     "notTicked": "Not ticked",
     "actions": "Actions",
+    "hiddenFromVisitors": "Hidden from visitors",
     "rowActions": "Actions for {name}",
     "remove": "Remove from collection",
     "noMatches": "No games match. Try another search or clear the filters.",
@@ -578,7 +579,7 @@
   },
   "fieldEditor": {
     "title": "Fields",
-    "description": "The extra fields every one of your games can have, like price paid or status. They are the same in all your collections. Drag to reorder.",
+    "description": "The extra fields every one of your games can have, like price paid or status. They are the same in all your collections. Drag to reorder. Hidden fields aren't shown to visitors of your public collections, and neither are charts that use them.",
     "empty": "No fields yet. Add one to start tracking things like price paid, status or rating.",
     "name": "Field name",
     "namePlaceholder": "Field name, like Notes",
@@ -620,6 +621,8 @@
       "invalid": "Something about these fields isn't valid. Check them and try again."
     },
     "allowMultiple": "Allow more than one choice",
+    "hide": "Hide from visitors",
+    "hideFor": "Hide {name} from visitors",
     "outOf": "Out of",
     "outOfFor": "What {name} is out of",
     "scaleStars": "5 (stars)",

@@ -21,6 +21,7 @@ import {
   Ellipsis,
   GripVertical,
   ListFilter,
+  Lock,
   MoveDown,
   MoveUp,
   Pencil,
@@ -567,6 +568,13 @@ const addedFormat = computed(
                 @click="header.column.toggleSorting()"
               >
                 {{ (header.column.columnDef.header as () => string)() }}
+                <Lock
+                  v-if="fieldOf(header.id)?.hidden"
+                  class="size-3.5 text-muted-foreground"
+                  role="img"
+                  :title="$t('table.hiddenFromVisitors')"
+                  :aria-label="$t('table.hiddenFromVisitors')"
+                />
                 <ArrowUp
                   v-if="header.column.getIsSorted() === 'asc'"
                   class="size-3.5"

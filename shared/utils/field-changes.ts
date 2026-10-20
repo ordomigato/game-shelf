@@ -111,6 +111,7 @@ export function cleanFields(fields: FieldDefinition[]): FieldDefinition[] {
       currency: field.currency ?? DEFAULT_CURRENCY,
     }),
     ...(field.type === 'rating' && { scale: field.scale ?? 5 }),
+    ...(field.hidden === true && { hidden: true as const }),
   }))
 }
 

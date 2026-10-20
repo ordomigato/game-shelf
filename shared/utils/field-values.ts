@@ -95,11 +95,57 @@ export function applyFieldValues(
   return invalidFieldIds.length ? { invalidFieldIds } : { data: next }
 }
 
+/** The ids of the fields kept from visitors. */
+function hiddenIds(fields: FieldDefinition[]): Set<string> {
+  return new Set(fields.filter((f) => f.hidden).map((f) => f.id))
+}
+
+/** The field ids a chart reads: its measure, grouping and timeline. */
+function widgetFieldIds(widget: ChartWidget): string[] {
+  const ids: string[] = []
+  if ('fieldId' in widget.measure) ids.push(widget.measure.fieldId)
+  if (widget.groupBy) ids.push(widget.groupBy)
+  if (widget.timeline) ids.push(widget.timeline.source)
+  return ids
+}
+
+/**
+ * The charts a visitor may see: the owner gets all of them, and a visitor
+ * gets none that read a hidden field.
+ */
+export function chartsFor(
+  viewerIsOwner: boolean,
+  fields: FieldDefinition[],
+  dashboard: ChartWidget[],
+): ChartWidget[] {
+  if (viewerIsOwner) return dashboard
+  const hidden = hiddenIds(fields)
+  return dashboard.filter(
+    (widget) => !widgetFieldIds(widget).some((id) => hidden.has(id)),
+  )
+}
+
+/**
+ * An item's values as the viewer may see them. A visitor gets only the
+ * values of the given (visible) fields.
+ */
+export function dataFor(
+  viewerIsOwner: boolean,
+  visibleFields: FieldDefinition[],
+  data: ItemData,
+): ItemData {
+  if (viewerIsOwner) return data
+  const visible = new Set(visibleFields.map((f) => f.id))
+  return Object.fromEntries(
+    Object.entries(data).filter(([id]) => visible.has(id)),
+  )
+}
+
 /**
  * The fields to show someone viewing a collection. The owner sees all of
  * them. A visitor sees only the fields that some game in the collection has
  * a value for, or that one of its charts uses, so a field the owner keeps
- * for other games isn't listed.
+ * for other games isn't listed. Hidden fields are never listed.
  */
 export function fieldsFor(
   viewerIsOwner: boolean,
@@ -113,9 +159,7 @@ export function fieldsFor(
     for (const id of Object.keys(item.data)) used.add(id)
   }
   for (const widget of dashboard) {
-    if ('fieldId' in widget.measure) used.add(widget.measure.fieldId)
-    if (widget.groupBy) used.add(widget.groupBy)
-    if (widget.timeline) used.add(widget.timeline.source)
+    for (const id of widgetFieldIds(widget)) used.add(id)
   }
-  return fields.filter((field) => used.has(field.id))
+  return fields.filter((field) => !field.hidden && used.has(field.id))
 }

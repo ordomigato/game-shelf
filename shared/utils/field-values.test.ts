@@ -3,6 +3,8 @@ import type { FieldDefinition, ItemData } from '../types/collection'
 import type { ChartWidget } from '../types/charts'
 import {
   applyFieldValues,
+  chartsFor,
+  dataFor,
   fieldsFor,
   normalizeFieldValue,
 } from './field-values'
@@ -162,5 +164,58 @@ describe('fieldsFor', () => {
 
   it('shows a visitor nothing when no game has a value', () => {
     expect(fieldsFor(false, all, [{ data: {} }], [])).toEqual([])
+  })
+})
+
+describe('hidden fields', () => {
+  const all: FieldDefinition[] = [
+    { id: 'a', name: 'Notes', type: 'text' },
+    { id: 'p', name: 'Price paid', type: 'currency', hidden: true },
+  ]
+  const widget = (extra: Partial<ChartWidget>): ChartWidget => ({
+    id: 'w',
+    kind: 'number',
+    title: '',
+    size: 'small',
+    measure: { op: 'count' },
+    ...extra,
+  })
+  const items: { data: ItemData }[] = [
+    { data: { a: 'hi', p: 60 } },
+    { data: { p: 20 } },
+  ]
+
+  it('never lists a hidden field to a visitor, even with values or a chart', () => {
+    const dashboard = [widget({ measure: { op: 'sum', fieldId: 'p' } })]
+    expect(fieldsFor(false, all, items, dashboard).map((f) => f.id)).toEqual([
+      'a',
+    ])
+  })
+
+  it('gives the owner hidden fields too', () => {
+    expect(fieldsFor(true, all, items, [])).toEqual(all)
+  })
+
+  it('leaves out charts that read a hidden field for a visitor only', () => {
+    const total = widget({ id: '1', measure: { op: 'sum', fieldId: 'p' } })
+    const byPrice = widget({ id: '2', kind: 'bar', groupBy: 'p' })
+    const overTime = widget({
+      id: '3',
+      kind: 'line',
+      timeline: { source: 'p', bucket: 'month', cumulative: false },
+    })
+    const count = widget({ id: '4' })
+    const dashboard = [total, byPrice, overTime, count]
+    expect(chartsFor(false, all, dashboard)).toEqual([count])
+    expect(chartsFor(true, all, dashboard)).toEqual(dashboard)
+  })
+
+  it('strips item data down to the visible fields for a visitor', () => {
+    const visible = fieldsFor(false, all, items, [])
+    expect(dataFor(false, visible, { a: 'hi', p: 60, gone: 'x' })).toEqual({
+      a: 'hi',
+    })
+    const data = { a: 'hi', p: 60 }
+    expect(dataFor(true, all, data)).toBe(data)
   })
 })

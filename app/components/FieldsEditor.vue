@@ -281,6 +281,22 @@ const currencyNames = computed(() => {
             </SelectContent>
           </Select>
         </div>
+
+        <!-- Kept from visitors, apart from any column setting -->
+        <div class="pl-6">
+          <Label class="flex items-center gap-2 font-normal">
+            <Checkbox
+              :model-value="draft.hidden === true"
+              :aria-label="
+                $t('fieldEditor.hideFor', {
+                  name: draft.name || $t('fieldEditor.newField'),
+                })
+              "
+              @update:model-value="draft.hidden = $event === true"
+            />
+            {{ $t('fieldEditor.hide') }}
+          </Label>
+        </div>
       </li>
     </VueDraggable>
 

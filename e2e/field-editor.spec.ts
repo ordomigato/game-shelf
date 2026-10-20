@@ -336,3 +336,34 @@ test('the account page edits the same fields for every game', async ({
   expect(saved[0]!.fields).toHaveLength(4)
   await expect(page.getByText('4 of 5 extra fields per game')).toBeVisible()
 })
+
+test('hides a field from visitors and marks its column', async ({ page }) => {
+  const saved = await openEditor(page)
+  const dialog = page.getByRole('dialog', { name: 'Fields' })
+  await expect(
+    page.getByRole('img', { name: 'Hidden from visitors' }),
+  ).toHaveCount(0)
+
+  await dialog
+    .getByRole('checkbox', { name: 'Hide Price paid from visitors' })
+    .click()
+  await dialog.getByRole('button', { name: 'Save fields' }).click()
+
+  await expect(dialog).toBeHidden()
+  expect(saved[0]!.fields).toEqual([
+    expect.objectContaining({ id: 'status' }),
+    {
+      id: 'price',
+      name: 'Price paid',
+      type: 'currency',
+      currency: 'USD',
+      hidden: true,
+    },
+    expect.objectContaining({ id: 'notes' }),
+  ])
+  await expect(
+    page
+      .getByRole('columnheader', { name: 'Price paid' })
+      .getByRole('img', { name: 'Hidden from visitors' }),
+  ).toBeVisible()
+})

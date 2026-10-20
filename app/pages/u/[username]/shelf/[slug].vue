@@ -30,7 +30,7 @@ import type {
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t, n, locale } = useI18n()
 const { limits } = usePlan()
 const proGames = PLAN_LIMITS.pro.gamesPerCollection
 // Over the limit, games can be kept and removed but not added.
@@ -449,8 +449,8 @@ async function deleteCollection() {
               }"
               >{{
                 $t('limits.gamesUsed', {
-                  used: data.itemCount,
-                  limit: limits.gamesPerCollection,
+                  used: n(data.itemCount),
+                  limit: n(limits.gamesPerCollection),
                 })
               }}</span
             >

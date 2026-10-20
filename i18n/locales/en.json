@@ -127,6 +127,8 @@
   "limits": {
     "collectionsUsed": "{used} of {limit} collections",
     "gamesUsed": "{used} of {limit} games",
+    "ownedOfLibrary": "{owned} owned · {library}",
+    "libraryUsed": "{used} of {limit} in your library",
     "fieldsUsed": "{used} of {limit} extra fields per game",
     "chartsUsed": "{used} of {limit} charts",
     "usedOf": "{used} of {limit}",

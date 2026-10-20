@@ -84,6 +84,13 @@ test('a collection over the limit warns and stops adding', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Add games' })).toBeDisabled()
 })
 
+test('the collection count has a separator in the thousands', async ({
+  page,
+}) => {
+  await openCollection(page, 5, 'pro')
+  await expect(page.getByText('5 of 1,000 games')).toBeVisible()
+})
+
 test('a collection with room has no warning', async ({ page }) => {
   await openCollection(page, 40)
   await expect(page.getByRole('link', { name: 'Add games' })).toBeVisible()

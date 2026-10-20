@@ -194,12 +194,18 @@ const overCap = computed(
 const fullCap = computed(
   () => capped.value && count.value >= limits.value.wishlist,
 )
-// Owned counts against the account's games limit (every game in the
-// library), the Wishlist against its own.
+// Owned counts against the account's games limit, which counts every game
+// in the library. When the library holds games that aren't owned (the
+// Wishlist ones), the owned number is shown on its own so it matches the
+// rows.
+const library = computed(() => data.value?.libraryCount ?? 0)
 const usage = computed(() =>
   props.list === 'owned'
-    ? { used: data.value?.libraryCount ?? 0, limit: limits.value.games }
+    ? { used: library.value, limit: limits.value.games }
     : { used: count.value, limit: limits.value.wishlist },
+)
+const splitOwned = computed(
+  () => props.list === 'owned' && library.value !== count.value,
 )
 // Thousands get a separator in the reader's language.
 const shown = computed(() => ({
@@ -429,7 +435,24 @@ function onRenamed(saved: LibraryItem) {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
+            <i18n-t
+              v-if="splitOwned"
+              keypath="limits.ownedOfLibrary"
+              tag="span"
+            >
+              <template #owned>{{ n(count) }}</template>
+              <template #library>
+                <span
+                  data-testid="list-usage"
+                  :class="{
+                    'font-medium text-destructive': usage.used > usage.limit,
+                  }"
+                  >{{ $t('limits.libraryUsed', shown) }}</span
+                >
+              </template>
+            </i18n-t>
             <span
+              v-else
               data-testid="list-usage"
               :class="{
                 'font-medium text-destructive': usage.used > usage.limit,

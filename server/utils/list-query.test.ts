@@ -83,7 +83,7 @@ describe('parseListQuery', () => {
     for (const column of [
       'name',
       'inCollections',
-      'year',
+      'released',
       'genre',
       'platforms',
       'addedAt',
@@ -306,13 +306,16 @@ describe('listOrder', () => {
     expect(order({ sort: 'platforms' }, 'wishlist')[0]).toContain(expected)
   })
 
-  it('sorts the year by the release date, empty last, without word order', () => {
-    expect(order({ sort: 'year' })[0]).toBe(
-      '"games"."release_date" asc nulls last',
+  it('sorts by the release date, TBD and empty last, without word order', () => {
+    const date = `(case when "games"."release_precision" = 'tbd' then null else "games"."release_date" end)`
+    expect(order({ sort: 'released' })[0]).toBe(`${date} asc nulls last`)
+    expect(order({ sort: 'released', dir: 'desc' })[0]).toBe(
+      `${date} desc nulls last`,
     )
-    expect(order({ sort: 'year', dir: 'desc' })[0]).toBe(
-      '"games"."release_date" desc nulls last',
-    )
+  })
+
+  it('still takes year, the old name of the released sort', () => {
+    expect(order({ sort: 'year' })[0]).toBe(order({ sort: 'released' })[0])
   })
 
   it('sorts the genre by the first genre, in natural order', () => {
@@ -357,7 +360,13 @@ describe('listOrder', () => {
     ]) {
       expect(order({ sort })[0]).toContain(' collate "natural_sort" asc')
     }
-    for (const sort of ['addedAt', 'year', 'f.price', 'f.bought', 'f.done']) {
+    for (const sort of [
+      'addedAt',
+      'released',
+      'f.price',
+      'f.bought',
+      'f.done',
+    ]) {
       expect(order({ sort })[0]).not.toContain('collate')
     }
   })

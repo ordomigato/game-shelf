@@ -1,3 +1,4 @@
+import type { ReleasePrecision } from '../utils/release-date'
 import type { ChartWidget } from './charts'
 
 export type FieldType =
@@ -87,8 +88,10 @@ export interface LibraryItem {
   /** For an IGDB game, the catalog's name once it has one. */
   name: string
   coverId: string | null
-  /** The IGDB game's first release year. Null when unknown. */
-  year: number | null
+  /** The IGDB game's first release date (a UTC day). Null when unknown. */
+  releaseDate: string | null
+  /** How exact `releaseDate` is. Null when not known. */
+  releasePrecision: ReleasePrecision | null
   /** The IGDB game's genres. Empty when unknown or added by hand. */
   genres: string[]
   data: ItemData

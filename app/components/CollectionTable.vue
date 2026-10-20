@@ -54,6 +54,7 @@ import {
   type ListView,
 } from '#shared/utils/list-view'
 import { genresText, platformsOf } from '#shared/utils/platforms'
+import { formatReleased, releaseSortDate } from '#shared/utils/release-date'
 
 /**
  * A collection's games as a table: one column per field the user keeps.
@@ -62,7 +63,7 @@ import { genresText, platformsOf } from '#shared/utils/platforms'
  * hand, and put games in their own order by dragging or from the row menu.
  * Games the owner wants but doesn't have yet are marked and faded.
  *
- * Every game shows its release year and genres from the catalog. The owner
+ * Every game shows its release date and genres from the catalog. The owner
  * also sees the platforms the game is owned and wanted on, and can change
  * them from the cell. Visitors don't get platforms.
  *
@@ -129,6 +130,9 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+
+const releasedText = (item: CollectionEntry) =>
+  formatReleased(item.releaseDate, item.releasePrecision, locale.value, t)
 const NuxtLink = resolveComponent('NuxtLink')
 
 // Search and filters
@@ -441,9 +445,10 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
       ]
     : []),
   {
-    id: 'year',
-    accessorFn: (item) => item.year ?? undefined,
-    header: () => t('table.year'),
+    id: 'released',
+    accessorFn: (item) =>
+      releaseSortDate(item.releaseDate, item.releasePrecision),
+    header: () => t('table.released'),
     sortUndefined: 'last',
     sortDescFirst: false,
   },
@@ -1040,10 +1045,10 @@ const addedFormat = computed(
                 </Button>
               </div>
               <span
-                v-else-if="cell.column.id === 'year'"
+                v-else-if="cell.column.id === 'released'"
                 class="wanted-fade text-muted-foreground tabular-nums"
               >
-                {{ item.year }}
+                {{ releasedText(item) }}
               </span>
               <span
                 v-else-if="cell.column.id === 'genre'"

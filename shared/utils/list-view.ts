@@ -16,7 +16,7 @@ export const GENRES_FILTER = '__genres'
 export const LIST_SORT_COLUMNS = [
   'name',
   'inCollections',
-  'year',
+  'released',
   'genre',
   'platforms',
   'addedAt',
@@ -60,6 +60,10 @@ const many = (value: unknown): string[] =>
 
 const one = (value: unknown): string | undefined => many(value)[0]
 
+/** The sort key from a link; `year` is what `released` was called. */
+export const sortKeyFromQuery = (key: string | undefined) =>
+  key === 'year' ? 'released' : (key ?? null)
+
 /**
  * The view a URL query describes. Anything unreadable falls back to the
  * default, so a mangled link still opens the list. `defaultSize` is the one
@@ -86,7 +90,7 @@ export function viewFromQuery(query: RawQuery, defaultSize: number): ListView {
     size: (LIST_PAGE_SIZES as readonly number[]).includes(size)
       ? size
       : defaultSize,
-    sort: one(query.sort) ?? null,
+    sort: sortKeyFromQuery(one(query.sort)),
     dir: one(query.dir) === 'desc' ? 'desc' : 'asc',
     q: one(query.q) ?? '',
     filters,

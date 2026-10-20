@@ -78,8 +78,8 @@ export const itemCoverId = sql<
 >`case when ${catalogGames.igdbId} is null then ${libraryItems.coverId} else ${catalogGames.coverId} end`
 
 /**
- * An item as the browser sees it. An IGDB game's name, cover, year and
- * genres come from its catalog row (from `catalogJoin`), and the item's own
+ * An item as the browser sees it. An IGDB game's name, cover, release
+ * date and genres come from its catalog row (from `catalogJoin`), and the item's own
  * name and cover are used when there's none.
  */
 export function toLibraryItem(
@@ -91,7 +91,8 @@ export function toLibraryItem(
     igdbId: row.igdbId,
     name: game ? game.name : row.name,
     coverId: game ? game.coverId : row.coverId,
-    year: game?.releaseDate ? Number(game.releaseDate.slice(0, 4)) : null,
+    releaseDate: game?.releaseDate ?? null,
+    releasePrecision: game?.releasePrecision ?? null,
     genres: game?.genres ?? [],
     data: row.data,
     owned: row.owned,
@@ -150,7 +151,8 @@ export function catalogPlatformsOf(
  * A game in a collection as the viewer may see it. Only the owner gets the
  * flags and platforms, the catalog's and their own. Visitors get `wanted`,
  * so a public collection can mark the games its owner is missing without
- * saying more. Year and genres are public catalog facts for everyone.
+ * saying more. The release date and genres are public catalog facts for
+ * everyone.
  */
 export function toCollectionEntry(
   row: ItemRow,

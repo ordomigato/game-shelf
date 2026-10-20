@@ -8,7 +8,7 @@ export const MAX_HIDDEN_COLUMNS = 100
 
 /** The built-in columns a collection's table has besides the name. */
 export const COLLECTION_COLUMNS = [
-  'year',
+  'released',
   'genre',
   'platforms',
   'addedAt',
@@ -17,7 +17,7 @@ export const COLLECTION_COLUMNS = [
 /** The built-in columns Owned and the Wishlist have besides the name. */
 export const LIST_COLUMNS = [
   'inCollections',
-  'year',
+  'released',
   'genre',
   'platforms',
   'addedAt',

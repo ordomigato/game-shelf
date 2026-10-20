@@ -88,6 +88,7 @@ export async function ensureCatalogGames(
           name: inserted('name'),
           coverId: inserted('cover_id'),
           releaseDate: inserted('release_date'),
+          releasePrecision: inserted('release_precision'),
           genres: inserted('genres'),
           platformIds: inserted('platform_ids'),
           fetchedAt: inserted('fetched_at'),

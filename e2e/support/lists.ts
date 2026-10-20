@@ -20,7 +20,8 @@ export interface FakeEntry {
    * server does.
    */
   platforms?: string[]
-  year?: number | null
+  releaseDate?: string | null
+  releasePrecision?: string | null
   genres?: string[]
   [key: string]: unknown
 }
@@ -68,7 +69,7 @@ export async function fakeList(
   const platformId = (name: string) =>
     [...name].reduce((sum, char) => sum * 31 + char.charCodeAt(0), 7) % 100_000
 
-  /** The game as the server sends it: with its year, genres and platforms. */
+  /** The game as the server sends it: with its release date, genres and platforms. */
   const served = (item: FakeEntry): FakeEntry => {
     const { platforms: names = [], ...rest } = item
     // The names are this list's platforms: the ids the fixture gives for
@@ -78,7 +79,8 @@ export async function fakeList(
     const ids = given?.length === names.length ? given : names.map(platformId)
     const own = list === 'owned' ? 'ownedOn' : 'wantedOn'
     return {
-      year: null,
+      releaseDate: null,
+      releasePrecision: null,
       genres: [],
       catalogPlatforms: names.map((name, i) => ({ id: ids[i]!, name })),
       ownedOn: [],
@@ -144,7 +146,9 @@ export async function fakeList(
       const key = (item: FakeEntry): unknown => {
         if (sort === 'name') return item.name
         if (sort === 'addedAt') return item.addedAt
-        if (sort === 'year') return item.year
+        if (sort === 'released') {
+          return item.releasePrecision === 'tbd' ? null : item.releaseDate
+        }
         if (sort === 'genre') return item.genres?.[0]
         if (sort === 'platforms') {
           // The first owned platform, else the first wanted one.

@@ -1,4 +1,5 @@
 import type { GameDetails, GameSummary } from '../../shared/types/game'
+import type { ReleasePrecision } from '../../shared/utils/release-date'
 
 export const SEARCH_PAGE_SIZE = 24
 /** How many IGDB matches one search fetches and ranks. Pages slice this. */
@@ -247,8 +248,57 @@ export interface IgdbCatalogGame {
   name: string
   cover?: { image_id: string }
   first_release_date?: number
+  /** `date_format` is a `date_formats` id, which IGDB doesn't expand here. */
+  release_dates?: { date?: number; date_format?: number }[]
   genres?: { id: number; name: string }[]
   platforms?: { id: number; name: string; abbreviation?: string }[]
+}
+
+/**
+ * IGDB `date_formats` ids (formerly `release_dates.category`) to how exact
+ * the date is. Q1 to Q4 are 3 to 6.
+ */
+const DATE_FORMAT_PRECISION: Record<number, ReleasePrecision> = {
+  0: 'day',
+  1: 'month',
+  2: 'year',
+  3: 'quarter',
+  4: 'quarter',
+  5: 'quarter',
+  6: 'quarter',
+  7: 'tbd',
+}
+
+/**
+ * How exact the game's first release date is. `first_release_date` is the
+ * earliest of its `release_dates`, so the release with that same timestamp
+ * says; failing that, the earliest dated one. A game with no date at all is
+ * TBD if a release says so. Null when IGDB gives nothing to go on.
+ */
+export function releasePrecisionOf(
+  game: Pick<IgdbCatalogGame, 'first_release_date' | 'release_dates'>,
+): ReleasePrecision | null {
+  const releases = game.release_dates ?? []
+  const precisionOf = (release?: { date_format?: number }) =>
+    release?.date_format === undefined
+      ? null
+      : (DATE_FORMAT_PRECISION[release.date_format] ?? null)
+  const dated = releases.filter(
+    (release): release is { date: number; date_format?: number } =>
+      release.date !== undefined,
+  )
+  const exact = dated.find(
+    (release) => release.date === game.first_release_date,
+  )
+  const earliest = dated.reduce<(typeof dated)[number] | undefined>(
+    (best, release) => (!best || release.date < best.date ? release : best),
+    undefined,
+  )
+  const chosen = exact ?? earliest
+  if (chosen) return precisionOf(chosen)
+  return releases.some((release) => precisionOf(release) === 'tbd')
+    ? 'tbd'
+    : null
 }
 
 /** A `games` row as read from IGDB, minus the timestamps. */
@@ -257,6 +307,7 @@ export interface CatalogGame {
   name: string
   coverId: string | null
   releaseDate: string | null
+  releasePrecision: ReleasePrecision | null
   genres: string[]
   platformIds: number[]
 }
@@ -280,7 +331,21 @@ export function buildCatalogQuery(ids: number[]): string {
   }
   return [
     'fields name, cover.image_id, first_release_date, genres.name,',
-    'platforms.name, platforms.abbreviation;',
+    'platforms.name, platforms.abbreviation,',
+    'release_dates.date, release_dates.date_format;',
+    `where id = (${ids.join(',')});`,
+    `limit ${CATALOG_BATCH_SIZE};`,
+  ].join(' ')
+}
+
+/**
+ * Reads only the release date and its precision for up to
+ * `CATALOG_BATCH_SIZE` games, for `scripts/refresh-catalog-dates.ts`.
+ */
+export function buildReleaseDatesQuery(ids: number[]): string {
+  buildCatalogQuery(ids) // the same checks on the ids
+  return [
+    'fields first_release_date, release_dates.date, release_dates.date_format;',
     `where id = (${ids.join(',')});`,
     `limit ${CATALOG_BATCH_SIZE};`,
   ].join(' ')
@@ -301,6 +366,7 @@ export function toCatalogGame(game: IgdbCatalogGame): {
         game.first_release_date === undefined
           ? null
           : new Date(game.first_release_date * 1000).toISOString().slice(0, 10),
+      releasePrecision: releasePrecisionOf(game),
       genres: [...new Set((game.genres ?? []).map((genre) => genre.name))],
       platformIds: [...new Set(platforms.map((platform) => platform.id))],
     },

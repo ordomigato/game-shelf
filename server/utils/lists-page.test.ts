@@ -148,7 +148,7 @@ describe('getListPage', () => {
     expect(result).toMatchObject({ page: 1, total: 0, itemCount: 0, items: [] })
   })
 
-  it('gives each game its year, genres and the catalog platforms it can pick from', async () => {
+  it('gives each game its release date, genres and the catalog platforms it can pick from', async () => {
     counts = [1, 1]
     pages.push([
       {
@@ -159,6 +159,7 @@ describe('getListPage', () => {
           name: 'A Link to the Past',
           coverId: null,
           releaseDate: '1991-11-21',
+          releasePrecision: 'month',
           genres: ['Adventure'],
           platformIds: [19, 5],
           fetchedAt: new Date(0),
@@ -168,7 +169,8 @@ describe('getListPage', () => {
     const result = await getListPage(owner, 'owned', parseListQuery({}, []), [])
     // Platform 5 has no name in the platforms table, so it can't be shown.
     expect(result.items[0]).toMatchObject({
-      year: 1991,
+      releaseDate: '1991-11-21',
+      releasePrecision: 'month',
       genres: ['Adventure'],
       catalogPlatforms: [{ id: 19, name: 'SNES' }],
     })

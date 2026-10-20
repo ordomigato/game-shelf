@@ -48,7 +48,8 @@ const chrono = {
   id: '30000000-0000-4000-8000-000000000001',
   igdbId: 1070,
   name: 'Chrono Trigger',
-  year: 1995,
+  releaseDate: '1995-03-11',
+  releasePrecision: 'day',
   genres: ['Role-playing (RPG)'],
   addedAt: '2026-01-01T00:00:00.000Z',
   ownedOn: [19],
@@ -59,7 +60,8 @@ const zelda = {
   id: '30000000-0000-4000-8000-000000000002',
   igdbId: 1026,
   name: 'Zelda',
-  year: 1991,
+  releaseDate: '1991-10-01',
+  releasePrecision: 'quarter',
   genres: ['Adventure', 'Puzzle'],
   addedAt: '2026-01-02T00:00:00.000Z',
   owned: false,
@@ -73,7 +75,8 @@ const homebrew = {
   id: '30000000-0000-4000-8000-000000000003',
   igdbId: null,
   name: 'Homebrew',
-  year: null,
+  releaseDate: null,
+  releasePrecision: null,
   genres: [],
   addedAt: '2026-01-03T00:00:00.000Z',
   catalogPlatforms: [],
@@ -127,13 +130,15 @@ async function open(page: Page, owner: boolean) {
 }
 
 test.describe('a collection', () => {
-  test('shows year, genres and platforms to its owner', async ({ page }) => {
+  test('shows release date, genres and platforms to its owner', async ({
+    page,
+  }) => {
     await open(page, true)
-    for (const name of ['Year', 'Genre', 'Platforms']) {
+    for (const name of ['Released', 'Genre', 'Platforms']) {
       await expect(header(page, name)).toBeVisible()
     }
     const chronoRow = rowOf(page, 'Chrono Trigger')
-    await expect(chronoRow).toContainText('1995')
+    await expect(chronoRow).toContainText('Mar 11, 1995')
     await expect(chronoRow).toContainText('Role-playing (RPG)')
     await expect(chronoRow.getByText('SNES')).toBeVisible()
     // A wishlisted platform is marked as such.
@@ -141,28 +146,30 @@ test.describe('a collection', () => {
       rowOf(page, 'Zelda').getByTitle('SNES (Wishlist)'),
     ).toBeVisible()
     await expect(rowOf(page, 'Zelda')).toContainText('Adventure, Puzzle')
+    // The date shows as exactly as IGDB knows it.
+    await expect(rowOf(page, 'Zelda')).toContainText('Q4 1991')
   })
 
   test('hides and shows them from Columns', async ({ page }) => {
     const saves = await open(page, true)
     await openColumns(page)
-    await page.getByRole('checkbox', { name: 'Year' }).click()
+    await page.getByRole('checkbox', { name: 'Released' }).click()
     await page.getByRole('checkbox', { name: 'Genre' }).click()
     await page.getByRole('checkbox', { name: 'Platforms' }).click()
-    await expect(header(page, 'Year')).toBeHidden()
+    await expect(header(page, 'Released')).toBeHidden()
     await expect(header(page, 'Genre')).toBeHidden()
     await expect(header(page, 'Platforms')).toBeHidden()
-    expect(saves.at(-1)).toEqual(['year', 'genre', 'platforms'])
+    expect(saves.at(-1)).toEqual(['released', 'genre', 'platforms'])
     await page.getByRole('button', { name: 'Show all' }).click()
-    await expect(header(page, 'Year')).toBeVisible()
+    await expect(header(page, 'Released')).toBeVisible()
     expect(saves.at(-1)).toEqual([])
   })
 
-  test('sorts by year, with games that have none last either way', async ({
+  test('sorts by release date, with games that have none last either way', async ({
     page,
   }) => {
     await open(page, true)
-    const sort = header(page, 'Year').getByRole('button')
+    const sort = header(page, 'Released').getByRole('button')
     await sort.click()
     expect(await names(page)).toEqual(['Zelda', 'Chrono Trigger', 'Homebrew'])
     await sort.click()
@@ -241,14 +248,14 @@ test.describe('a collection', () => {
     ).toHaveCount(0)
   })
 
-  test('shows a visitor the year and genres but never platforms', async ({
+  test('shows a visitor the release date and genres but never platforms', async ({
     page,
   }) => {
     await open(page, false)
-    await expect(header(page, 'Year')).toBeVisible()
+    await expect(header(page, 'Released')).toBeVisible()
     await expect(header(page, 'Genre')).toBeVisible()
     await expect(header(page, 'Platforms')).toHaveCount(0)
-    await expect(rowOf(page, 'Zelda')).toContainText('1991')
+    await expect(rowOf(page, 'Zelda')).toContainText('Q4 1991')
     await expect(page.getByText('SNES', { exact: true })).toHaveCount(0)
     await expect(
       page.getByRole('button', { name: /Choose platforms/ }),
@@ -261,14 +268,16 @@ test.describe('a collection', () => {
 test.describe('Owned', () => {
   const game = (
     i: number,
-    year: number | null,
+    releaseDate: string | null,
+    releasePrecision: string | null,
     genres: string[],
   ): FakeEntry => ({
     id: `30000000-0000-4000-8000-00000000000${i}`,
     igdbId: 1000 + i,
     name: `Game ${i}`,
     coverId: null,
-    year,
+    releaseDate,
+    releasePrecision,
     genres,
     addedAt: new Date(Date.UTC(2026, 0, 1, i)).toISOString(),
     data: {},
@@ -290,9 +299,9 @@ test.describe('Owned', () => {
       route.fulfill({ json: { owned: 3, wishlist: 0 } }),
     )
     const list = await fakeList(page, 'retro_fan', 'owned', [
-      game(1, 1995, ['Role-playing (RPG)']),
-      game(2, 1991, ['Adventure', 'Puzzle']),
-      game(3, null, []),
+      game(1, '1995-03-11', 'day', ['Role-playing (RPG)']),
+      game(2, '1991-11-01', 'month', ['Adventure', 'Puzzle']),
+      game(3, null, 'tbd', []),
     ])
     await page.goto('/u/retro_fan/shelf/owned')
     await expect(page.getByRole('table')).toBeVisible()
@@ -303,22 +312,25 @@ test.describe('Owned', () => {
     page,
   }) => {
     const list = await open(page)
-    for (const name of ['Year', 'Genre', 'Platforms']) {
+    for (const name of ['Released', 'Genre', 'Platforms']) {
       await expect(header(page, name)).toBeVisible()
     }
-    await expect(rowOf(page, 'Game 2')).toContainText('1991')
+    await expect(rowOf(page, 'Game 2')).toContainText('Nov 1991')
+    await expect(rowOf(page, 'Game 3')).toContainText('TBD')
     await expect(rowOf(page, 'Game 2')).toContainText('Adventure, Puzzle')
 
     await openColumns(page)
-    await page.getByRole('checkbox', { name: 'Year' }).click()
-    await expect(header(page, 'Year')).toBeHidden()
-    expect(list.columnSaves.at(-1)).toEqual(['year'])
+    await page.getByRole('checkbox', { name: 'Released' }).click()
+    await expect(header(page, 'Released')).toBeHidden()
+    expect(list.columnSaves.at(-1)).toEqual(['released'])
   })
 
-  test('asks the server to sort by year and genre', async ({ page }) => {
+  test('asks the server to sort by release date and genre', async ({
+    page,
+  }) => {
     const list = await open(page)
-    await header(page, 'Year').getByRole('button').click()
-    await expect(page).toHaveURL(/sort=year/)
+    await header(page, 'Released').getByRole('button').click()
+    await expect(page).toHaveURL(/sort=released/)
     expect(await names(page)).toEqual(['Game 2', 'Game 1', 'Game 3'])
     await header(page, 'Genre').getByRole('button').click()
     await expect(page).toHaveURL(/sort=genre/)

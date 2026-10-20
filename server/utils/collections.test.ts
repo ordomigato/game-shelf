@@ -26,6 +26,7 @@ const game: CatalogRow = {
   name: 'The Legend of Zelda: A Link to the Past',
   coverId: 'co3vzn',
   releaseDate: '1991-11-21',
+  releasePrecision: 'day',
   genres: ['Adventure', 'Role-playing (RPG)'],
   platformIds: [19],
   fetchedAt: new Date(0),
@@ -40,7 +41,8 @@ describe('toLibraryItem', () => {
       igdbId: 1026,
       name: 'The Legend of Zelda: A Link to the Past',
       coverId: 'co3vzn',
-      year: 1991,
+      releaseDate: '1991-11-21',
+      releasePrecision: 'day',
       genres: ['Adventure', 'Role-playing (RPG)'],
       data: { hours: 12 },
       owned: true,
@@ -67,10 +69,17 @@ describe('toLibraryItem', () => {
   })
 
   it('uses the catalog’s missing cover and date as they are', () => {
-    const bare = { ...game, coverId: null, releaseDate: null, genres: [] }
+    const bare = {
+      ...game,
+      coverId: null,
+      releaseDate: null,
+      releasePrecision: null,
+      genres: [],
+    }
     expect(toLibraryItem(item, bare)).toMatchObject({
       coverId: null,
-      year: null,
+      releaseDate: null,
+      releasePrecision: null,
       genres: [],
     })
   })
@@ -79,7 +88,8 @@ describe('toLibraryItem', () => {
     expect(toLibraryItem(item, null)).toMatchObject({
       name: 'Zelda 3',
       coverId: 'old',
-      year: null,
+      releaseDate: null,
+      releasePrecision: null,
       genres: [],
     })
   })
@@ -128,11 +138,12 @@ describe('toCollectionEntry', () => {
     expect(toCollectionEntry(item, game, new Date(0), false).wanted).toBe(false)
   })
 
-  it('shows a visitor the year and genres but no platforms', () => {
+  it('shows a visitor the release date and genres but no platforms', () => {
     const names = new Map([[19, 'SNES']])
     const entry = toCollectionEntry(both, game, new Date(0), false, names)
     expect(entry).toMatchObject({
-      year: 1991,
+      releaseDate: '1991-11-21',
+      releasePrecision: 'day',
       genres: ['Adventure', 'Role-playing (RPG)'],
     })
     expect(JSON.stringify(entry)).not.toContain('SNES')

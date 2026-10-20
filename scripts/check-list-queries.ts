@@ -195,8 +195,9 @@ for (const list of ['owned', 'wishlist'] as const) {
   await run(list, `filter genre with quotes and wildcards`, {
     genre: `x'%_\\; drop table games`,
   })
+  await run(list, 'old sort key year (an alias of released)', { sort: 'year' })
   if (genres[0]) {
-    for (const sort of ['year', 'genre']) {
+    for (const sort of ['released', 'genre']) {
       await run(list, `filter genre ${genres[0]} + sort ${sort} desc`, {
         genre: genres[0],
         sort,

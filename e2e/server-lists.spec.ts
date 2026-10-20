@@ -20,7 +20,8 @@ const game = (i: number, list: 'owned' | 'wishlist'): FakeEntry => ({
   igdbId: 1000 + i,
   name: `Game ${String(i).padStart(3, '0')}`,
   coverId: null,
-  year: null,
+  releaseDate: null,
+  releasePrecision: null,
   genres: [],
   addedAt: new Date(Date.UTC(2026, 0, 1, i)).toISOString(),
   data: {
@@ -143,7 +144,7 @@ test('shows the account fields as columns, hidden ones with a lock', async ({
   await expect(page.getByRole('columnheader')).toHaveText([
     /Name/,
     /Collections/,
-    /Year/,
+    /Released/,
     /Genre/,
     /Platforms/,
     /Score/,

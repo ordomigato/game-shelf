@@ -4,7 +4,7 @@ import { allColumnsKnown, columnKeys, knownHiddenColumns } from './columns'
 describe('columnKeys', () => {
   it('gives a collection the core columns and Added besides its fields', () => {
     expect([...columnKeys('collection', ['status'])]).toEqual([
-      'year',
+      'released',
       'genre',
       'platforms',
       'addedAt',
@@ -13,7 +13,7 @@ describe('columnKeys', () => {
   })
 
   it('gives the lists the same core columns, and their collections', () => {
-    for (const key of ['year', 'genre', 'platforms']) {
+    for (const key of ['released', 'genre', 'platforms']) {
       expect(columnKeys('list', []).has(key)).toBe(true)
       expect(columnKeys('collection', []).has(key)).toBe(true)
     }

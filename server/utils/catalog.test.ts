@@ -56,6 +56,7 @@ function row(igdbId: number, fetchedAt: Date | null): CatalogRow {
     name: `Game ${igdbId}`,
     coverId: null,
     releaseDate: null,
+    releasePrecision: null,
     genres: [],
     platformIds: [],
     fetchedAt,

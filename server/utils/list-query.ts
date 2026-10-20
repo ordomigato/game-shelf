@@ -6,6 +6,7 @@ import {
   fieldIdOfKey,
   isFieldKey,
   LIST_SORT_COLUMNS,
+  sortKeyFromQuery,
 } from '../../shared/utils/list-view'
 import { games as catalogGames, libraryItems } from '../db/schema'
 import { itemName } from './collections'
@@ -73,11 +74,12 @@ export function parseListQuery(
 ): ListQuery {
   const parsed = baseSchema.safeParse(raw)
   if (!parsed.success) throw badRequest('Invalid list query')
-  const { sort: sortKey, collection, platform, genre, ...rest } = parsed.data
+  const { sort: rawSortKey, collection, platform, genre, ...rest } = parsed.data
   const byId = new Map(fields.map((field) => [field.id, field]))
 
+  const sortKey = sortKeyFromQuery(rawSortKey)
   let sort: ListSort | null = null
-  if (sortKey !== undefined) {
+  if (sortKey !== null) {
     if (isFieldKey(sortKey)) {
       // A field since deleted: the link still opens, in the default order.
       const field = byId.get(fieldIdOfKey(sortKey))
@@ -278,8 +280,9 @@ function sortValue(sort: ListSort, ownerId: string): SQL {
       return sql`lower(${itemName})`
     case 'addedAt':
       return sql`library_items.created_at`
-    case 'year':
-      return sql`${catalogGames.releaseDate}`
+    case 'released':
+      // TBD has no date to speak of, so it goes last with the empty.
+      return sql`(case when ${catalogGames.releasePrecision} = 'tbd' then null else ${catalogGames.releaseDate} end)`
     case 'genre':
       return sql`lower((${catalogGames.genres})[1])`
     case 'platforms':
@@ -300,7 +303,7 @@ function sortsAsText(sort: ListSort): boolean {
   if ('field' in sort) {
     return ['text', 'select', 'multiselect'].includes(sort.field.type)
   }
-  return sort.column !== 'addedAt' && sort.column !== 'year'
+  return sort.column !== 'addedAt' && sort.column !== 'released'
 }
 
 /**

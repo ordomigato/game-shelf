@@ -15,6 +15,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { ReleasePrecision } from '../../shared/utils/release-date'
 import type { CustomLimits } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
@@ -117,26 +118,41 @@ export const platforms = pgTable('platforms', {
  * every user. Written only by the server from IGDB, never from what a
  * browser sends. See `server/utils/catalog.ts`.
  */
-export const games = pgTable('games', {
-  igdbId: integer('igdb_id').primaryKey(),
-  name: text('name').notNull(),
-  coverId: text('cover_id'),
-  /** IGDB's `first_release_date`, as a UTC day. */
-  releaseDate: date('release_date', { mode: 'string' }),
-  /** Genre names. */
-  genres: text('genres')
-    .array()
-    .notNull()
-    .default(sql`'{}'`),
-  /** IGDB platform ids (`platforms.igdb_id`). */
-  platformIds: integer('platform_ids')
-    .array()
-    .notNull()
-    .default(sql`'{}'`),
-  /** When it was last read from IGDB. Null until it has been. */
-  fetchedAt: timestamp('fetched_at', { withTimezone: true }),
-  ...timestamps,
-})
+export const games = pgTable(
+  'games',
+  {
+    igdbId: integer('igdb_id').primaryKey(),
+    name: text('name').notNull(),
+    coverId: text('cover_id'),
+    /** IGDB's `first_release_date`, as a UTC day. */
+    releaseDate: date('release_date', { mode: 'string' }),
+    /**
+     * How exact the date is: the day, or only its month, year or quarter,
+     * or not announced. Null when unknown (not read from IGDB since this
+     * was added).
+     */
+    releasePrecision: text('release_precision').$type<ReleasePrecision>(),
+    /** Genre names. */
+    genres: text('genres')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    /** IGDB platform ids (`platforms.igdb_id`). */
+    platformIds: integer('platform_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    /** When it was last read from IGDB. Null until it has been. */
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      'games_release_precision',
+      sql`${table.releasePrecision} in ('day', 'month', 'year', 'quarter', 'tbd')`,
+    ),
+  ],
+)
 
 /**
  * A game a user is tracking, once per game per user, however many

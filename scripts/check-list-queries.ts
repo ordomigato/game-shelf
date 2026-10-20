@@ -11,6 +11,8 @@
  *
  *   npx sst shell --stage dev -- npx tsx scripts/check-list-queries.ts <username>
  */
+import { sql } from 'drizzle-orm'
+import { useDb } from '../server/utils/db'
 import { findUserByUsername } from '../server/utils/users'
 import { getUserFields } from '../server/utils/collections'
 import { getListPage } from '../server/utils/lists'
@@ -60,6 +62,26 @@ async function run(
       `ERROR  ${list.padEnd(8)} rows=   - total=     - ${String(ms).padStart(5)}ms  ${label}  ${message}`,
     )
     return null
+  }
+}
+
+// The natural sort collation (migration 0020) must exist and order digits by
+// value.
+{
+  cases += 1
+  try {
+    const result = await useDb().execute(
+      sql`select ('Final Fantasy 2' collate "natural_sort") < ('Final Fantasy 10' collate "natural_sort") as natural`,
+    )
+    const rows = (result as unknown as { rows?: { natural: boolean }[] }).rows
+    const natural = rows?.[0]?.natural
+    if (natural !== true) throw new Error(`"2" did not sort before "10"`)
+    console.log('ok     collation natural_sort puts "Final Fantasy 2" first')
+  } catch (error) {
+    failures += 1
+    console.log(
+      `ERROR  collation natural_sort ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 

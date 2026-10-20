@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   COLLECTIONS_FILTER,
   columnOfSortKey,
+  pruneView,
   PLATFORMS_FILTER,
   sortKeyOf,
   viewFromQuery,
@@ -89,5 +90,36 @@ describe('sort keys', () => {
     expect(sortKeyOf('abc123')).toBe('f.abc123')
     expect(columnOfSortKey('f.abc123')).toBe('abc123')
     expect(columnOfSortKey('addedAt')).toBe('addedAt')
+  })
+})
+
+describe('pruneView', () => {
+  it('drops a sort and filters on fields that are gone, keeping the rest', () => {
+    const view = viewFromQuery(
+      {
+        sort: 'f.gone',
+        'f.gone': 'x',
+        'f.kept': 'y',
+        collection: 'c',
+        platform: '1',
+        q: 'a',
+      },
+      50,
+    )
+    expect(pruneView(view, new Set(['kept']))).toMatchObject({
+      sort: null,
+      q: 'a',
+      filters: {
+        kept: ['y'],
+        [COLLECTIONS_FILTER]: ['c'],
+        [PLATFORMS_FILTER]: ['1'],
+      },
+    })
+    expect(
+      pruneView(viewFromQuery({ sort: 'f.kept' }, 50), new Set(['kept'])).sort,
+    ).toBe('f.kept')
+    expect(pruneView(viewFromQuery({ sort: 'name' }, 50), new Set()).sort).toBe(
+      'name',
+    )
   })
 })

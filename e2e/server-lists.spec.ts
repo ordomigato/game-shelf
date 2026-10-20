@@ -330,3 +330,33 @@ test('a failing page shows the error with a retry', async ({ page }) => {
     page.getByRole('heading', { level: 1, name: 'Owned' }),
   ).toBeVisible()
 })
+
+test('a value saved while moving to another page does not send you back', async ({
+  page,
+}) => {
+  const list = await openList(page)
+  let saves = 0
+  await page.route('**/api/library-items/*/values', async (route) => {
+    const id = route.request().url().split('/').at(-2)!
+    const { values } = route.request().postDataJSON() as {
+      values: Record<string, string>
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const item = list.items.find((entry) => entry.id === id)!
+    const data = { ...item.data, ...values }
+    list.update(id, { data })
+    saves += 1
+    await route.fulfill({ json: { id, data } })
+  })
+  await page.goto('/u/retro_fan/shelf/owned')
+  await expect(page.locator('tbody tr')).toHaveCount(50)
+  await page.getByRole('combobox', { name: 'Status for Game 120' }).click()
+  await page.getByRole('option', { name: 'Playing' }).click()
+  // The save is still on its way when the next page is asked for.
+  await page.getByRole('button', { name: 'Next page' }).click()
+  await expect(page).toHaveURL(/page=2/)
+  await expect.poll(() => saves).toBe(1)
+  await expect(page.getByText('51–100 of 120')).toBeVisible()
+  await expect(page).toHaveURL(/page=2/)
+  await expect(page.locator('tbody tr').first()).toContainText('Game 070')
+})

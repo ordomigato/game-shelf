@@ -15,7 +15,6 @@ export const PLATFORMS_FILTER = '__platforms'
 export const LIST_SORT_COLUMNS = [
   'name',
   'inCollections',
-  'collectionCount',
   'platforms',
   'addedAt',
 ] as const
@@ -87,6 +86,26 @@ export function viewFromQuery(query: RawQuery, defaultSize: number): ListView {
     q: one(query.q) ?? '',
     filters,
   }
+}
+
+/**
+ * The view without a sort or filters on fields that don't exist (any more),
+ * as a link kept from before a field was deleted would have.
+ */
+export function pruneView(view: ListView, fieldIds: Set<string>): ListView {
+  const filters = Object.fromEntries(
+    Object.entries(view.filters).filter(
+      ([key]) =>
+        key === COLLECTIONS_FILTER ||
+        key === PLATFORMS_FILTER ||
+        fieldIds.has(key),
+    ),
+  )
+  const sortGone =
+    view.sort !== null &&
+    isFieldKey(view.sort) &&
+    !fieldIds.has(fieldIdOfKey(view.sort))
+  return { ...view, filters, sort: sortGone ? null : view.sort }
 }
 
 /**

@@ -12,7 +12,10 @@ export default defineEventHandler(async (event) => {
   const { sub } = await requireAuth(event)
   const { list } = await getValidatedRouterParams(event, paramsSchema.parse)
   const user = await findOrCreateUser(sub)
-  await rateLimit(event, `export:${user.id}`, { limit: 3, windowSeconds: 600 })
+  await rateLimit(event, `export-list:${user.id}`, {
+    limit: 3,
+    windowSeconds: 600,
+  })
   const [fields, items] = await Promise.all([
     getUserFields(user.id),
     listForExport(user.id, list),

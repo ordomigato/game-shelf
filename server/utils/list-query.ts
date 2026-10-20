@@ -76,9 +76,9 @@ export function parseListQuery(
   let sort: ListSort | null = null
   if (sortKey !== undefined) {
     if (isFieldKey(sortKey)) {
+      // A field since deleted: the link still opens, in the default order.
       const field = byId.get(fieldIdOfKey(sortKey))
-      if (!field) throw badRequest('Unknown sort')
-      sort = { field }
+      if (field) sort = { field }
     } else {
       const column = LIST_SORT_COLUMNS.find((known) => known === sortKey)
       if (!column) throw badRequest('Unknown sort')
@@ -89,10 +89,10 @@ export function parseListQuery(
   const fieldFilters: ListQuery['fieldFilters'] = []
   for (const [key, value] of Object.entries(raw)) {
     if (!isFieldKey(key)) continue
+    // A filter on a field since deleted (or one that can't be filtered) is
+    // dropped, not an error.
     const field = byId.get(fieldIdOfKey(key))
-    if (!field || !FILTERABLE.includes(field.type)) {
-      throw badRequest('Unknown filter')
-    }
+    if (!field || !FILTERABLE.includes(field.type)) continue
     const values = asArray(value)
     if (values.length > 100 || values.some((v) => typeof v !== 'string')) {
       throw badRequest('Invalid filter')
@@ -171,10 +171,11 @@ function fieldFilter(field: FieldDefinition, values: string[]): SQL | null {
       : sql`not coalesce(${ticked}, false)`
   }
   if (field.type === 'select') {
-    return sql`(jsonb_typeof(${value}) = 'string' and (${value} #>> '{}') = any(${textList(values)}))`
+    return sql`(case when jsonb_typeof(${value}) = 'string' then (${value} #>> '{}') = any(${textList(values)}) else false end)`
   }
-  // A list of choices matches when it has any of the wanted ones.
-  return sql`(jsonb_typeof(${value}) = 'array' and exists (select 1 from jsonb_array_elements_text(${value}) as choice(name) where choice.name = any(${textList(values)})))`
+  // A list of choices matches when it has any of the wanted ones. The
+  // array function only runs on arrays: SQL doesn't promise `and` stops early.
+  return sql`(case when jsonb_typeof(${value}) = 'array' then exists (select 1 from jsonb_array_elements_text(${value}) as choice(name) where choice.name = any(${textList(values)})) else false end)`
 }
 
 /** Whether a word appears in the parts of a game the search reads. */
@@ -195,8 +196,8 @@ function wordMatch(
     const value = valueOf(field)
     parts.push(
       field.type === 'multiselect'
-        ? sql`(jsonb_typeof(${value}) = 'array' and exists (select 1 from jsonb_array_elements_text(${value}) as searched_choice(name) where ${like(sql`searched_choice.name`)}))`
-        : sql`(jsonb_typeof(${value}) = 'string' and ${like(sql`(${value} #>> '{}')`)})`,
+        ? sql`(case when jsonb_typeof(${value}) = 'array' then exists (select 1 from jsonb_array_elements_text(${value}) as searched_choice(name) where ${like(sql`searched_choice.name`)}) else false end)`
+        : sql`(case when jsonb_typeof(${value}) = 'string' then ${like(sql`(${value} #>> '{}')`)} else false end)`,
     )
   }
   return sql`(${sql.join(parts, sql` or `)})`
@@ -270,9 +271,20 @@ function sortValue(sort: ListSort, list: ListName, ownerId: string): SQL {
       return sql`(select lower(coalesce(first_platform.abbreviation, first_platform.name)) from platforms as first_platform where first_platform.igdb_id = (${platformColumn(list)})[1])`
     case 'inCollections':
       return sql`(select string_agg(lower(sorted_collection.title), ', ' order by lower(sorted_collection.title)) from collection_items as entry inner join collections as sorted_collection on sorted_collection.id = entry.collection_id where entry.item_id = library_items.id and sorted_collection.owner_id = ${ownerId})`
-    case 'collectionCount':
-      return sql`(select nullif(count(*), 0)::int from collection_items as entry where entry.item_id = library_items.id)`
   }
+}
+
+/**
+ * The ICU collation (made by a migration) that orders digits by value.
+ */
+export const NATURAL_COLLATION = 'natural_sort'
+
+/** Whether a sort compares words, so it takes the natural collation. */
+function sortsAsText(sort: ListSort): boolean {
+  if ('field' in sort) {
+    return ['text', 'select', 'multiselect'].includes(sort.field.type)
+  }
+  return sort.column !== 'addedAt'
 }
 
 /**
@@ -291,8 +303,12 @@ export function listOrder(
   ]
   if (!query.sort) return tiebreak
   const direction = query.dir === 'desc' ? sql.raw('desc') : sql.raw('asc')
+  // Text compares numbers as numbers: "Final Fantasy 2" before "... 10".
+  const collation = sortsAsText(query.sort)
+    ? sql.raw(` collate "${NATURAL_COLLATION}"`)
+    : sql.raw('')
   return [
-    sql`${sortValue(query.sort, list, ownerId)} ${direction} nulls last`,
+    sql`${sortValue(query.sort, list, ownerId)}${collation} ${direction} nulls last`,
     ...tiebreak,
   ]
 }

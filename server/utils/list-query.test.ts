@@ -77,13 +77,7 @@ describe('parseListQuery', () => {
   })
 
   it('accepts the built-in columns', () => {
-    for (const column of [
-      'name',
-      'inCollections',
-      'collectionCount',
-      'platforms',
-      'addedAt',
-    ]) {
+    for (const column of ['name', 'inCollections', 'platforms', 'addedAt']) {
       expect(parse({ sort: column }).sort).toEqual({ column })
     }
   })
@@ -94,10 +88,7 @@ describe('parseListQuery', () => {
     ['a page that is not a number', { page: 'x' }],
     ['a direction that is not asc or desc', { dir: 'sideways' }],
     ['a sort that is neither a column nor a field', { sort: 'password' }],
-    ['a sort by a field the user does not have', { sort: 'f.other' }],
     ['a sort that tries to inject SQL', { sort: 'name; drop table users' }],
-    ['a filter on a field the user does not have', { 'f.other': 'x' }],
-    ['a filter on a field that cannot be filtered', { 'f.price': 'x' }],
     ['a checkbox filter that is not yes or no', { 'f.done': 'maybe' }],
     ['a collection that is not an id', { collection: 'x' }],
     ['a platform that is not a number', { platform: '1; drop table x' }],
@@ -105,6 +96,25 @@ describe('parseListQuery', () => {
     ['a page given twice', { page: ['1', '2'] }],
   ])('rejects %s', (_name, raw) => {
     expect(() => parse(raw)).toThrow(
+      expect.objectContaining({ statusCode: 400 }),
+    )
+  })
+})
+
+describe('stale links', () => {
+  it('ignores a sort or filter on a field that is gone or cannot be filtered', () => {
+    const query = parse({
+      sort: 'f.deleted',
+      'f.deleted': 'x',
+      'f.price': 'x',
+      'f.done': 'yes',
+    })
+    expect(query.sort).toBeNull()
+    expect(query.fieldFilters.map((f) => f.field.id)).toEqual(['done'])
+  })
+
+  it('still rejects a malformed value for a field that exists', () => {
+    expect(() => parse({ 'f.done': 'maybe' })).toThrow(
       expect.objectContaining({ statusCode: 400 }),
     )
   })
@@ -258,7 +268,7 @@ describe('listOrder', () => {
 
   it('sorts the name without regard to case', () => {
     expect(order({ sort: 'name' })[0]).toContain(
-      'lower(coalesce("games"."name", "library_items"."name")) asc nulls last',
+      'lower(coalesce("games"."name", "library_items"."name")) collate "natural_sort" asc nulls last',
     )
   })
 
@@ -271,15 +281,12 @@ describe('listOrder', () => {
     )
   })
 
-  it('sorts collections by name or by count, only the owners', () => {
+  it('sorts collections by name, only the owners own', () => {
     const names = renderAll(
       listOrder(owner, 'owned', parse({ sort: 'inCollections' })),
     )[0]!
     expect(names.sql).toContain('string_agg(lower(')
     expect(names.params).toContain(owner)
-    expect(order({ sort: 'collectionCount' })[0]).toContain(
-      'nullif(count(*), 0)',
-    )
   })
 
   it('sorts each kind of field by its type', () => {
@@ -296,6 +303,22 @@ describe('listOrder', () => {
     expect(first('note')).toContain('lower(')
     expect(first('tags')).toContain('string_agg')
     expect(first('tags')).toContain('with ordinality')
+  })
+
+  it('orders words with numbers by value, only where it compares words', () => {
+    for (const sort of [
+      'name',
+      'platforms',
+      'inCollections',
+      'f.status',
+      'f.note',
+      'f.tags',
+    ]) {
+      expect(order({ sort })[0]).toContain(' collate "natural_sort" asc')
+    }
+    for (const sort of ['addedAt', 'f.price', 'f.bought', 'f.done']) {
+      expect(order({ sort })[0]).not.toContain('collate')
+    }
   })
 
   it('passes the field id as a value', () => {

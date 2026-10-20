@@ -8,13 +8,14 @@ import {
   LIST_PAGE_SIZES,
   viewFromQuery,
   viewToQuery,
+  pruneView,
   type ListView,
 } from '#shared/utils/list-view'
 import type {
   CollectionEntry,
   CollectionLink,
   FieldValue,
-  ItemData,
+  ListDetail,
   OwnerEntry,
   LibraryItem,
   ListName,
@@ -66,29 +67,72 @@ const viewKey = computed(() =>
   JSON.stringify(viewToQuery(view.value, { withSize: true })),
 )
 
+// Value saves in flight. An answer that was read while one started or
+// finished may predate it, so it is read again rather than shown.
+let valueSaves = 0
+let valueEdits = 0
+
 // The server sorts, searches and filters, so each change asks for one page.
 // The rows on screen stay until the new page arrives, and a newer request
 // cancels an older one so a slow answer never replaces a fresher one.
 const { data, status, error, refresh } = useAsyncData(
   () => `list-${username.value}-${props.list}`,
-  (_nuxt, { signal }) =>
-    collections.getList(username.value, props.list, view.value, signal),
+  (_nuxt, { signal }) => fetchPage(signal),
   { server: false, watch: [username, () => props.list, viewKey] },
 )
 const notFound = computed(() => error.value?.statusCode === 404)
 
-// Refetching after a change made here fills the gap without dimming.
-const quiet = ref(false)
+async function fetchPage(signal: AbortSignal): Promise<ListDetail> {
+  const requested = view.value
+  const key = viewKey.value
+  for (let attempt = 0; ; attempt++) {
+    const mark = valueEdits
+    const page = await collections.getList(
+      username.value,
+      props.list,
+      requested,
+      signal,
+    )
+    if ((mark !== valueEdits || valueSaves) && attempt < 3) continue
+    // Only a finished request for what's still asked for may move the
+    // address, never an edit made to the rows on screen.
+    if (key === viewKey.value) settleView(requested, page)
+    return page
+  }
+}
+
+/**
+ * Brings the address in line with the answer: the last page when the page
+ * asked for is past the end, and no sort or filter on a field that's gone.
+ */
+function settleView(requested: ListView, page: ListDetail) {
+  const settled = {
+    ...pruneView(requested, new Set(page.fields.map((field) => field.id))),
+    page: page.page,
+  }
+  const asQuery = (v: ListView) =>
+    JSON.stringify(viewToQuery(v, { withSize: true }))
+  if (asQuery(settled) !== asQuery(requested)) showView(settled, true)
+}
+
+// Refetching after a change made here fills the gap without dimming. The
+// flag belongs to the address it was set for, so moving elsewhere loads
+// with the usual dimming.
+const quietFor = ref<string | null>(null)
 async function refetchQuietly() {
-  quiet.value = true
+  const key = viewKey.value
+  quietFor.value = key
   try {
     await refresh()
   } finally {
-    quiet.value = false
+    if (quietFor.value === key) quietFor.value = null
   }
 }
 const loading = computed(
-  () => status.value === 'pending' && Boolean(data.value) && !quiet.value,
+  () =>
+    status.value === 'pending' &&
+    Boolean(data.value) &&
+    quietFor.value !== viewKey.value,
 )
 
 /** Changes what the list shows, by changing the address. */
@@ -119,13 +163,6 @@ const onView = (change: Partial<ListView>) =>
     'q' in change &&
       Object.keys(change).every((key) => key === 'q' || key === 'page'),
   )
-
-// A page past the end comes back as the last one: the address follows.
-watch(data, (page) => {
-  if (page && page.page !== view.value.page) {
-    showView({ page: page.page }, true)
-  }
-})
 
 const tableServer = computed(() =>
   data.value
@@ -235,29 +272,36 @@ async function saveValue(
 ) {
   const item = data.value?.items.find((entry) => entry.id === itemId)
   if (!item) return
-  const before = item.data
-  const setData = (itemData: ItemData) =>
+  const before = item.data[fieldId]
+  /** Sets or clears one field on one row, leaving the rest as they are. */
+  const setField = (next: FieldValue | undefined) =>
     setItems(
-      (data.value?.items ?? []).map((entry) =>
-        entry.id === itemId ? { ...entry, data: itemData } : entry,
-      ),
+      (data.value?.items ?? []).map((entry) => {
+        if (entry.id !== itemId) return entry
+        const { [fieldId]: _old, ...rest } = entry.data
+        return {
+          ...entry,
+          data: next === undefined ? rest : { ...rest, [fieldId]: next },
+        }
+      }),
     )
-  setData(
-    value === null
-      ? Object.fromEntries(
-          Object.entries(before).filter(([id]) => id !== fieldId),
-        )
-      : { ...before, [fieldId]: value },
-  )
+  setField(value ?? undefined)
+  valueSaves += 1
+  valueEdits += 1
   try {
     const saved = await collections.updateItemValues(itemId, {
       [fieldId]: value,
     })
-    setData(saved.data)
+    setField(saved.data[fieldId])
   } catch {
-    setData(before)
+    setField(before)
     toast.error(t('table.saveFailed'))
+  } finally {
+    valueSaves -= 1
+    valueEdits += 1
   }
+  // Sorting and filtering by this field may now put the row elsewhere.
+  void refetchQuietly()
 }
 
 const exporting = ref(false)

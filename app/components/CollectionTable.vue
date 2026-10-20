@@ -122,19 +122,24 @@ const filters = computed(
 
 // A server list asks for a new search once typing pauses, and follows the
 // address when it changes by itself (the back button).
+let lastEmittedQuery: string | null = null
 watchDebounced(
   query,
   (text) => {
     if (props.server && text.trim() !== props.server.view.q) {
-      emit('view', { q: text.trim(), page: 1 })
+      lastEmittedQuery = text.trim()
+      emit('view', { q: lastEmittedQuery, page: 1 })
     }
   },
   { debounce: 300 },
 )
+// The address echoing what was typed must not overwrite letters typed since.
 watch(
   () => props.server?.view.q,
   (text) => {
-    if (text !== undefined && text !== query.value.trim()) query.value = text
+    if (text === undefined || text === lastEmittedQuery) return
+    lastEmittedQuery = null
+    if (text !== query.value.trim()) query.value = text
   },
 )
 

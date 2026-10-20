@@ -1,4 +1,5 @@
 import { ofetch } from 'ofetch'
+import type { NitroFetchOptions, NitroFetchRequest } from 'nitropack'
 import type { ChartWidget } from '#shared/types/charts'
 import type {
   CollectionDetail,
@@ -11,6 +12,7 @@ import type {
   CollectionLink,
 } from '#shared/types/collection'
 import type { ListAction } from '#shared/utils/lists'
+import { viewToQuery, type ListView } from '#shared/utils/list-view'
 import type { PublicProfile } from '#shared/types/user'
 import type { GameMembership } from '~/composables/useGameMemberships'
 
@@ -54,11 +56,14 @@ export function useCollections() {
     )
   }
 
-  async function viewerFetch<T>(url: string): Promise<T> {
+  async function viewerFetch<T>(
+    url: string,
+    options: NitroFetchOptions<NitroFetchRequest> = {},
+  ): Promise<T> {
     await auth.ensureLoaded()
     return auth.status.value === 'signedIn'
-      ? auth.apiFetch<T>(url)
-      : ofetch<T>(url)
+      ? auth.apiFetch<T>(url, options)
+      : (ofetch<T>(url, options as object) as Promise<T>)
   }
 
   const userPath = (username: string) =>
@@ -81,11 +86,37 @@ export function useCollections() {
         `${userPath(username)}/${encodeURIComponent(slug)}`,
       ),
 
-    /** Owned or the Wishlist. Only its owner can read them (404). */
-    getList: (username: string, list: ListName) =>
+    /**
+     * One page of Owned or the Wishlist, sorted, searched and filtered by
+     * the server. Only its owner can read them (404). `signal` cancels the
+     * request when a newer one replaces it.
+     */
+    getList: (
+      username: string,
+      list: ListName,
+      view: ListView,
+      signal?: AbortSignal,
+    ) =>
       viewerFetch<ListDetail>(
         `/api/u/${encodeURIComponent(username)}/lists/${list}`,
+        { query: viewToQuery(view, { withSize: true }), signal },
       ),
+
+    /** The whole of Owned or the Wishlist as a CSV file. */
+    exportList: (list: ListName) =>
+      auth.apiFetch<Blob>(`/api/lists/${list}/export`, {
+        responseType: 'blob',
+      }),
+
+    /** Sets a game's values for the user's fields, from a list. `null` clears. */
+    updateItemValues: (
+      itemId: string,
+      values: Record<string, FieldValue | null>,
+    ) =>
+      auth.apiFetch<LibraryItem>(`/api/library-items/${itemId}/values`, {
+        method: 'PATCH',
+        body: { values },
+      }),
 
     create: (input: {
       title: string

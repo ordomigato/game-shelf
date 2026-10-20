@@ -517,6 +517,7 @@
     "name": "Name",
     "added": "Added",
     "search": "Search this collection",
+    "searchGames": "Search games",
     "filter": "Filter",
     "clearFilters": "Clear",
     "showing": "Showing {shown} of {total}",
@@ -877,6 +878,7 @@
   },
   "lists": {
     "loadFailed": "Couldn't load this list. Try again.",
+    "exportFailed": "Couldn't prepare your download. Try again.",
     "onlyYou": "Private",
     "ownedHint": "Every game you own. Collections can hold games you only want too.",
     "wishlistHint": "Games you want. They can also be in your collections, so you can see what's missing.",

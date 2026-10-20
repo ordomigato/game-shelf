@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { signInAs } from './support/session'
+import { fakeList } from './support/lists'
 
 const zelda = {
   id: '10000000-0000-4000-8000-000000000003',
@@ -22,6 +23,9 @@ const customSummary = {
 }
 
 const lists = { owned: 3, wishlist: 1 }
+
+let ownedList: Awaited<ReturnType<typeof fakeList>>
+let wishlistList: Awaited<ReturnType<typeof fakeList>>
 
 const base = {
   coverId: null,
@@ -94,24 +98,15 @@ async function openLists(page: Page, listDelay = 0) {
     })
   })
   await page.route('**/api/lists', (route) => route.fulfill({ json: lists }))
-  await page.route('**/api/u/retro_fan/lists/owned', (route) =>
-    route.fulfill({
-      json: {
-        list: 'owned',
-        itemCount: 3,
-        items: [linkToThePast, homebrew, gtaV],
-      },
-    }),
-  )
-  await page.route('**/api/u/retro_fan/lists/wishlist', (route) =>
-    route.fulfill({
-      json: {
-        list: 'wishlist',
-        itemCount: 2,
-        items: [chrono, { ...gtaV, platforms: ['PS4'] }],
-      },
-    }),
-  )
+  ownedList = await fakeList(page, 'retro_fan', 'owned', [
+    linkToThePast,
+    homebrew,
+    gtaV,
+  ])
+  wishlistList = await fakeList(page, 'retro_fan', 'wishlist', [
+    chrono,
+    { ...gtaV, platforms: ['PS4'] },
+  ])
   const calls: string[] = []
   await page.route('**/api/library-items/*/lists', (route) => {
     const request = route.request()
@@ -126,6 +121,9 @@ async function openLists(page: Page, listDelay = 0) {
       unwant: id === gtaV.id ? { owned: true, wishlisted: false } : null,
     }
     const state = states[type]
+    // The server drops the game from a list it is no longer on.
+    if (!state || !state.owned) ownedList.remove(id)
+    if (!state || !state.wishlisted) wishlistList.remove(id)
     return route.fulfill({
       json: {
         item: state && { ...base, id, ...state },
@@ -168,6 +166,9 @@ async function stubAdds(page: Page) {
         !remove.includes(collectionId) && all.indexOf(collectionId) === i,
     )
     inside.set(id, now)
+    const links = [zelda, snes].filter((c) => now.includes(c.id))
+    ownedList.update(id, { inCollections: links })
+    wishlistList.update(id, { inCollections: links })
     return route.fulfill({ json: { collectionIds: now } })
   })
   return adds
@@ -212,11 +213,15 @@ test('Owned shows the shared columns, with the collections and platforms', async
   await expect(rows.nth(0).getByText('SNES', { exact: true })).toHaveCount(2)
   await expect(rows.nth(2).getByText('X360')).toBeVisible()
 
-  // Searching finds games by the collections they're in.
-  const search = page.getByRole('searchbox', { name: 'Search this collection' })
-  await search.fill('zelda')
+  // The server searches the game's name.
+  const search = page
+    .getByRole('main')
+    .getByRole('searchbox', { name: 'Search games' })
+  await search.fill('homebrew')
   await expect(rows).toHaveCount(1)
+  await expect(page).toHaveURL(/q=homebrew/)
   await search.fill('')
+  await expect(rows).toHaveCount(3)
 
   // No fields, order, charts, import or sharing.
   await expect(page.getByRole('button', { name: 'Table' })).toHaveCount(0)
@@ -252,8 +257,9 @@ test('/owned opens the Owned list', async ({ page }) => {
 
 test('someone else gets a not found page for both lists', async ({ page }) => {
   for (const list of ['owned', 'wishlist']) {
-    await page.route(`**/api/u/someone/lists/${list}`, (route) =>
-      route.fulfill({ status: 404, json: { statusCode: 404 } }),
+    await page.route(
+      new RegExp(`/api/u/someone/lists/${list}(\\?.*)?$`),
+      (route) => route.fulfill({ status: 404, json: { statusCode: 404 } }),
     )
     await page.goto(`/u/someone/shelf/${list}`)
     await expect(
@@ -339,7 +345,9 @@ test('the Wishlist has its own rows, platforms and "Got it"', async ({
   ).toBeVisible()
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(2)
-  await expect(rows.nth(1).getByText('PS4')).toBeVisible()
+  await expect(
+    rows.filter({ hasText: 'Grand Theft Auto V' }).getByText('PS4'),
+  ).toBeVisible()
 
   await page.getByRole('button', { name: 'Actions for Chrono Trigger' }).click()
   await expect(

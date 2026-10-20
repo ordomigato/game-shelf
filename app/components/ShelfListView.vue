@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { ArrowLeft, Lock, PenLine, Plus } from '@lucide/vue'
+import { ArrowLeft, Download, Lock, PenLine, Plus } from '@lucide/vue'
+import { FetchError } from 'ofetch'
 import { toast } from 'vue-sonner'
 import { PLAN_LIMITS } from '#shared/utils/plans'
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  LIST_PAGE_SIZES,
+  viewFromQuery,
+  viewToQuery,
+  type ListView,
+} from '#shared/utils/list-view'
 import type {
   CollectionEntry,
   CollectionLink,
+  FieldValue,
+  ItemData,
   OwnerEntry,
   LibraryItem,
   ListName,
@@ -34,12 +44,100 @@ const shelfName = computed(() =>
     : t('shelf.userTitle', { username: username.value }),
 )
 
+// Rows per page is remembered on this device. The address names it only
+// once someone has chosen one.
+const SIZE_KEY = 'gameshelf:list-page-size'
+const savedSize = ref(DEFAULT_LIST_PAGE_SIZE)
+if (import.meta.client) {
+  try {
+    const stored = Number(localStorage.getItem(SIZE_KEY))
+    if ((LIST_PAGE_SIZES as readonly number[]).includes(stored)) {
+      savedSize.value = stored
+    }
+  } catch {
+    // Storage can be blocked. The default is fine.
+  }
+}
+
+// The page, rows per page, sort, search and filters are the address's query,
+// so the back button and a reload land in the same place.
+const view = computed(() => viewFromQuery(route.query, savedSize.value))
+const viewKey = computed(() =>
+  JSON.stringify(viewToQuery(view.value, { withSize: true })),
+)
+
+// The server sorts, searches and filters, so each change asks for one page.
+// The rows on screen stay until the new page arrives, and a newer request
+// cancels an older one so a slow answer never replaces a fresher one.
 const { data, status, error, refresh } = useAsyncData(
   () => `list-${username.value}-${props.list}`,
-  () => collections.getList(username.value, props.list),
-  { watch: [username, () => props.list] },
+  (_nuxt, { signal }) =>
+    collections.getList(username.value, props.list, view.value, signal),
+  { server: false, watch: [username, () => props.list, viewKey] },
 )
 const notFound = computed(() => error.value?.statusCode === 404)
+
+// Refetching after a change made here fills the gap without dimming.
+const quiet = ref(false)
+async function refetchQuietly() {
+  quiet.value = true
+  try {
+    await refresh()
+  } finally {
+    quiet.value = false
+  }
+}
+const loading = computed(
+  () => status.value === 'pending' && Boolean(data.value) && !quiet.value,
+)
+
+/** Changes what the list shows, by changing the address. */
+function showView(change: Partial<ListView>, replace = false) {
+  if (change.size !== undefined) {
+    savedSize.value = change.size
+    try {
+      localStorage.setItem(SIZE_KEY, String(change.size))
+    } catch {
+      // Not remembered, which is fine.
+    }
+  }
+  const next = { ...view.value, ...change }
+  void navigateTo(
+    {
+      path: route.path,
+      query: viewToQuery(next, {
+        withSize: 'size' in route.query || change.size !== undefined,
+      }),
+    },
+    { replace },
+  )
+}
+// Typing a search shouldn't fill the history with every pause.
+const onView = (change: Partial<ListView>) =>
+  showView(
+    change,
+    'q' in change &&
+      Object.keys(change).every((key) => key === 'q' || key === 'page'),
+  )
+
+// A page past the end comes back as the last one: the address follows.
+watch(data, (page) => {
+  if (page && page.page !== view.value.page) {
+    showView({ page: page.page }, true)
+  }
+})
+
+const tableServer = computed(() =>
+  data.value
+    ? {
+        view: view.value,
+        total: data.value.total,
+        listSize: data.value.itemCount,
+        loading: loading.value,
+        platforms: data.value.platforms,
+      }
+    : undefined,
+)
 
 // Only the Wishlist has a cap of its own. Over it, games can be kept and
 // removed but not added.
@@ -55,11 +153,28 @@ const proWishlist = PLAN_LIMITS.pro.wishlist
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
-// The loaded list is held shallowly, so changes replace it rather than
+// The loaded page is held shallowly, so changes replace it rather than
 // editing it in place.
 function setItems(items: OwnerEntry[]) {
   if (!data.value) return
-  data.value = { ...data.value, items, itemCount: items.length }
+  data.value = { ...data.value, items }
+}
+
+/**
+ * Takes a game off the page at once and from the counts, then asks for the
+ * page again so the next game takes its place.
+ */
+function leaveView(itemId: string) {
+  if (!data.value) return
+  const items = data.value.items.filter((entry) => entry.id !== itemId)
+  if (items.length === data.value.items.length) return
+  data.value = {
+    ...data.value,
+    items,
+    itemCount: data.value.itemCount - 1,
+    total: data.value.total - 1,
+  }
+  void refetchQuietly()
 }
 
 /** Whether a game is still on this list after a change. */
@@ -85,7 +200,7 @@ const offeringCollections = ref(false)
 async function gotIt(itemId: string) {
   const item = data.value?.items.find((entry) => entry.id === itemId)
   if (!(await moves.gotIt(itemId)) || !item) return
-  setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
+  leaveView(itemId)
   const alreadyIn = item.inCollections?.map(({ id }) => id) ?? []
   // The list may still be loading, or have failed to when the page opened.
   const owned = await sidebar.load().catch(() => mine.value)
@@ -102,12 +217,65 @@ function collectionsChanged(itemId: string, links: CollectionLink[]) {
       entry.id === itemId ? { ...entry, inCollections: links } : entry,
     ),
   )
+  // A collection filter or sort may now put the game elsewhere.
+  void refetchQuietly()
 }
 
 /** Moves an owned game to the Wishlist. It leaves Owned. */
 async function toWishlist(itemId: string) {
   if (!(await moves.toWishlist(itemId))) return
-  setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
+  leaveView(itemId)
+}
+
+/** Saves one value straight away in the table, undoing it if saving fails. */
+async function saveValue(
+  itemId: string,
+  fieldId: string,
+  value: FieldValue | null,
+) {
+  const item = data.value?.items.find((entry) => entry.id === itemId)
+  if (!item) return
+  const before = item.data
+  const setData = (itemData: ItemData) =>
+    setItems(
+      (data.value?.items ?? []).map((entry) =>
+        entry.id === itemId ? { ...entry, data: itemData } : entry,
+      ),
+    )
+  setData(
+    value === null
+      ? Object.fromEntries(
+          Object.entries(before).filter(([id]) => id !== fieldId),
+        )
+      : { ...before, [fieldId]: value },
+  )
+  try {
+    const saved = await collections.updateItemValues(itemId, {
+      [fieldId]: value,
+    })
+    setData(saved.data)
+  } catch {
+    setData(before)
+    toast.error(t('table.saveFailed'))
+  }
+}
+
+const exporting = ref(false)
+
+/** Downloads the whole list as CSV, whatever the search and filters. */
+async function exportCsv() {
+  exporting.value = true
+  try {
+    saveFile(await collections.exportList(props.list), `${props.list}.csv`)
+  } catch (e) {
+    toast.error(
+      e instanceof FetchError && e.statusCode === 429
+        ? t('account.settings.exportTooSoon')
+        : t('lists.exportFailed'),
+    )
+  } finally {
+    exporting.value = false
+  }
 }
 
 /**
@@ -120,9 +288,7 @@ async function removeItem(itemId: string) {
   try {
     const saved = await leaving.leave(item, props.list)
     if (!saved) return
-    if (!saved.item || !onList(saved.item)) {
-      setItems((data.value?.items ?? []).filter((entry) => entry.id !== itemId))
-    }
+    if (!saved.item || !onList(saved.item)) leaveView(itemId)
   } catch {
     toast.error(t('table.removeFailed'))
   }
@@ -144,6 +310,7 @@ function onRenamed(saved: LibraryItem) {
       entry.id === saved.id ? { ...entry, name: saved.name } : entry,
     ),
   )
+  void refetchQuietly()
 }
 </script>
 
@@ -164,7 +331,7 @@ function onRenamed(saved: LibraryItem) {
     </div>
 
     <div
-      v-else-if="status === 'pending' && !data"
+      v-else-if="!data && !error"
       class="flex flex-col gap-4"
       aria-hidden="true"
     >
@@ -199,6 +366,15 @@ function onRenamed(saved: LibraryItem) {
           </p>
         </div>
         <div class="flex items-center gap-2">
+          <Button variant="outline" :disabled="exporting" @click="exportCsv">
+            <Download />
+            <span class="hidden sm:inline">{{
+              $t('collection.exportCsv')
+            }}</span>
+            <span class="sr-only sm:hidden">{{
+              $t('collection.exportCsv')
+            }}</span>
+          </Button>
           <Button v-if="!fullCap" as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
@@ -243,7 +419,7 @@ function onRenamed(saved: LibraryItem) {
       </Alert>
 
       <div
-        v-if="!data.items.length"
+        v-if="!data.itemCount"
         class="rounded-lg border border-dashed py-12 text-center"
       >
         <p class="font-medium">{{ $t('collection.empty') }}</p>
@@ -265,12 +441,15 @@ function onRenamed(saved: LibraryItem) {
 
       <CollectionTable
         v-else
-        :fields="[]"
+        :fields="data.fields"
         :items="data.items"
         :mode="list"
         :add-targets="mine"
+        :server="tableServer"
         editable
         :shelf-path="shelfPath"
+        @view="onView"
+        @save="saveValue"
         @remove="removeItem"
         @rename="startRenaming"
         @collections-changed="collectionsChanged"

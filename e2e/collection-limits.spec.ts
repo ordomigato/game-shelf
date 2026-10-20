@@ -301,11 +301,16 @@ test('the Wishlist over its cap warns and stops adding', async ({ page }) => {
   await page.route('**/api/lists', (route) =>
     route.fulfill({ json: { owned: 0, wishlist: 230 } }),
   )
-  await page.route('**/api/u/retro_fan/lists/wishlist', (route) =>
+  await page.route(/\/api\/u\/retro_fan\/lists\/wishlist(\?.*)?$/, (route) =>
     route.fulfill({
       json: {
         list: 'wishlist',
         itemCount: 230,
+        total: 230,
+        page: 1,
+        size: 50,
+        fields: [],
+        platforms: [],
         items: Array.from({ length: 3 }, (_, i) => entry(i)),
       },
     }),

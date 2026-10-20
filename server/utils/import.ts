@@ -285,7 +285,7 @@ export async function importIntoCollection(
       from (values ${sql.join(
         toUpdate.map(
           (update) =>
-            sql`(${update.id}::uuid, ${JSON.stringify(update.data)}::jsonb, ${intArray(update.ownedOn)}, ${intArray(update.wantedOn)}, ${update.wishlisted})`,
+            sql`(${update.id}::uuid, ${JSON.stringify(update.data)}::jsonb, ${intArray(update.ownedOn)}, ${intArray(update.wantedOn)}, ${update.wishlisted}::boolean)`,
         ),
         sql`, `,
       )}) as changed(id, data, owned_on, wanted_on, wishlisted)

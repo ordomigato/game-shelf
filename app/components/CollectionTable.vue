@@ -705,20 +705,16 @@ function ariaSort(direction: false | 'asc' | 'desc') {
   return direction === 'asc' ? 'ascending' : 'descending'
 }
 
-// Sticky columns: the drag handle (2rem) and the cover (3rem) stay put on
-// phones. From sm up the name is pinned too, right after the cover.
+// Sticky columns at every width: only the drag handle (2rem) and the cover
+// (3rem) stay put. The name scrolls like any other column.
 function headerClass(id: string) {
   if (id === 'cover')
     return `sticky z-10 w-12 max-w-12 min-w-12 bg-card ${reorderable.value ? 'left-8' : 'left-0'}`
-  if (id === 'name')
-    return `bg-card sm:sticky sm:z-10 ${reorderable.value ? 'sm:left-20' : 'sm:left-12'}`
   return undefined
 }
 function cellClass(id: string) {
   if (id === 'cover')
     return `pinned-cell sticky z-10 w-12 max-w-12 min-w-12 ${reorderable.value ? 'left-8' : 'left-0'}`
-  if (id === 'name')
-    return `pinned-cell sm:sticky sm:z-10 ${reorderable.value ? 'sm:left-20' : 'sm:left-12'}`
   return undefined
 }
 
@@ -1042,7 +1038,7 @@ const addedFormat = computed(
               </component>
               <div
                 v-else-if="cell.column.id === 'name'"
-                class="flex max-w-56 min-w-40 flex-wrap items-center gap-x-2 gap-y-1 sm:max-w-80 sm:min-w-48"
+                class="flex max-w-64 min-w-40 flex-wrap items-center gap-x-2 gap-y-1"
               >
                 <component
                   :is="item.igdbId ? NuxtLink : 'div'"
@@ -1053,10 +1049,9 @@ const addedFormat = computed(
                 >
                   <!-- Cells don't wrap by default, so a long name needs this to
                        fold onto a few lines. -->
-                  <span
-                    class="line-clamp-3 break-words whitespace-normal sm:line-clamp-2"
-                    >{{ item.name }}</span
-                  >
+                  <span class="line-clamp-2 break-words whitespace-normal">{{
+                    item.name
+                  }}</span>
                 </component>
                 <Badge
                   v-if="!isList && item.wanted"

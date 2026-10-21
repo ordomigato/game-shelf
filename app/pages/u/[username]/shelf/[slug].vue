@@ -496,6 +496,10 @@ async function deleteCollection() {
               <Plus />
               {{ $t('collection.addGames') }}
             </Button>
+            <ScanButton
+              v-if="data.items.length"
+              :collection="{ id: data.id, title: data.title }"
+            />
             <Button
               v-if="ADD_BY_HAND && data.items.length"
               variant="outline"
@@ -593,6 +597,7 @@ async function deleteCollection() {
                 $t('collection.searchGames')
               }}</NuxtLink>
             </Button>
+            <ScanButton :collection="{ id: data.id, title: data.title }" />
             <Button
               v-if="ADD_BY_HAND"
               variant="outline"

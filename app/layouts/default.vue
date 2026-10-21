@@ -10,6 +10,7 @@
 const { signedIn, shelfPath } = useViewer()
 const app = computed(() => signedIn.value && shelfPath.value !== null)
 useSearchShortcut()
+const scannerOpen = useState('scanner-open', () => false)
 </script>
 
 <template>
@@ -31,5 +32,6 @@ useSearchShortcut()
       <SiteFooter />
     </div>
     <UnownDialog v-if="app" />
+    <LazyBarcodeScanner v-if="app && scannerOpen" />
   </div>
 </template>

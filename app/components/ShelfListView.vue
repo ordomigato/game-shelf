@@ -556,6 +556,7 @@ function onRenamed(saved: LibraryItem) {
             <Plus />
             {{ $t('collection.addGames') }}
           </Button>
+          <ScanButton v-if="data.isOwner" :list="list" />
           <Button
             v-if="data.isOwner && ADD_BY_HAND"
             variant="outline"

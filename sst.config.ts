@@ -29,6 +29,9 @@ export default $config({
     // Neon Postgres connection string. Each stage points at its own Neon
     // branch.
     const databaseUrl = new sst.Secret('DatabaseUrl')
+    // ScanDex (barcode lookups). The token is the owner's, so it is linked
+    // to the Nuxt server only and never reaches the browser.
+    const scanDexToken = new sst.Secret('ScanDexToken')
 
     // The sign-up and reset-password code email (Cognito sends both from
     // one template). HTML is free with Cognito's own sender.
@@ -202,6 +205,7 @@ export default $config({
         twitchClientId,
         twitchClientSecret,
         databaseUrl,
+        scanDexToken,
         userPool,
         userPoolClient,
       ],

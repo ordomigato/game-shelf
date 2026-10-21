@@ -2,6 +2,49 @@
   "app": {
     "title": "{page} - ThisPlayShelf"
   },
+  "scan": {
+    "button": "Scan",
+    "buttonLabel": "Scan barcodes",
+    "title": "Scan barcodes",
+    "description": "Scan the barcode on each box. Check the list, then add them all at once.",
+    "cameraLabel": "Camera view for scanning barcodes",
+    "cameraStarting": "Starting the camera…",
+    "cameraDenied": "The camera is blocked. Allow it in your browser settings to scan, or type the barcode below.",
+    "cameraNone": "This device has no camera we can use. Type the barcode below.",
+    "typeLabel": "Type the barcode",
+    "typePlaceholder": "Numbers under the barcode",
+    "typeAdd": "Add",
+    "notABarcode": "That isn't a barcode we can read. Check the numbers and try again.",
+    "listFull": "The list is full at {max} games. Add these first, then keep scanning.",
+    "listTitle": "Scanned",
+    "empty": "Nothing scanned yet.",
+    "lookingUp": "Looking up {code}",
+    "noMatch": "No match for {code}",
+    "failed": "Couldn't look this up",
+    "dailyLimit": "You've scanned a lot today. Try again tomorrow.",
+    "retry": "Try again",
+    "alreadyOwned": "Already owned",
+    "alreadyWishlisted": "Already on your Wishlist",
+    "remove": "Remove {name}",
+    "removeCode": "Remove {code}",
+    "tick": "Add {name}",
+    "listChoice": "Add to",
+    "toCollection": "Also add to {collection}",
+    "add": "Add {count} to {list}",
+    "adding": "Adding…",
+    "clear": "Clear list",
+    "closeTitle": "Close the scanner?",
+    "closeBody": "You have {count} scanned. They stay here until you add them or clear the list.",
+    "keepScanning": "Keep scanning",
+    "closeKeep": "Close",
+    "added": "Added {count} to {list}.",
+    "addedToCollection": "{count} joined {collection}.",
+    "withoutPlatform": "{count} was added without a platform. | {count} were added without a platform.",
+    "skippedAlready": "{count} was already there. | {count} were already there.",
+    "skippedOther": "{count} couldn't be added. | {count} couldn't be added.",
+    "addFailed": "Couldn't add these. Try again.",
+    "gone": "That collection no longer exists."
+  },
   "header": {
     "signIn": "Sign in",
     "account": "Account",
@@ -78,12 +121,14 @@
     "speed": "About a quarter of visits report how quickly pages load: anonymous timings, with no account or address attached. The server records which kinds of page were requested and how long they took, never what you typed.",
     "othersTitle": "Other services",
     "others": "Cover images load straight from IGDB, so IGDB sees your browser's address when you view them, as any website would.",
+    "scanningTitle": "Scanning barcodes",
+    "scanning": "The camera picture never leaves your device. Only the barcode number is sent to us, and we look it up through ScanDex.",
     "controlTitle": "Take it with you, or delete it",
     "control": "In {settings} you can export everything as spreadsheet files, or delete your account. Deleting removes your account and everything you've added. The database host keeps a few hours of history for recovery, after which it's gone for good.",
     "settingsLink": "Settings",
     "questionsTitle": "Questions",
     "questions": "Email {email}.",
-    "updated": "Last updated October 12, 2026."
+    "updated": "Last updated October 21, 2026."
   },
   "contact": {
     "title": "Contact",
@@ -158,7 +203,9 @@
       "games": "You can have up to {limit} games on your plan, owned or wishlisted.",
       "textLength": "Text fields can hold up to {limit} characters on your plan.",
       "chartsPerCollection": "A collection can have up to {limit} charts on your plan.",
-      "importRows": "Imports can take up to {limit} rows at a time on your plan."
+      "importRows": "Imports can take up to {limit} rows at a time on your plan.",
+      "bulkLibrary": "Your library has room for {fit} more. Untick some games and try again.",
+      "bulkCollection": "This collection has room for {fit} more. Untick some games and try again."
     }
   },
   "error": {

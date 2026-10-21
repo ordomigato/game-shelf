@@ -283,3 +283,29 @@ export const rateLimits = pgTable('rate_limits', {
   windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
   count: integer('count').notNull(),
 })
+
+/**
+ * ScanDex's answers for barcodes, so the same box isn't asked about twice.
+ * Only what ScanDex said is kept, never anything a user typed or chose. A
+ * row with no `igdbId` means ScanDex has no game for the barcode. Keys are
+ * normalised (`shared/utils/barcode.ts`). See `server/utils/barcodes.ts`.
+ */
+export const barcodeLookups = pgTable(
+  'barcode_lookups',
+  {
+    code: text('code').primaryKey(),
+    igdbId: integer('igdb_id'),
+    /** The IGDB platform (version) the box is for. */
+    platformId: integer('platform_id'),
+    platformName: text('platform_name'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      'barcode_lookups_match_parts',
+      sql`${table.igdbId} is not null or (${table.platformId} is null and ${table.platformName} is null)`,
+    ),
+  ],
+)

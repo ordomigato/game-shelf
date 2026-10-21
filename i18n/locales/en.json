@@ -83,7 +83,12 @@
     "failedWith": "Couldn't send: {message}",
     "requestFailed": "Couldn't send these. Try again.",
     "loading": "Loading…",
-    "loadFailed": "Couldn't load your barcodes. Try again later.",
+    "loadFailed": "Couldn't load your barcodes.",
+    "retry": "Try again",
+    "count": "{count} pick to share | {count} picks to share",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "progress": "Sent {done} of {total}",
     "empty": "Nothing to share right now."
   },
   "header": {
@@ -430,6 +435,7 @@
       "security": "Security",
       "fields": "Fields",
       "usage": "Usage",
+      "scandex": "ScanDex",
       "settings": "Settings"
     },
     "profile": {

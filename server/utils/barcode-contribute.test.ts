@@ -22,6 +22,8 @@ let updates: Record<string, unknown>[]
 let failClaim = false
 let joined: unknown[]
 let conditions: unknown[]
+let limits: number[]
+let statements: number
 
 const { PgDialect } = await import('drizzle-orm/pg-core')
 const { barcodeLookups, games, platforms } = await import('../db/schema')
@@ -31,6 +33,7 @@ const sqlOf = (condition: never) => new PgDialect().sqlToQuery(condition)
 
 vi.stubGlobal('useDb', () => ({
   select: () => {
+    statements += 1
     let rows: Row[] = []
     const query = {
       from: () => query,
@@ -50,7 +53,10 @@ vi.stubGlobal('useDb', () => ({
         return query
       },
       orderBy: () => query,
-      limit: () => query,
+      limit: (n: number) => {
+        limits.push(n)
+        return query
+      },
       then: (resolve: (rows: Row[]) => void) => resolve(rows),
     }
     return query
@@ -94,6 +100,8 @@ beforeEach(() => {
   updates = []
   joined = []
   conditions = []
+  limits = []
+  statements = 0
   failClaim = false
   log.mockReset()
   submitToScanDex.mockReset()
@@ -122,6 +130,20 @@ describe('listSuggestions', () => {
     expect(params).toContain('u1')
     expect(sql).toContain('"user_barcodes"."submitted_at" is null')
     expect(sql).toContain('"barcode_lookups"."igdb_id" is null')
+  })
+
+  it('lists every pick up to a cap of 1,000, in one statement', async () => {
+    eligible = Array.from({ length: 100 }, (_, i) =>
+      row(`590${String(i).padStart(10, '0')}`),
+    )
+    expect(await listSuggestions('u1')).toHaveLength(100)
+    expect(limits).toEqual([1000])
+    expect(statements).toBe(1)
+  })
+
+  it('keeps the limit of 20 when sending a given set of codes', async () => {
+    await sendSuggestions('u1', [CODE])
+    expect(limits).toEqual([20])
   })
 
   it('joins the platform and the game, so a pick with no platform is never listed', async () => {

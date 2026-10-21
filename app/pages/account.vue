@@ -6,13 +6,26 @@ definePageMeta({ middleware: 'auth' })
 const router = useRouter()
 const currentPath = computed(() => router.currentRoute.value.path)
 
-const tabs = [
+const auth = useAuth()
+
+// ScanDex is only listed for accounts allowed to share barcodes.
+const allTabs = [
   { to: '/account', labelKey: 'account.tabs.profile' },
   { to: '/account/security', labelKey: 'account.tabs.security' },
   { to: '/account/fields', labelKey: 'account.tabs.fields' },
   { to: '/account/usage', labelKey: 'account.tabs.usage' },
+  {
+    to: '/account/scandex',
+    labelKey: 'account.tabs.scandex',
+    contributors: true,
+  },
   { to: '/account/settings', labelKey: 'account.tabs.settings' },
 ]
+const tabs = computed(() =>
+  allTabs.filter(
+    (tab) => !tab.contributors || auth.me.value?.contributesBarcodes,
+  ),
+)
 </script>
 
 <template>

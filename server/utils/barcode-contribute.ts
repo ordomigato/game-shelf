@@ -8,8 +8,14 @@ import { barcodeLookups, games, platforms, userBarcodes } from '../db/schema'
 import { log } from './log'
 import { submitToScanDex } from './scandex'
 
-/** The most picks one request lists or sends. */
+/** The most picks one send request carries. */
 export const MAX_SENDS = 20
+
+/**
+ * The most picks one listing returns. Only a safety cap: a person's unsent
+ * picks are expected to number in the low hundreds at most.
+ */
+export const MAX_LISTED = 1000
 
 interface Eligible extends BarcodeSuggestion {
   platformId: number
@@ -30,14 +36,15 @@ export async function requireContributor(event: H3Event) {
 }
 
 /**
- * The user's own picks that ScanDex could be told about, newest first, at
- * most 20. Decided here and not by the browser. A pick is eligible when:
+ * The user's own picks that ScanDex could be told about, newest first.
+ * Decided here and not by the browser. A pick is eligible when:
  * - it has a platform (ScanDex needs one),
  * - our shared cache says ScanDex had no game for the code, so a Change on a
  *   ScanDex match is never eligible,
  * - and it hasn't been sent (`submitted_at` is null).
- * The game and platform names come from our catalog. `codes` narrows the
- * list to those barcodes.
+ * The game and platform names come from our catalog. With `codes` (a send)
+ * the list is narrowed to those barcodes and holds at most 20. Without them
+ * (a listing) it holds up to 1,000. One statement either way.
  */
 async function findEligible(
   ownerId: string,
@@ -66,11 +73,11 @@ async function findEligible(
       ),
     )
     .orderBy(desc(userBarcodes.updatedAt))
-    .limit(MAX_SENDS)
+    .limit(codes ? MAX_SENDS : MAX_LISTED)
   return rows
 }
 
-/** The picks the user could share, for them to choose from. */
+/** Every pick the user could share, for them to choose from. */
 export async function listSuggestions(
   ownerId: string,
 ): Promise<BarcodeSuggestion[]> {

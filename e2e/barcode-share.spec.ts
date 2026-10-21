@@ -175,42 +175,135 @@ test('an account that is not allowed never sees the share step or asks for picks
   expect(seen.lists).toBe(0)
 })
 
-test('Settings lists the picks to share, and says when there are none', async ({
-  page,
-}) => {
-  await signIn(page, true)
-  const seen = await stubSuggestions(
-    page,
-    [suggestion(3), suggestion(4)],
-    [
-      { code: ean(3), result: 'sent' },
-      { code: ean(4), result: 'sent' },
-    ],
-  )
-  await page.goto('/account/settings')
+const sharedTab = (page: Page) =>
+  page.getByRole('navigation', { name: 'Account sections' })
 
-  await expect(
-    page.getByRole('heading', { name: 'To share with ScanDex' }),
-  ).toBeVisible()
-  await expect(page.getByTestId('share-row')).toHaveCount(2)
-  await page.getByRole('button', { name: 'Send 2 to ScanDex' }).click()
-  await expect(page.getByTestId('share-sent')).toHaveCount(2)
-  expect(seen.sent).toEqual([[ean(3), ean(4)]])
-
-  // Done reloads the list, which is now empty.
-  await page.unroute('**/api/barcodes/suggestions')
-  await stubSuggestions(page, [])
-  await page.getByTestId('share-done').click()
-  await expect(page.getByText('Nothing to share right now.')).toBeVisible()
-})
-
-test('Settings has no share section for an account that is not allowed', async ({
+test('the ScanDex tab is hidden from a normal account and its address is not found', async ({
   page,
 }) => {
   await signIn(page, false)
   const seen = await stubSuggestions(page, [suggestion(3)])
+  await page.goto('/account')
+  await expect(
+    sharedTab(page).getByRole('link', { name: 'Usage' }),
+  ).toBeVisible()
+  await expect(
+    sharedTab(page).getByRole('link', { name: 'ScanDex' }),
+  ).toHaveCount(0)
+
+  await page.goto('/account/scandex')
+  await expect(
+    page.getByRole('heading', { name: 'Page not found' }),
+  ).toBeVisible()
+  await expect(page.getByTestId('scandex-page')).toHaveCount(0)
+  expect(seen.lists).toBe(0)
+})
+
+test('an allowed account sees the ScanDex tab and its list', async ({
+  page,
+}) => {
+  await signIn(page, true)
+  await stubSuggestions(page, [suggestion(3), suggestion(4)])
+  await page.goto('/account')
+  await sharedTab(page).getByRole('link', { name: 'ScanDex' }).click()
+  await expect(page).toHaveURL(/\/account\/scandex$/)
+  await expect(page.getByTestId('share-count')).toHaveText('2 picks to share')
+  await expect(page.getByTestId('share-row')).toHaveCount(2)
+  await expect(page.getByTestId('share-row').first()).toContainText(
+    `Nintendo Switch · ${ean(3)}`,
+  )
+})
+
+test('Select all and Clear change what is sent', async ({ page }) => {
+  await signIn(page, true)
+  await stubSuggestions(page, [suggestion(1), suggestion(2), suggestion(3)])
+  await page.goto('/account/scandex')
+  await expect(
+    page.getByRole('button', { name: 'Send 3 to ScanDex' }),
+  ).toBeEnabled()
+  await page.getByRole('button', { name: 'Clear' }).click()
+  await expect(
+    page.getByRole('button', { name: 'Send 0 to ScanDex' }),
+  ).toBeDisabled()
+  await page.getByRole('button', { name: 'Select all' }).click()
+  await expect(
+    page.getByRole('button', { name: 'Send 3 to ScanDex' }),
+  ).toBeEnabled()
+})
+
+test('45 picks are sent in 3 rounds with progress, and only the failures stay', async ({
+  page,
+}) => {
+  await signIn(page, true)
+  const all = Array.from({ length: 45 }, (_, i) => suggestion(i + 1))
+  // Every 10th pick fails.
+  const fails = (code: string) => Number(code.slice(3, 12)) % 10 === 0
+  const rounds: string[][] = []
+  let sentAll = false
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  await page.route('**/api/barcodes/suggestions', async (route) => {
+    if (route.request().method() === 'POST') {
+      const { codes } = route.request().postDataJSON() as { codes: string[] }
+      rounds.push(codes)
+      // The last round waits, so the progress after round 2 can be seen.
+      if (rounds.length === 3) await gate
+      if (rounds.length === 3) sentAll = true
+      return route.fulfill({
+        json: codes.map((code) =>
+          fails(code)
+            ? { code, result: 'failed', status: 400, message: 'Not valid' }
+            : { code, result: 'sent' },
+        ),
+      })
+    }
+    return route.fulfill({
+      json: sentAll ? all.filter((s) => fails(s.code)) : all,
+    })
+  })
+  await page.goto('/account/scandex')
+  await expect(page.getByTestId('share-count')).toHaveText('45 picks to share')
+
+  await page.getByRole('button', { name: 'Send 45 to ScanDex' }).click()
+  await expect(page.getByTestId('share-progress')).toHaveText('Sent 40 of 45')
+  await expect(page.getByRole('button', { name: 'Sending…' })).toBeDisabled()
+  await expect(page.getByTestId('share-failed')).toHaveCount(4)
+  release()
+
+  // The list reloads: the 4 failed picks (10, 20, 30, 40) stay, ticked.
+  await expect(page.getByTestId('share-count')).toHaveText('4 picks to share')
+  await expect(page.getByTestId('share-row')).toHaveCount(4)
+  await expect(page.getByTestId('share-failed').first()).toHaveText(
+    "Couldn't send: Not valid",
+  )
+  await expect(
+    page.getByRole('button', { name: 'Send 4 to ScanDex' }),
+  ).toBeEnabled()
+  expect(rounds.map((r) => r.length)).toEqual([20, 20, 5])
+})
+
+test('the ScanDex tab says when there is nothing to share, and offers a retry on an error', async ({
+  page,
+}) => {
+  await signIn(page, true)
+  let fail = true
+  await page.route('**/api/barcodes/suggestions', (route) =>
+    fail
+      ? route.fulfill({ status: 500, json: {} })
+      : route.fulfill({ json: [] }),
+  )
+  await page.goto('/account/scandex')
+  await expect(page.getByText("Couldn't load your barcodes.")).toBeVisible()
+  fail = false
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect(page.getByText('Nothing to share right now.')).toBeVisible()
+})
+
+test('Settings no longer has a share section', async ({ page }) => {
+  await signIn(page, true)
+  const seen = await stubSuggestions(page, [suggestion(3)])
   await page.goto('/account/settings')
   await expect(page.getByRole('heading', { name: 'Appearance' })).toBeVisible()
-  await expect(page.getByTestId('share-settings')).toHaveCount(0)
+  await expect(page.getByText('To share with ScanDex')).toHaveCount(0)
   expect(seen.lists).toBe(0)
 })

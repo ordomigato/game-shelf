@@ -66,7 +66,6 @@ async function deleteAccount() {
         <ThemeSwitcher show-labels />
       </CardContent>
     </Card>
-    <SettingsBarcodeShare v-if="auth.me.value?.contributesBarcodes" />
     <Card>
       <CardHeader>
         <CardTitle>

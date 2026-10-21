@@ -534,6 +534,7 @@ function onRenamed(saved: LibraryItem) {
           <VisibilityMenu
             v-if="data.isOwner"
             :visibility="data.visibility"
+            :list="list"
             :disabled="changingVisibility"
             @change="setVisibility"
           />
@@ -542,6 +543,7 @@ function onRenamed(saved: LibraryItem) {
             :path="`${shelfPath}/${list}`"
             :title="title"
             :is-public="data.visibility === 'public'"
+            :list="list"
             :make-public="() => setVisibility('public')"
           />
           <Button v-if="data.isOwner && !libraryFull" as-child>

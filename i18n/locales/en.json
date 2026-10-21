@@ -689,6 +689,8 @@
     "label": "Who can see this: {current}",
     "privateHint": "Only you can see it.",
     "publicHint": "Anyone with the link can see it, and it's listed on your collections page. Visitors see which platforms you own or want each game on.",
+    "publicHintOwned": "Anyone with the link can see it, and it's listed on your collections page. Visitors see which platforms you own each game on.",
+    "publicHintWishlist": "Anyone with the link can see it, and it's listed on your collections page. Visitors see which platforms you want each game on.",
     "nowPublic": "Collection is now public",
     "nowPrivate": "Collection is now private",
     "failed": "Couldn't change who can see it. Try again."
@@ -699,6 +701,8 @@
     "copyFailed": "Couldn't copy the link. Here it is: {url}",
     "makePublicTitle": "Make it public to share?",
     "makePublicBody": "Anyone with the link will be able to see this, and it will be listed on your collections page. Visitors see which platforms you own or want each game on. You can make it private again at any time.",
+    "makePublicBodyOwned": "Anyone with the link will be able to see this, and it will be listed on your collections page. Visitors see which platforms you own each game on. You can make it private again at any time.",
+    "makePublicBodyWishlist": "Anyone with the link will be able to see this, and it will be listed on your collections page. Visitors see which platforms you want each game on. You can make it private again at any time.",
     "makePublicConfirm": "Make public and share"
   },
   "preview": {

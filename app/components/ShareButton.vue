@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Share2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import type { ListName } from '#shared/types/collection'
 
 /**
  * Shares a page's link: the device's share sheet where there is one (most
@@ -12,6 +13,8 @@ const props = defineProps<{
   path: string
   title: string
   isPublic: boolean
+  /** Set for the Owned and Wishlist lists, which show one kind of platform. */
+  list?: ListName
   /** Makes the collection public. Resolves false if that failed. */
   makePublic?: () => Promise<boolean>
 }>()
@@ -60,7 +63,13 @@ async function publishAndShare() {
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t('share.makePublicTitle') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('share.makePublicBody') }}
+          {{
+            list === 'owned'
+              ? $t('share.makePublicBodyOwned')
+              : list === 'wishlist'
+                ? $t('share.makePublicBodyWishlist')
+                : $t('share.makePublicBody')
+          }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>

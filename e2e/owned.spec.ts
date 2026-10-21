@@ -200,6 +200,7 @@ test('Owned shows the shared columns, with the collections and platforms', async
   await page.goto('/u/retro_fan/shelf/owned')
   const table = page.getByRole('table')
   await expect(table.getByRole('columnheader')).toHaveText([
+    /Cover/,
     /Name/,
     /Collections/,
     /Released/,

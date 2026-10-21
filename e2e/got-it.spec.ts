@@ -384,7 +384,11 @@ test('the pinned name matches the row while its menu is open', async ({
 }) => {
   await openSnes(page)
   // By CSS: an open menu hides the rest of the page from role queries.
-  const name = page.locator('table tbody tr').first().locator('.pinned-cell')
+  const name = page
+    .locator('table tbody tr')
+    .first()
+    .locator('.pinned-cell')
+    .last()
   const closed = await name.evaluate(
     (el) => getComputedStyle(el).backgroundColor,
   )

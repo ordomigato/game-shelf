@@ -72,7 +72,7 @@ import { formatReleased, releaseSortDate } from '#shared/utils/release-date'
  * sorting, search, filters and paging to the server: `items` is then one
  * page, and the table asks for changes with `view` instead of making them.
  *
- * The owner can hide columns (all but the name). `hiddenColumns` holds the
+ * The owner can hide columns (all but the cover and the name). `hiddenColumns` holds the
  * keys of the hidden ones and `hideColumns` asks the page to save a new set.
  */
 const props = defineProps<{
@@ -426,6 +426,13 @@ const columnVisibility = computed<VisibilityState>(() =>
 )
 
 const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
+  // Display only: not sortable, not hideable, not in any export.
+  {
+    id: 'cover',
+    header: () => t('table.cover'),
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     id: 'name',
     accessorFn: (item) => item.name,
@@ -512,10 +519,10 @@ const columns = computed<ColumnDef<CollectionEntry>[]>(() => [
   },
 ])
 
-// The columns the owner can hide: all but the name.
+// The columns the owner can hide: all but the cover and the name.
 const hideable = computed(() =>
   columns.value
-    .filter((column) => column.id !== 'name')
+    .filter((column) => column.id !== 'name' && column.id !== 'cover')
     .map((column) => ({
       id: column.id!,
       label: (column.header as () => string)(),
@@ -696,6 +703,23 @@ function fieldOf(columnId: string) {
 function ariaSort(direction: false | 'asc' | 'desc') {
   if (!direction) return 'none'
   return direction === 'asc' ? 'ascending' : 'descending'
+}
+
+// Sticky columns: the drag handle (2rem) and the cover (3rem) stay put on
+// phones. From sm up the name is pinned too, right after the cover.
+function headerClass(id: string) {
+  if (id === 'cover')
+    return `sticky z-10 w-12 max-w-12 min-w-12 bg-card ${reorderable.value ? 'left-8' : 'left-0'}`
+  if (id === 'name')
+    return `bg-card sm:sticky sm:z-10 ${reorderable.value ? 'sm:left-20' : 'sm:left-12'}`
+  return undefined
+}
+function cellClass(id: string) {
+  if (id === 'cover')
+    return `pinned-cell sticky z-10 w-12 max-w-12 min-w-12 ${reorderable.value ? 'left-8' : 'left-0'}`
+  if (id === 'name')
+    return `pinned-cell sm:sticky sm:z-10 ${reorderable.value ? 'sm:left-20' : 'sm:left-12'}`
+  return undefined
 }
 
 const addedFormat = computed(
@@ -914,18 +938,23 @@ const addedFormat = computed(
         <TableHeader>
           <!-- Header cells don't react to hover like the rows below. -->
           <TableRow class="hover:bg-transparent">
-            <TableHead v-if="reorderable" class="w-8 pr-0">
+            <TableHead
+              v-if="reorderable"
+              class="sticky left-0 z-10 w-8 max-w-8 min-w-8 bg-card pr-0"
+            >
               <span class="sr-only">{{ $t('table.order') }}</span>
             </TableHead>
             <TableHead
               v-for="header in table.getFlatHeaders()"
               :key="header.id"
               :aria-sort="ariaSort(header.column.getIsSorted())"
-              :class="{
-                'sticky left-0 z-10 min-w-48 bg-card': header.id === 'name',
-              }"
+              :class="headerClass(header.id)"
             >
+              <span v-if="header.id === 'cover'" class="sr-only">{{
+                (header.column.columnDef.header as () => string)()
+              }}</span>
               <button
+                v-else
                 type="button"
                 class="-mx-2 inline-flex items-center gap-1 rounded-md px-2 py-1 whitespace-nowrap outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                 @click="header.column.toggleSorting()"
@@ -977,7 +1006,10 @@ const addedFormat = computed(
             :key="item.id"
             :class="{ 'is-wanted': isWanted(item) }"
           >
-            <TableCell v-if="reorderable" class="w-8 pr-0">
+            <TableCell
+              v-if="reorderable"
+              class="sticky left-0 z-10 w-8 max-w-8 min-w-8 pinned-cell pr-0"
+            >
               <!-- Keyboard users move games from the row menu instead. -->
               <span
                 class="drag-handle flex cursor-grab touch-none items-center justify-center rounded-sm py-1 text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
@@ -990,28 +1022,41 @@ const addedFormat = computed(
             <TableCell
               v-for="cell in rowOf(item).getVisibleCells()"
               :key="cell.id"
-              :class="{
-                // See .pinned-cell in tailwind.css.
-                'pinned-cell sticky left-0 z-10': cell.column.id === 'name',
-              }"
+              :class="cellClass(cell.column.id)"
             >
+              <!-- The name link already reaches the game, so this one is
+                   skipped by the keyboard and screen readers. -->
+              <component
+                :is="item.igdbId ? NuxtLink : 'div'"
+                v-if="cell.column.id === 'cover'"
+                :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
+                class="wanted-fade block w-8 rounded-sm outline-none"
+                :tabindex="item.igdbId ? -1 : undefined"
+                aria-hidden="true"
+              >
+                <GameCover
+                  :name="item.name"
+                  :cover-id="item.coverId"
+                  size="thumb"
+                />
+              </component>
               <div
-                v-if="cell.column.id === 'name'"
-                class="flex items-center gap-2"
+                v-else-if="cell.column.id === 'name'"
+                class="flex max-w-56 min-w-40 flex-wrap items-center gap-x-2 gap-y-1 sm:max-w-80 sm:min-w-48"
               >
                 <component
                   :is="item.igdbId ? NuxtLink : 'div'"
                   :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
-                  class="wanted-fade flex min-w-0 flex-1 items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  class="wanted-fade min-w-0 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   :class="{ 'hover:underline': item.igdbId }"
+                  :title="item.name"
                 >
-                  <GameCover
-                    :name="item.name"
-                    :cover-id="item.coverId"
-                    size="thumb"
-                    class="w-8 shrink-0"
-                  />
-                  <span class="line-clamp-2">{{ item.name }}</span>
+                  <!-- Cells don't wrap by default, so a long name needs this to
+                       fold onto a few lines. -->
+                  <span
+                    class="line-clamp-3 break-words whitespace-normal sm:line-clamp-2"
+                    >{{ item.name }}</span
+                  >
                 </component>
                 <Badge
                   v-if="!isList && item.wanted"

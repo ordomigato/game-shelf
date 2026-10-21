@@ -71,6 +71,7 @@ test.describe('visitors', () => {
   }) => {
     await openCollection(page, false)
     await expect(page.getByRole('columnheader')).toHaveText([
+      'Cover',
       'Name',
       'Released',
       'Genre',
@@ -359,4 +360,52 @@ test.describe('long collections', () => {
     await expect(remove).toBeVisible()
     expect((await remove.boundingBox())!.height).toBeLessThan(40)
   })
+})
+
+const longName = 'The Legend of Zelda: Breath of the Wild – Expansion Pass'
+
+const isSticky = (page: Page, name: string) =>
+  page
+    .getByRole('columnheader', { name })
+    .evaluate((el) => getComputedStyle(el).position === 'sticky')
+
+for (const width of [375, 390]) {
+  for (const owner of [true, false]) {
+    test(`only the cover is pinned on a ${width}px phone as ${owner ? 'the owner' : 'a visitor'}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await openCollection(page, owner, [
+        item(1, longName, { status: 'Playing' }),
+        ...items.slice(1),
+      ])
+      expect(await isSticky(page, 'Cover')).toBe(true)
+      expect(await isSticky(page, 'Name')).toBe(false)
+      const cover = await page
+        .getByRole('columnheader', { name: 'Cover' })
+        .boundingBox()
+      const table = await page.getByRole('table').boundingBox()
+      expect(cover!.x + cover!.width - table!.x).toBeLessThan(width * 0.25)
+      // The other columns are still there, scrolled sideways beside it.
+      await expect(
+        page.getByRole('columnheader', { name: 'Genre' }),
+      ).toBeAttached()
+    })
+  }
+}
+
+test('the cover and the name are both pinned on a wide screen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await openCollection(page, true)
+  expect(await isSticky(page, 'Cover')).toBe(true)
+  expect(await isSticky(page, 'Name')).toBe(true)
+  const cover = await page
+    .getByRole('columnheader', { name: 'Cover' })
+    .boundingBox()
+  const name = await page
+    .getByRole('columnheader', { name: 'Name' })
+    .boundingBox()
+  expect(name!.x).toBeGreaterThanOrEqual(cover!.x + cover!.width - 1)
 })

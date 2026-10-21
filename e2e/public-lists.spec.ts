@@ -142,6 +142,7 @@ test.describe('a visitor', () => {
     await expect(page.getByTestId('list-usage')).toHaveText('2 games')
     const table = page.getByRole('table')
     await expect(table.getByRole('columnheader')).toHaveText([
+      /Cover/,
       /Name/,
       /Released/,
       /Genre/,

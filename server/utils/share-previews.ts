@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNotNull } from 'drizzle-orm'
+import { and, asc, count, desc, eq } from 'drizzle-orm'
 import en from '../../i18n/locales/en.json'
 import type { ListName } from '../../shared/types/collection'
 import type { Message } from '../../shared/types/message'
@@ -9,9 +9,16 @@ import {
   shelfPreview,
   type SharePreview,
 } from '../../shared/utils/share-preview'
+import {
+  SITE_NAME,
+  canonicalUrl,
+  collectionJsonLd,
+  jsonLdScript,
+  type ListedGame,
+} from '../../shared/utils/seo'
 import { collectionItems, collections, games, libraryItems } from '../db/schema'
 import type { users } from '../db/schema'
-import { catalogJoin, itemCoverId } from './collections'
+import { catalogJoin, itemCoverId, itemName } from './collections'
 
 /**
  * A message in English, the only language so far. Plural messages pick a
@@ -48,6 +55,11 @@ const escape = (value: string) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
+/** The size of a collection's cover (IGDB's `cover_big`). */
+const COVER_SIZE = { width: 264, height: 374 }
+/** The size of the site image, /og.png. */
+const SITE_IMAGE_SIZE = { width: 1200, height: 630 }
+
 /** The Open Graph and Twitter tags for a preview, ready for the page head. */
 export function previewTags(
   preview: SharePreview,
@@ -56,25 +68,75 @@ export function previewTags(
 ): string[] {
   const title = translate(preview.title)
   const description = translate(preview.description).slice(0, 300)
+  // A collection's first cover when it has one, otherwise the site image.
+  const image = preview.image ?? `${site}/og.png`
+  const size = preview.image ? COVER_SIZE : SITE_IMAGE_SIZE
+  const alt = preview.image ? title : translate({ key: 'preview.imageAlt' })
   const tags: [string, string, string][] = [
     ['name', 'description', description],
-    ['property', 'og:site_name', 'ThisPlayShelf'],
+    ['property', 'og:site_name', SITE_NAME],
     ['property', 'og:type', 'website'],
     ['property', 'og:url', url],
     ['property', 'og:title', title],
     ['property', 'og:description', description],
+    ['property', 'og:image', image],
+    ['property', 'og:image:width', String(size.width)],
+    ['property', 'og:image:height', String(size.height)],
+    ['property', 'og:image:alt', alt],
+    // A portrait cover fits the small card better than the wide one.
     ['name', 'twitter:card', preview.image ? 'summary' : 'summary_large_image'],
     ['name', 'twitter:title', title],
     ['name', 'twitter:description', description],
+    ['name', 'twitter:image', image],
+    ['name', 'twitter:image:alt', alt],
   ]
-  // A collection's first cover when it has one, otherwise the site image.
-  const image = preview.image ?? `${site}/og.png`
-  tags.push(['property', 'og:image', image])
-  tags.push(['name', 'twitter:image', image])
   return tags.map(
     ([attribute, name, content]) =>
       `<meta ${attribute}="${name}" content="${escape(content)}">`,
   )
+}
+
+/**
+ * Everything the server adds to the head of a shared page: the canonical
+ * link, the preview tags and, for a collection or list, its structured data.
+ */
+export function previewHead(
+  preview: SharePreview,
+  path: string,
+  site: string,
+): string[] {
+  const url = canonicalUrl(site, path)
+  return [
+    `<link rel="canonical" href="${escape(url)}">`,
+    ...previewTags(preview, url, site),
+    ...(preview.games
+      ? [
+          `<script type="application/ld+json">${jsonLdScript(
+            collectionJsonLd({
+              name: translate(preview.title),
+              url,
+              description: translate(preview.description),
+              games: preview.games,
+              site,
+            }),
+          )}</script>`,
+        ]
+      : []),
+  ]
+}
+
+/** How many games a collection's structured data names. */
+const LISTED_GAMES = 25
+
+/** The image and games for a preview, from a collection's first games. */
+function previewGames(
+  first: { name: string; igdbId: number | null; coverId: string | null }[],
+): { image?: string; games: ListedGame[] } {
+  const coverId = first.find((game) => game.coverId)?.coverId
+  return {
+    ...(coverId && { image: igdbImageUrl(coverId, 'cover_big') }),
+    games: first.map(({ name, igdbId }) => ({ name, igdbId })),
+  }
 }
 
 /**
@@ -90,15 +152,19 @@ async function listPreview(
   const db = useDb()
   const flag = list === 'owned' ? libraryItems.owned : libraryItems.wishlisted
   const onList = and(eq(libraryItems.ownerId, owner.id), eq(flag, true))
-  const [[{ value: itemCount } = { value: 0 }], [cover]] = await Promise.all([
+  const [[{ value: itemCount } = { value: 0 }], first] = await Promise.all([
     db.select({ value: count() }).from(libraryItems).where(onList),
     db
-      .select({ coverId: itemCoverId })
+      .select({
+        name: itemName,
+        igdbId: libraryItems.igdbId,
+        coverId: itemCoverId,
+      })
       .from(libraryItems)
       .leftJoin(games, catalogJoin)
-      .where(and(onList, isNotNull(itemCoverId)))
+      .where(onList)
       .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
-      .limit(1),
+      .limit(LISTED_GAMES),
   ])
   return collectionPreview({
     collection: translate({
@@ -107,9 +173,7 @@ async function listPreview(
     owner: ownerName,
     description: null,
     itemCount,
-    image: cover?.coverId
-      ? igdbImageUrl(cover.coverId, 'cover_big')
-      : undefined,
+    ...previewGames(first),
   })
 }
 
@@ -156,32 +220,29 @@ export async function findSharePreview(
       ),
     )
   if (!collection) return null
-  const [[{ value: itemCount } = { value: 0 }], [cover]] = await Promise.all([
+  const [[{ value: itemCount } = { value: 0 }], first] = await Promise.all([
     db
       .select({ value: count() })
       .from(collectionItems)
       .where(eq(collectionItems.collectionId, collection.id)),
     db
-      .select({ coverId: itemCoverId })
+      .select({
+        name: itemName,
+        igdbId: libraryItems.igdbId,
+        coverId: itemCoverId,
+      })
       .from(collectionItems)
       .innerJoin(libraryItems, eq(libraryItems.id, collectionItems.itemId))
       .leftJoin(games, catalogJoin)
-      .where(
-        and(
-          eq(collectionItems.collectionId, collection.id),
-          isNotNull(itemCoverId),
-        ),
-      )
+      .where(eq(collectionItems.collectionId, collection.id))
       .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
-      .limit(1),
+      .limit(LISTED_GAMES),
   ])
   return collectionPreview({
     collection: collection.title,
     owner: ownerName,
     description: collection.description,
     itemCount,
-    image: cover?.coverId
-      ? igdbImageUrl(cover.coverId, 'cover_big')
-      : undefined,
+    ...previewGames(first),
   })
 }

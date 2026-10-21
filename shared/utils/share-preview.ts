@@ -1,4 +1,5 @@
 import type { Message } from '../types/message'
+import type { ListedGame } from './seo'
 
 /** What a shared link's preview says, as messages to put in the reader's language. */
 export interface SharePreview {
@@ -6,6 +7,8 @@ export interface SharePreview {
   description: Message
   /** An image URL for the preview, when there is one. */
   image?: string
+  /** The first games of a collection or list, for its structured data. */
+  games?: ListedGame[]
 }
 
 /** The shared pages that get a preview: a shelf, or one collection on it. */
@@ -31,6 +34,7 @@ export function collectionPreview(input: {
   description: string | null
   itemCount: number
   image?: string
+  games?: ListedGame[]
 }): SharePreview {
   return {
     title: {
@@ -44,6 +48,7 @@ export function collectionPreview(input: {
           params: { count: input.itemCount },
         },
     ...(input.image && { image: input.image }),
+    ...(input.games && { games: input.games }),
   }
 }
 

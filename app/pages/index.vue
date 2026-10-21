@@ -129,27 +129,24 @@ const showTooShort = computed(
     input.value.trim().length > 0 &&
     input.value.trim().length < MIN_SEARCH_LENGTH,
 )
-// Rendered on the server. Tells search engines the site name and how to
-// search it, so results can show a search box for the site.
+// Rendered on the server. Tells search engines the site name, logo and how
+// to search it, so results can show a search box for the site. Search
+// results (`/?q=zelda`) are left out of the index, and the canonical link
+// (app.vue) points them back to the home page.
 const site = useSiteUrl()
-useHead({
+useHead(() => ({
+  title: t('app.title', { page: t('seo.homeTitle') }),
   script: [
     {
       type: 'application/ld+json',
-      innerHTML: () =>
-        JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'WebSite',
-          name: 'ThisPlayShelf',
-          url: `${site.value}/`,
-          potentialAction: {
-            '@type': 'SearchAction',
-            target: `${site.value}/?q={search_term_string}`,
-            'query-input': 'required name=search_term_string',
-          },
-        }),
+      innerHTML: jsonLdScript(siteJsonLd(site.value)),
     },
   ],
+}))
+useSeoMeta({
+  description: () => t('seo.descriptions.home'),
+  ogDescription: () => t('seo.descriptions.home'),
+  robots: () => robotsFor(route.path, route.query),
 })
 
 const resultsLabel = computed(() => {

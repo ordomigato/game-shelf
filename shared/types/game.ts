@@ -1,3 +1,5 @@
+import type { ReleasePrecision } from '../utils/release-date'
+
 /** A game as shown in search results. */
 export interface GameSummary {
   id: number
@@ -29,6 +31,8 @@ export interface GameDetails {
   coverId: string | null
   /** First release date as `YYYY-MM-DD` (UTC), or null when unknown. */
   releaseDate: string | null
+  /** How exact `releaseDate` is: a year-only game is dated 1 January. */
+  releasePrecision: ReleasePrecision | null
   summary: string | null
   /** Full platform names, e.g. "Super Nintendo Entertainment System". */
   platforms: string[]

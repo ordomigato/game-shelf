@@ -9,9 +9,9 @@ import type { ExploreCollection, ExplorePage } from '#shared/types/collection'
 const { t } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('explore.title') }) }))
 useSeoMeta({
-  description: () => t('explore.description'),
+  description: () => t('seo.descriptions.explore'),
   ogTitle: () => t('app.title', { page: t('explore.title') }),
-  ogDescription: () => t('explore.description'),
+  ogDescription: () => t('seo.descriptions.explore'),
 })
 
 // The request's own fetch, which also works while rendering on the server (a

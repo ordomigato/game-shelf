@@ -32,18 +32,41 @@ useHead(() => ({
     : 'ThisPlayShelf',
 }))
 
-// Rendered on the server, so link previews show the game.
+// Rendered on the server, so link previews and search engines see the game.
+// CloudFront doesn't keep this page: the server draws the signed-in layout
+// from a cookie, so it differs by viewer. The game's data is cached instead
+// (server/api/games/[id].get.ts).
+const site = useSiteUrl()
+const description = computed(() =>
+  game.value ? gameDescription(game.value, t) : t('seo.descriptions.home'),
+)
+const cover = computed(() =>
+  game.value?.coverId ? gameCoverUrl(game.value.coverId) : null,
+)
 useSeoMeta({
-  description: () => game.value?.summary?.slice(0, 300) ?? t('preview.site'),
+  description: () => description.value,
   ogTitle: () => game.value?.name ?? 'ThisPlayShelf',
-  ogDescription: () => game.value?.summary?.slice(0, 300) ?? t('preview.site'),
-  ogImage: () =>
-    game.value?.coverId
-      ? igdbImageUrl(game.value.coverId, 'cover_big')
-      : undefined,
+  ogDescription: () => description.value,
+  ogImage: () => cover.value ?? `${site.value}/og.png`,
+  ogImageWidth: () => (cover.value ? GAME_COVER_SIZE.width : 1200),
+  ogImageHeight: () => (cover.value ? GAME_COVER_SIZE.height : 630),
+  ogImageAlt: () =>
+    game.value && cover.value
+      ? t('game.coverAlt', { name: game.value.name })
+      : t('preview.imageAlt'),
   // A portrait cover fits the small card better than the wide one.
-  twitterCard: () => (game.value?.coverId ? 'summary' : 'summary_large_image'),
+  twitterCard: () => (cover.value ? 'summary' : 'summary_large_image'),
 })
+useHead(() => ({
+  script: game.value
+    ? [
+        {
+          type: 'application/ld+json',
+          innerHTML: jsonLdScript(gameJsonLd(game.value, site.value)),
+        },
+      ]
+    : [],
+}))
 
 // Show whether the game is already in a collection. Browser only, once the
 // page has hydrated, so the server-rendered button never changes under Vue.

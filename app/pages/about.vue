@@ -7,9 +7,9 @@ const linkClass =
 const { t } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('about.title') }) }))
 useSeoMeta({
-  description: () => t('about.intro'),
+  description: () => t('seo.descriptions.about'),
   ogTitle: () => t('app.title', { page: t('about.title') }),
-  ogDescription: () => t('about.intro'),
+  ogDescription: () => t('seo.descriptions.about'),
 })
 </script>
 

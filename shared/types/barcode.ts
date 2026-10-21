@@ -27,6 +27,8 @@ export interface BulkAddEntry {
   barcode?: string
   /** The user picked this game for `barcode` (Find it or Change). */
   own?: boolean
+  /** Only remember `barcode` for the user. Never adds the game. */
+  rememberOnly?: boolean
 }
 
 /** Why a game in a bulk add was left alone. */

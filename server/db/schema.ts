@@ -314,9 +314,10 @@ export const barcodeLookups = pgTable(
  * A game a user matched to a barcode themselves (Find it or Change in the
  * scanner), kept for that user only so scanning the box again is instant.
  * It is never shared, never copied into `barcode_lookups` and never sent to
- * ScanDex. A row is written only in the batch that adds the game, so the
- * game is then in the user's library and the library's cap on games bounds
- * how many a person can keep. Every query is scoped by `owner_id`. Keys are
+ * ScanDex. A row is written only in a bulk add, for a game that is in the
+ * user's library then. Rows are keyed by barcode, so the library doesn't
+ * bound them: `bulkAdd` stops saving new ones once a user holds as many as
+ * their plan's game limit. Every query is scoped by `owner_id`. Keys are
  * normalised like `barcode_lookups.code`.
  */
 export const userBarcodes = pgTable(

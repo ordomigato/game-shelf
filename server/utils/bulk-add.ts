@@ -25,8 +25,8 @@ function noRoomFor(where: keyof typeof BULK_NO_ROOM, fit: number): never {
 
 /**
  * The barcodes the user matched themselves, for games that end up in the
- * library (added, or already there). Skipped and unknown games leave no
- * trace, and a ScanDex match is never kept here. The platform is kept only
+ * library (added, or already there). Unknown games leave no trace, and a
+ * ScanDex match is never kept here. The platform is kept only
  * if the catalog lists it for the game, as the add does. For a barcode named
  * twice in a batch, the last pick wins.
  */
@@ -56,6 +56,32 @@ function ownPicks(
 }
 
 /**
+ * Stored picks are capped per user at the plan's game limit, since they are
+ * keyed by barcode and a library of games doesn't bound them. Once a user is
+ * at the cap, a pick for a barcode they have no pick for yet is left out.
+ * Changing a pick they already have still works.
+ */
+async function withRoomForPicks<T extends { code: string }>(
+  ownerId: string,
+  limits: PlanLimits,
+  picks: T[],
+): Promise<T[]> {
+  if (!picks.length) return picks
+  const stored = await useDb()
+    .select({ code: userBarcodes.code })
+    .from(userBarcodes)
+    .where(eq(userBarcodes.ownerId, ownerId))
+  const known = new Set(stored.map((row) => row.code))
+  let room = Math.max(0, limits.games - known.size)
+  return picks.filter((pick) => {
+    if (known.has(pick.code)) return true
+    if (room <= 0) return false
+    room -= 1
+    return true
+  })
+}
+
+/**
  * Puts many IGDB games on Owned or the Wishlist (and into one of the user's
  * collections) at once, with the rules of adding them one by one (see
  * `planBulkAdd`). The games are read in a few queries and written in one
@@ -70,8 +96,16 @@ export async function bulkAdd(
   input: { list: ListName; collectionId?: string; entries: BulkAddEntry[] },
 ): Promise<BulkAddResult> {
   const db = useDb()
-  const entries = dedupeEntries(input.entries)
-  const igdbIds = [...new Set(entries.map((entry) => entry.igdbId))]
+  // `rememberOnly` entries only carry a barcode and are never added.
+  const entries = dedupeEntries(
+    input.entries.filter((entry) => !entry.rememberOnly),
+  )
+  const igdbIds = [
+    ...new Set([
+      ...entries.map((entry) => entry.igdbId),
+      ...input.entries.map((entry) => entry.igdbId),
+    ]),
+  ]
   if (input.collectionId) {
     await assertOwnsCollections(ownerId, [input.collectionId])
   }
@@ -182,7 +216,14 @@ export async function bulkAdd(
         on conflict do nothing`),
     )
   }
-  const picks = ownPicks(input.entries, new Set(plan.present), catalog)
+  // A barcode is remembered for a game that is now in the library: one just
+  // added, or one that was already there.
+  const inLibrary = new Set([...plan.present, ...existing.keys()])
+  const picks = await withRoomForPicks(
+    ownerId,
+    limits,
+    ownPicks(input.entries, inLibrary, catalog),
+  )
   if (picks.length) {
     statements.push(
       db

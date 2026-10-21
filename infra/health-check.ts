@@ -9,10 +9,7 @@ import {
 import { PublishCommand, SNSClient } from '@aws-sdk/client-sns'
 import { neon } from '@neondatabase/serverless'
 import { Resource } from 'sst'
-import {
-  BARCODE_MATCH_TTL_MS,
-  BARCODE_NO_MATCH_TTL_MS,
-} from '../shared/utils/barcode'
+import { BARCODE_NO_MATCH_TTL_MS } from '../shared/utils/barcode'
 import { type HealthReport, problems, summary } from './health'
 
 /**
@@ -48,16 +45,15 @@ export async function handler(): Promise<void> {
 }
 
 /**
- * Deletes cached barcode answers too old to be used again (one statement),
- * so the table doesn't grow for ever. A failure is only logged.
+ * Deletes cached "no match" answers too old to be used again (one
+ * statement). Matches are kept for good. A failure is only logged.
  */
 async function pruneBarcodeCache(): Promise<void> {
   try {
     await neon(Resource.DatabaseUrl.value)`
       delete from barcode_lookups
-      where fetched_at < now() - make_interval(secs => case
-        when igdb_id is null then ${BARCODE_NO_MATCH_TTL_MS / 1000}::double precision
-        else ${BARCODE_MATCH_TTL_MS / 1000}::double precision end)`
+      where igdb_id is null
+        and fetched_at < now() - make_interval(secs => ${BARCODE_NO_MATCH_TTL_MS / 1000}::double precision)`
   } catch (error) {
     console.error('barcode cache prune failed', error)
   }

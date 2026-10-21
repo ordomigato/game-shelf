@@ -7,6 +7,7 @@ import type { ListName } from '#shared/types/collection'
 import { MAX_SCAN_BATCH, normalizeBarcode } from '#shared/utils/barcode'
 import { SCAN_STORAGE_KEY as STORAGE_KEY } from '~/utils/scan-storage'
 import {
+  batchEntries,
   canTick,
   defaultTicked,
   entriesToAdd,
@@ -274,7 +275,7 @@ export function useBarcodeScanner() {
         method: 'POST',
         body: {
           list: list.value,
-          items: toAdd.value,
+          items: batchEntries(rows.value, list.value),
           ...(collection.value &&
             intoCollection.value && { collectionId: collection.value.id }),
         },

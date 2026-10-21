@@ -3,6 +3,7 @@ import type { BarcodeMatch } from '../../shared/types/barcode'
 import {
   canTick,
   defaultTicked,
+  batchEntries,
   entriesToAdd,
   parseStoredRows,
   pickGame,
@@ -135,7 +136,7 @@ describe('pickGame', () => {
     expect(rows[0]).toMatchObject({ ticked: false, own: true })
     expect(entriesToAdd(rows, 'owned')).toEqual([])
     expect(
-      entriesToAdd(
+      batchEntries(
         pickGame([none], 'n', match({ platform: null }), 'owned').rows,
         'owned',
       ),
@@ -158,7 +159,7 @@ describe('pickGame', () => {
       'owned',
     )
     expect(merged).toBe('c5')
-    expect(rows).toEqual([existing])
+    expect(rows).toEqual([{ ...existing, extraCodes: ['n'] }])
   })
 
   it('does not merge the same game on another platform', () => {
@@ -194,16 +195,90 @@ describe('own picks', () => {
       match({ igdbId: 2 }),
       'owned',
     ).rows[0]!
-    expect(entriesToAdd([picked, row(match({ igdbId: 1 }))], 'owned')).toEqual([
+    expect(batchEntries([picked, row(match({ igdbId: 1 }))], 'owned')).toEqual([
       { igdbId: 2, platformId: 130, barcode: 'n', own: true },
       { igdbId: 1, platformId: 130 },
     ])
+    expect(entriesToAdd([picked], 'owned')).toEqual([
+      { igdbId: 2, platformId: 130 },
+    ])
   })
 
-  it('add once when two rows hold the same game, keeping the user’s barcode', () => {
-    const picked: ScanRow = { ...row(match()), code: 'mine', own: true }
-    expect(entriesToAdd([row(match()), picked], 'owned')).toEqual([
+  it('send every own code for one game: one adds, the rest are remember-only', () => {
+    const a: ScanRow = { ...row(match()), code: 'a', own: true }
+    const b: ScanRow = { ...row(match()), code: 'b', own: true }
+    expect(batchEntries([a, b], 'owned')).toEqual([
+      { igdbId: 1, platformId: 130, barcode: 'a', own: true },
+      {
+        igdbId: 1,
+        platformId: 130,
+        barcode: 'b',
+        own: true,
+        rememberOnly: true,
+      },
+    ])
+    expect(entriesToAdd([a, b], 'owned')).toHaveLength(1)
+  })
+
+  it('keep the user’s barcode when a ScanDex row for the game comes first', () => {
+    const scandex: ScanRow = { ...row(match()), code: 'x' }
+    const mine: ScanRow = { ...row(match()), code: 'mine', own: true }
+    expect(batchEntries([scandex, mine], 'owned')).toEqual([
       { igdbId: 1, platformId: 130, barcode: 'mine', own: true },
     ])
+  })
+
+  it('are remembered for a game already on the list, without adding it', () => {
+    const held: ScanRow = {
+      ...row(match({ owned: true, ownedOn: [130] })),
+      code: 'h',
+      own: true,
+    }
+    expect(entriesToAdd([held], 'wishlist')).toEqual([])
+    expect(batchEntries([held], 'wishlist')).toEqual([
+      {
+        igdbId: 1,
+        platformId: 130,
+        barcode: 'h',
+        own: true,
+        rememberOnly: true,
+      },
+    ])
+  })
+
+  it('are not remembered when the user unticked a game they could add', () => {
+    const unticked: ScanRow = { ...row(match(), false), code: 'u', own: true }
+    expect(batchEntries([unticked], 'owned')).toEqual([])
+  })
+})
+
+describe('a pick merged into another row', () => {
+  it('moves its barcode to the row it merged with', () => {
+    const scandex: ScanRow = { ...row(match({ igdbId: 5 })), code: 'a' }
+    const none: ScanRow = { code: 'b', status: 'none', ticked: false }
+    const { rows } = pickGame(
+      [none, scandex],
+      'b',
+      match({ igdbId: 5 }),
+      'owned',
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.extraCodes).toEqual(['b'])
+    expect(batchEntries(rows, 'owned')).toEqual([
+      { igdbId: 5, platformId: 130, barcode: 'b', own: true },
+    ])
+  })
+
+  it('survives session storage', () => {
+    const scandex: ScanRow = { ...row(match({ igdbId: 5 })), code: 'a' }
+    const none: ScanRow = { code: 'b', status: 'none', ticked: false }
+    const { rows } = pickGame(
+      [none, scandex],
+      'b',
+      match({ igdbId: 5 }),
+      'owned',
+    )
+    const restored = parseStoredRows(JSON.parse(JSON.stringify(rows)))
+    expect(restored[0]!.extraCodes).toEqual(['b'])
   })
 })

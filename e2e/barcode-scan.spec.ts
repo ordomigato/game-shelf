@@ -418,3 +418,21 @@ test('ScanDex is credited in the scanner and on the About page', async ({
     page.getByRole('article').getByRole('link', { name: 'ScanDex' }),
   ).toHaveAttribute('href', 'https://scandex.gamery.app')
 })
+
+test('the platform step has a Back button that returns to the list', async ({
+  page,
+}) => {
+  await stubLookups(page, () => ({ match: null }))
+  await stubFindIt(page)
+  await openOwnedScanner(page)
+  await type(page, ean(3))
+  await page
+    .getByRole('button', { name: `Find the game for ${ean(3)}` })
+    .click()
+  await page.getByLabel('Search for the game').fill('zelda')
+  await page.getByTestId('scan-find-result').click()
+  await expect(page.getByLabel('No platform')).toBeChecked()
+  await page.getByRole('button', { name: 'Back to the list' }).click()
+  await expect(page.getByTestId('scan-find')).toHaveCount(0)
+  await expect(page.getByText(`No match for ${ean(3)}`)).toBeVisible()
+})

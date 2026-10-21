@@ -173,8 +173,13 @@ export async function resolveBarcode(
 ): Promise<BarcodeResult> {
   const own = await findOwnPick(ownerId, barcode.code)
   if (own) {
-    const match = await describeMatch(ownerId, own)
-    if (match) return { match, own: true }
+    try {
+      const match = await describeMatch(ownerId, own)
+      if (match) return { match, own: true }
+    } catch {
+      // IGDB or the catalog failed: the cache and ScanDex can still answer.
+      log('warn', 'barcode.own_pick_failed')
+    }
   }
   const answer = await lookupBarcode(
     barcode.code,

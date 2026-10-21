@@ -200,10 +200,15 @@ function confirm() {
           </div>
         </RadioGroup>
       </template>
-      <div class="mt-auto flex items-center justify-between gap-2">
-        <Button type="button" variant="ghost" @click="choosing = null">
-          {{ $t('scan.findOtherGame') }}
-        </Button>
+      <div class="mt-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex gap-2">
+          <Button type="button" variant="ghost" @click="choosing = null">
+            {{ $t('scan.findOtherGame') }}
+          </Button>
+          <Button type="button" variant="ghost" @click="emit('back')">
+            {{ $t('scan.findBack') }}
+          </Button>
+        </div>
         <Button
           type="button"
           :disabled="loadingGame || gameFailed"

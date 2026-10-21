@@ -23,18 +23,19 @@ let failSave = false
 let cached: Record<string, unknown> | undefined
 // Rows of user_barcodes, as the table holds them.
 let ownRows: Record<string, unknown>[] = []
+const ownConditions: unknown[] = []
 const saved: Record<string, unknown>[] = []
 vi.stubGlobal('useDb', () => ({
   select: () => ({
     from: (table: unknown) => ({
-      where: async (condition: unknown) =>
-        table === userBarcodes
-          ? ownRows.filter((row) => matches(condition, row))
-          : table === barcodeLookups
-            ? cached
-              ? [cached]
-              : []
-            : [],
+      where: async (condition: unknown) => {
+        if (table === userBarcodes) {
+          ownConditions.push(condition)
+          return ownRows.filter((row) => matches(condition, row))
+        }
+        if (table === barcodeLookups) return cached ? [cached] : []
+        return []
+      },
     }),
   }),
   insert: () => ({
@@ -65,6 +66,7 @@ function matches(condition: unknown, row: Record<string, unknown>): boolean {
   return values.includes(row.ownerId) && values.includes(row.code)
 }
 
+const { PgDialect } = await import('drizzle-orm/pg-core')
 const { userBarcodes, barcodeLookups } = await import('../db/schema')
 const { lookupBarcode, findOwnPick, resolveBarcode } =
   await import('./barcodes')
@@ -80,6 +82,7 @@ const match = {
 beforeEach(() => {
   cached = undefined
   ownRows = []
+  ownConditions.length = 0
   saved.length = 0
   askScanDex.mockReset()
   ensureCatalogGames.mockReset()
@@ -94,12 +97,12 @@ beforeEach(() => {
 })
 
 describe('lookupBarcode', () => {
-  it('answers from the cache without asking ScanDex or counting a lookup', async () => {
+  it('answers from the cache, however old a match is, without asking ScanDex or counting a lookup', async () => {
     cached = {
       igdbId: 26758,
       platformId: 130,
       platformName: 'Nintendo Switch',
-      fetchedAt: new Date(Date.now() - 29 * DAY),
+      fetchedAt: new Date(Date.now() - 400 * DAY),
     }
     const beforeScanDex = vi.fn()
     expect(await lookupBarcode('0045496590048', beforeScanDex)).toEqual(match)
@@ -107,8 +110,8 @@ describe('lookupBarcode', () => {
     expect(beforeScanDex).not.toHaveBeenCalled()
   })
 
-  it('asks again once a match is 30 days old, and keeps the new answer', async () => {
-    cached = { igdbId: 1, fetchedAt: new Date(Date.now() - 31 * DAY) }
+  it('finds a game ScanDex added since a day-old no-match, and keeps the match', async () => {
+    cached = { igdbId: null, fetchedAt: new Date(Date.now() - 2 * DAY) }
     askScanDex.mockResolvedValue(match)
     const beforeScanDex = vi.fn()
     expect(await lookupBarcode('0045496590048', beforeScanDex)).toEqual(match)
@@ -148,16 +151,11 @@ describe('lookupBarcode', () => {
   })
 
   it('answers a cached barcode even when the daily cap refuses', async () => {
-    cached = {
-      igdbId: 1,
-      platformId: 2,
-      platformName: 'X',
-      fetchedAt: new Date(Date.now() - 40 * DAY),
-    }
+    cached = { igdbId: null, fetchedAt: new Date(Date.now() - 40 * DAY) }
     const answer = await lookupBarcode('0045496590048', async () => {
       throw Object.assign(new Error('Too many requests'), { statusCode: 429 })
     })
-    expect(answer).toMatchObject({ kind: 'match', igdbId: 1 })
+    expect(answer).toEqual({ kind: 'none' })
     expect(askScanDex).not.toHaveBeenCalled()
   })
 
@@ -177,14 +175,9 @@ describe('lookupBarcode', () => {
   })
 
   it('uses an older answer when ScanDex fails', async () => {
-    cached = {
-      igdbId: 26758,
-      platformId: 130,
-      platformName: 'Nintendo Switch',
-      fetchedAt: new Date(Date.now() - 40 * DAY),
-    }
+    cached = { igdbId: null, fetchedAt: new Date(Date.now() - 40 * DAY) }
     askScanDex.mockRejectedValue(new ScanDexError('down'))
-    expect(await lookupBarcode('0045496590048')).toEqual(match)
+    expect(await lookupBarcode('0045496590048')).toEqual({ kind: 'none' })
   })
 })
 
@@ -205,6 +198,29 @@ describe('findOwnPick', () => {
       platformName: null,
     })
     expect(askScanDex).not.toHaveBeenCalled()
+  })
+
+  it('filters on the owner and the barcode in the query itself', async () => {
+    await findOwnPick('user-a', '0045496590048')
+    const { sql, params } = new PgDialect().sqlToQuery(
+      ownConditions[0] as never,
+    )
+    expect(sql).toContain('"user_barcodes"."owner_id" = $1')
+    expect(sql).toContain('"user_barcodes"."code" = $2')
+    expect(params).toEqual(['user-a', '0045496590048'])
+  })
+
+  it('keeps two users’ picks for one barcode apart', async () => {
+    ownRows = [
+      { ownerId: 'user-a', code: '0045496590048', igdbId: 7 },
+      { ownerId: 'user-b', code: '0045496590048', igdbId: 9 },
+    ]
+    expect(await findOwnPick('user-a', '0045496590048')).toMatchObject({
+      igdbId: 7,
+    })
+    expect(await findOwnPick('user-b', '0045496590048')).toMatchObject({
+      igdbId: 9,
+    })
   })
 
   it('never gives one user another user’s pick', async () => {
@@ -254,6 +270,23 @@ describe('resolveBarcode', () => {
     expect(result.match?.igdbId).toBe(26758)
     expect(cap).toHaveBeenCalledOnce()
     expect(askScanDex).toHaveBeenCalledOnce()
+  })
+
+  it('falls through to the cache when reading the picked game fails', async () => {
+    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+    cached = { igdbId: 26758, fetchedAt: new Date() }
+    ensureCatalogGames.mockImplementation(async (ids: number[]) => {
+      if (ids.includes(7)) throw new Error('IGDB down')
+      return ids.map((igdbId) => ({
+        igdbId,
+        name: 'G',
+        coverId: null,
+        releaseDate: null,
+      }))
+    })
+    const result = await resolveBarcode('user-a', barcode, cap)
+    expect(result.own).toBeUndefined()
+    expect(result.match?.igdbId).toBe(26758)
   })
 
   it('falls back to ScanDex when IGDB no longer knows the picked game', async () => {

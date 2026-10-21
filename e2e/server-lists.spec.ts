@@ -142,6 +142,7 @@ test('shows the account fields as columns, hidden ones with a lock', async ({
   await openList(page)
   await page.goto('/u/retro_fan/shelf/owned')
   await expect(page.getByRole('columnheader')).toHaveText([
+    /Cover/,
     /Name/,
     /Collections/,
     /Released/,

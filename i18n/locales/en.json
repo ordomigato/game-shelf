@@ -517,6 +517,7 @@
   },
   "table": {
     "name": "Name",
+    "cover": "Cover",
     "added": "Added",
     "search": "Search this collection",
     "searchGames": "Search games",

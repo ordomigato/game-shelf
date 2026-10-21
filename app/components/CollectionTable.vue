@@ -922,7 +922,10 @@ const addedFormat = computed(
               :key="header.id"
               :aria-sort="ariaSort(header.column.getIsSorted())"
               :class="{
-                'sticky left-0 z-10 min-w-48 bg-card': header.id === 'name',
+                // On a phone the name column stays under half the screen (see
+                // the name cell below), so the other columns fit beside it.
+                'sticky left-0 z-10 max-w-[40vw] bg-card sm:max-w-none sm:min-w-48':
+                  header.id === 'name',
               }"
             >
               <button
@@ -997,13 +1000,14 @@ const addedFormat = computed(
             >
               <div
                 v-if="cell.column.id === 'name'"
-                class="flex items-center gap-2"
+                class="flex max-w-[40vw] flex-col gap-1 sm:max-w-none sm:flex-row sm:items-center sm:gap-2"
               >
                 <component
                   :is="item.igdbId ? NuxtLink : 'div'"
                   :to="item.igdbId ? `/games/${item.igdbId}` : undefined"
                   class="wanted-fade flex min-w-0 flex-1 items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   :class="{ 'hover:underline': item.igdbId }"
+                  :title="item.name"
                 >
                   <GameCover
                     :name="item.name"
@@ -1011,12 +1015,16 @@ const addedFormat = computed(
                     size="thumb"
                     class="w-8 shrink-0"
                   />
-                  <span class="line-clamp-2">{{ item.name }}</span>
+                  <!-- Cells don't wrap by default, so a long name needs this to
+                       fold onto two lines. -->
+                  <span class="line-clamp-2 whitespace-normal">{{
+                    item.name
+                  }}</span>
                 </component>
                 <Badge
                   v-if="!isList && item.wanted"
                   variant="outline"
-                  class="shrink-0 text-muted-foreground"
+                  class="shrink-0 self-start text-muted-foreground sm:self-auto"
                 >
                   {{ $t('table.wishlist') }}
                 </Badge>

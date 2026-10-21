@@ -360,3 +360,27 @@ test.describe('long collections', () => {
     expect((await remove.boundingBox())!.height).toBeLessThan(40)
   })
 })
+
+const longName = 'The Legend of Zelda: Breath of the Wild – Expansion Pass'
+
+for (const width of [375, 390]) {
+  for (const owner of [true, false]) {
+    test(`the name column stays narrow on a ${width}px phone as ${owner ? 'the owner' : 'a visitor'}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await openCollection(page, owner, [
+        item(1, longName, { status: 'Playing' }),
+        ...items.slice(1),
+      ])
+      const box = await page
+        .getByRole('columnheader', { name: 'Name' })
+        .boundingBox()
+      expect(box!.width).toBeLessThan(width / 2)
+      // The other columns are still there, scrolled sideways beside it.
+      await expect(
+        page.getByRole('columnheader', { name: 'Genre' }),
+      ).toBeAttached()
+    })
+  }
+}

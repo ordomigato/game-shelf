@@ -204,16 +204,18 @@ const resultsLabel = computed(() => {
           autofocus
           class="h-14 bg-card pr-14 pl-12 text-lg md:text-lg"
         />
-        <ScanButton
-          icon-only
-          :list="target?.list"
-          :collection="
-            target?.collectionId
-              ? { id: target.collectionId, title: target.title }
-              : undefined
-          "
-          class="absolute top-1/2 right-2 -translate-y-1/2"
-        />
+        <!-- Centred by the wrapper: a button's press nudge would replace a translate. -->
+        <div class="absolute inset-y-0 right-2 flex items-center">
+          <ScanButton
+            icon-only
+            :list="target?.list"
+            :collection="
+              target?.collectionId
+                ? { id: target.collectionId, title: target.title }
+                : undefined
+            "
+          />
+        </div>
       </form>
       <p v-if="showTooShort" class="mt-3 text-sm text-muted-foreground">
         {{ $t('search.tooShort', { count: MIN_SEARCH_LENGTH }) }}

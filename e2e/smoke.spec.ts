@@ -4,7 +4,7 @@ import { signInAs } from './support/session'
 test('home page loads', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveTitle(
-    'Track and share your game collection · ThisPlayShelf',
+    'ThisPlayShelf - Your game collection, on display',
   )
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Find any game',

@@ -135,7 +135,7 @@ const showTooShort = computed(
 // (app.vue) points them back to the home page.
 const site = useSiteUrl()
 useHead(() => ({
-  title: t('app.title', { page: t('seo.homeTitle') }),
+  title: t('seo.homeTitle'),
   script: [
     {
       type: 'application/ld+json',

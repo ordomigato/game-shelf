@@ -8,7 +8,7 @@ describe('translate', () => {
         key: 'preview.collectionTitle',
         params: { collection: 'NES Games', owner: 'Retro Fan' },
       }),
-    ).toBe("NES Games · Retro Fan's collections")
+    ).toBe("NES Games - Retro Fan's collections")
   })
 
   it('picks the plural form by count', () => {

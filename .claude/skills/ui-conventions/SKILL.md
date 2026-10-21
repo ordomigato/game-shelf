@@ -64,6 +64,19 @@ variables under its class in `tailwind.css`. A dark-based theme also needs
 the `dark` variant to apply (the `@custom-variant dark` rule), so plan for
 that when the first one lands.
 
+## The logo is one set of files
+
+The logo files live in `public/brand/` (`logo-`, `wordmark-` and `mark-`,
+each `light` for light backgrounds and `dark` for dark ones, text already
+outlined to paths). `public/favicon.svg`, `public/email-logo.png`,
+`public/og.png` and `app/assets/brand/logo-paths.ts` (the paths
+`BrandLogo.vue` draws) come from the same definition. Never rebuild the
+wordmark from text and a font in HTML, an email or an image: use
+`<BrandLogo>` in the app and these files elsewhere. To change the logo, edit
+`scripts/brand-assets.ts`, then run `npx tsx scripts/brand-assets.ts` and
+`npx tsx scripts/og-image.ts` and commit the outputs. Logo colours also live
+in `--logo-*` in `tailwind.css`, and a unit test fails if they disagree.
+
 ## Vue and Nuxt idiom
 
 - No hard-coded user-facing text, including aria-labels and alt text. Use

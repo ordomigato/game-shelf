@@ -1,10 +1,24 @@
 <script setup lang="ts">
+import {
+  markShelves,
+  markViewBox,
+  markWalls,
+  wordmarkBox,
+  wordmarkPlay,
+  wordmarkThis,
+  wordmarkThisOpacity,
+  wordmarkViewBox,
+  wordmarkWidth,
+} from '~/assets/brand/logo-paths'
+
 /**
- * The ThisPlayShelf logo: the S-shaped glass shelf (app/assets/brand, V11)
- * and the wordmark, a small "this" before PlayShelf. Colours come from the
- * --logo-* variables in tailwind.css, so it follows the theme.
+ * The ThisPlayShelf logo: the S-shaped glass shelf and the wordmark. The
+ * shapes are the generated ones in app/assets/brand/logo-paths.ts (see
+ * scripts/brand-assets.ts, the same source as public/brand). The mark takes
+ * its colours from the --logo-* variables in tailwind.css and the wordmark
+ * from the surrounding text colour, so both follow the theme.
  */
-defineProps<{
+const props = defineProps<{
   /** Only the mark, for tight spaces. */
   compact?: boolean
   /** Only the mark on phones. */
@@ -13,20 +27,27 @@ defineProps<{
   small?: boolean
 }>()
 
+// The wordmark's box is bigger than its line of text (room for the "y" tail),
+// so it is sized from the font size and the extra is taken back out in
+// negative margins: the baseline, cap height and gaps stay where a plain
+// line of text would put them.
+const wordStyle = computed(() => {
+  const k = (props.small ? 16 : 20) / 100
+  const b = wordmarkBox
+  return {
+    height: `${b.h * k}px`,
+    margin: `${b.y * k}px ${(wordmarkWidth - b.x - b.w) * k}px ${(100 - b.y - b.h) * k}px ${b.x * k}px`,
+  }
+})
+
 // Each logo on the page needs its own gradient id.
 const glass = `logo-glass-${useId()}`
-
-const shelves = [
-  'M70.7131 82L141.424 122.821L70.7131 163.642L0.00244141 122.821Z',
-  'M70.7131 41L141.424 81.8209L70.7131 122.642L0.00244141 81.8209Z',
-  'M70.7131 0L141.424 40.8209L70.7131 81.6418L0.00244141 40.8209Z',
-]
 </script>
 
 <template>
-  <span class="inline-flex items-center gap-2 font-heading">
+  <span class="inline-flex items-center gap-2">
     <svg
-      viewBox="-6 -6 154 176"
+      :viewBox="markViewBox"
       class="w-auto shrink-0"
       :class="small ? 'h-5' : 'h-7'"
       aria-hidden="true"
@@ -51,11 +72,10 @@ const shelves = [
         </linearGradient>
       </defs>
       <g style="fill: var(--logo-wall); fill-opacity: var(--logo-wall-opacity)">
-        <path d="M0 41.0009L70.7107 0.190869V41.0109L0 81.8209Z" />
-        <path d="M70.7131 122.822L141.424 82.0118V122.832L70.7131 163.642Z" />
+        <path v-for="wall in markWalls" :key="wall" :d="wall" />
       </g>
       <path
-        v-for="shelf in shelves"
+        v-for="shelf in markShelves"
         :key="shelf"
         :d="shelf"
         :fill="`url(#${glass})`"
@@ -65,17 +85,17 @@ const shelves = [
         stroke-opacity=".9"
       />
     </svg>
-    <span
-      class="leading-none whitespace-nowrap"
-      :class="[
-        small ? 'text-base' : 'text-xl',
-        { 'sr-only': compact, 'max-sm:sr-only': compactOnPhone },
-      ]"
+    <span class="sr-only">ThisPlayShelf</span>
+    <svg
+      :viewBox="wordmarkViewBox"
+      fill="currentColor"
+      class="w-auto shrink-0"
+      :style="wordStyle"
+      :class="{ hidden: compact, 'max-sm:hidden': compactOnPhone }"
+      aria-hidden="true"
     >
-      <span
-        class="mr-[0.14em] align-[0.62em] text-[0.55em] font-normal tracking-wide opacity-60"
-        >this</span
-      ><span class="font-extrabold">PlayShelf</span>
-    </span>
+      <path :d="wordmarkThis" :fill-opacity="wordmarkThisOpacity" />
+      <path :d="wordmarkPlay" />
+    </svg>
   </span>
 </template>

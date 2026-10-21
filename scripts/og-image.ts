@@ -2,26 +2,23 @@
  * Draws the site's preview image, public/og.png (1200x630), shown when a
  * link to the site is shared.
  *
- * The mark and the wordmark copy app/components/BrandLogo.vue: the same
- * shelf paths, the same dark theme colours (tailwind.css) and the same
- * fonts (Exo 2 for the wordmark, Outfit for the lines under it, loaded from
- * Google Fonts like the app does). If the logo changes, change it here too.
+ * The mark and the wordmark are the dark-background files in public/brand
+ * (made by scripts/brand-assets.ts, run that first if the logo changed), put
+ * in the page as they are. The lines under them use Outfit, loaded from
+ * Google Fonts like the app does.
  *
- * Run it with `npx tsx scripts/og-image.ts` (needs network for the fonts and
+ * Run it with `npx tsx scripts/og-image.ts` (needs network for the font and
  * Playwright's Chromium, `npx playwright install chromium`). Pass another
  * path to write the PNG somewhere else.
  */
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { crc32, deflateSync } from 'node:zlib'
 import { chromium } from '@playwright/test'
 
 const out = process.argv[2] ?? 'public/og.png'
 
-const shelves = [
-  'M70.7131 82L141.424 122.821L70.7131 163.642L0.00244141 122.821Z',
-  'M70.7131 41L141.424 81.8209L70.7131 122.642L0.00244141 81.8209Z',
-  'M70.7131 0L141.424 40.8209L70.7131 81.6418L0.00244141 40.8209Z',
-]
+const brand = (file: string) =>
+  readFileSync(new URL(`../public/brand/${file}`, import.meta.url), 'utf8')
 
 /**
  * The background, a diagonal gradient as a PNG data URL. Chrome dithers CSS
@@ -71,20 +68,19 @@ function gradient(): string {
   return `data:image/png;base64,${png.toString('base64')}`
 }
 
+// The wordmark's viewBox is x y w h around a line of text 100 units tall.
+const [wx, wy, , wh] = brand('wordmark-dark.svg')
+  .match(/viewBox="([^"]+)"/)![1]!
+  .split(' ')
+  .map(Number) as [number, number, number, number]
+const [wordH, wordTop, wordLeft] = [wh * 1.04, wy * 1.04, wx * 1.04]
+
 const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Outfit:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap">
 <style>
-  :root {
-    --logo-wall: #9cc7ea;
-    --logo-wall-opacity: 0.55;
-    --logo-glass-from: #eaf5ff;
-    --logo-glass-via: #79bcef;
-    --logo-glass-to: #3c6e93;
-    --logo-edge: #ddefff;
-  }
   * { margin: 0; box-sizing: border-box; }
   body {
     width: 1200px;
@@ -98,50 +94,18 @@ const html = `<!doctype html>
   }
   svg { height: 365px; width: auto; flex: none; }
   .words { display: flex; flex-direction: column; }
-  /* BrandLogo's wordmark, scaled up. */
-  .logo {
-    font-family: 'Exo 2', sans-serif;
-    font-size: 104px;
-    line-height: 1;
-    white-space: nowrap;
-    color: #f2f7fc;
-    margin-bottom: 38px;
-  }
-  .logo .this {
-    margin-right: 0.14em;
-    vertical-align: 0.62em;
-    font-size: 0.55em;
-    font-weight: 400;
-    letter-spacing: 0.025em;
-    opacity: 0.6;
-  }
-  .logo .play { font-weight: 700; }
+  /* The text is 104px tall; the wordmark's box is taller (room for the "y"
+     tail), so it is sized by the same scale and moved back up. */
+  .logo { height: 104px; margin-bottom: 38px; }
+  .logo svg { height: ${wordH}px; margin-top: ${wordTop}px; margin-left: ${wordLeft}px; }
   .tagline { font-size: 38px; font-weight: 600; color: #72bdf4; margin-bottom: 26px; }
   .sub { font-size: 25px; font-weight: 400; color: #a6b0be; }
 </style>
 </head>
 <body>
-  <svg viewBox="-6 -6 154 176" aria-hidden="true">
-    <defs>
-      <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" style="stop-color: var(--logo-glass-from)" stop-opacity=".95" />
-        <stop offset=".55" style="stop-color: var(--logo-glass-via)" stop-opacity=".55" />
-        <stop offset="1" style="stop-color: var(--logo-glass-to)" stop-opacity=".7" />
-      </linearGradient>
-    </defs>
-    <g style="fill: var(--logo-wall); fill-opacity: var(--logo-wall-opacity)">
-      <path d="M0 41.0009L70.7107 0.190869V41.0109L0 81.8209Z" />
-      <path d="M70.7131 122.822L141.424 82.0118V122.832L70.7131 163.642Z" />
-    </g>
-    ${shelves
-      .map(
-        (d) =>
-          `<path d="${d}" fill="url(#glass)" style="stroke: var(--logo-edge)" stroke-width="2.5" stroke-linejoin="round" stroke-opacity=".9" />`,
-      )
-      .join('\n    ')}
-  </svg>
+  ${brand('mark-dark.svg')}
   <div class="words">
-    <div class="logo"><span class="this">this</span><span class="play">PlayShelf</span></div>
+    <div class="logo">${brand('wordmark-dark.svg')}</div>
     <div class="tagline">Your collection, on display.</div>
     <div class="sub">Search games, track your collection and share your shelf.</div>
   </div>

@@ -4,8 +4,8 @@ import { log } from './log'
 const LOOKUP_URL = 'https://scandex.gamery.app/api/v2/lookup'
 const CREATE_URL = 'https://scandex.gamery.app/api/v2/create'
 const TIMEOUT_MS = 5000
-/** Suggesting a game is never worth making anyone wait long. */
-const CREATE_TIMEOUT_MS = 3000
+/** The person who pressed Send waits for this, so keep it short. */
+const CREATE_TIMEOUT_MS = 5000
 
 /** What ScanDex knows about a barcode. */
 export type ScanDexAnswer =

@@ -10,8 +10,6 @@ import { submitToScanDex } from './scandex'
 
 /** The most picks one request lists or sends. */
 export const MAX_SENDS = 20
-/** How long sending may take, reading the database included. */
-const TOTAL_MS = 3000
 
 interface Eligible extends BarcodeSuggestion {
   platformId: number
@@ -99,9 +97,10 @@ const failed = (
  * that isn't eligible comes back as failed with status 0. `submitted_at` is
  * claimed in one statement before sending, so two requests never send the
  * same code, and given back for a code whose send failed so it can be
- * listed and sent again. The whole call gives up after 3 seconds. Never
- * throws: a failure is logged (never with the database's error, which
- * carries the barcodes) and shows as failed.
+ * listed and sent again. Everything finishes before this returns (each call
+ * to ScanDex has its own timeout), so no claim is left behind. Never throws:
+ * a failure is logged (never with the database's error, which carries the
+ * barcodes) and shows as failed.
  */
 export async function sendSuggestions(
   ownerId: string,
@@ -110,29 +109,13 @@ export async function sendSuggestions(
   const wanted = [...new Set(codes)].slice(0, MAX_SENDS)
   const results = new Map<string, SuggestionResult>()
   const claimed = new Set<string>()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<'late'>((resolve) => {
-    timer = setTimeout(() => resolve('late'), TOTAL_MS)
-  })
   try {
-    const outcome = await Promise.race([
-      send(ownerId, wanted, claimed, results),
-      deadline,
-    ])
-    if (outcome === 'late')
-      log('warn', 'barcode.suggest_failed', { status: -2 })
+    await send(ownerId, wanted, claimed, results)
   } catch (error) {
-    log('warn', 'barcode.suggest_failed', {
-      status: -1,
-      error: error instanceof Error ? error.name : 'unknown',
-    })
-  } finally {
-    clearTimeout(timer)
+    logFailure(error)
   }
-  // A late answer from ScanDex no longer changes what the caller is told.
-  const done = new Map(results)
   const release = [...claimed].filter(
-    (code) => done.get(code)?.result !== 'sent',
+    (code) => results.get(code)?.result !== 'sent',
   )
   if (release.length) {
     try {
@@ -146,13 +129,17 @@ export async function sendSuggestions(
           ),
         )
     } catch (error) {
-      log('warn', 'barcode.suggest_failed', {
-        status: -1,
-        error: error instanceof Error ? error.name : 'unknown',
-      })
+      logFailure(error)
     }
   }
-  return wanted.map((code) => done.get(code) ?? failed(code))
+  return wanted.map((code) => results.get(code) ?? failed(code))
+}
+
+function logFailure(error: unknown) {
+  log('warn', 'barcode.suggest_failed', {
+    status: -1,
+    error: error instanceof Error ? error.name : 'unknown',
+  })
 }
 
 async function send(

@@ -194,6 +194,10 @@ const usageKey = {
 }
 const total = computed(() => data.value?.libraryCount ?? 0)
 const overLimit = computed(() => total.value > limits.value.games)
+// A full library can't take new games, so adding is switched off.
+const libraryFull = computed(
+  () => isOwner.value && total.value >= limits.value.games,
+)
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
@@ -509,6 +513,13 @@ function onRenamed(saved: LibraryItem) {
             </i18n-t>
           </div>
           <p
+            v-if="libraryFull"
+            class="text-sm font-medium text-destructive"
+            data-testid="library-full"
+          >
+            {{ $t('limits.libraryFull') }}
+          </p>
+          <p
             v-if="data.isOwner"
             class="max-w-prose text-sm text-muted-foreground"
           >
@@ -533,15 +544,20 @@ function onRenamed(saved: LibraryItem) {
             :is-public="data.visibility === 'public'"
             :make-public="() => setVisibility('public')"
           />
-          <Button v-if="data.isOwner" as-child>
+          <Button v-if="data.isOwner && !libraryFull" as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
               {{ $t('collection.addGames') }}
             </NuxtLink>
           </Button>
+          <Button v-else-if="data.isOwner" disabled>
+            <Plus />
+            {{ $t('collection.addGames') }}
+          </Button>
           <Button
             v-if="data.isOwner && ADD_BY_HAND"
             variant="outline"
+            :disabled="libraryFull"
             @click="addingByHand = true"
           >
             <PenLine />

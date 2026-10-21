@@ -20,6 +20,9 @@ export interface SearchTarget {
  * that list", and `toggle` adds or removes a game in one click. Without
  * one it means "on either list".
  *
+ * When the library is full, `blocked` says which results can't be added: the
+ * ones the library doesn't have yet, since a new game needs room.
+ *
  * Checked in the browser only, after hydration, and only for results not
  * checked yet, so loading more results doesn't re-ask for the first page.
  */
@@ -31,7 +34,10 @@ export function useTrackedGames(
   const auth = useAuth()
   const collections = useCollections()
   const unown = useUnownConfirm()
+  const { full: libraryFull } = useLibraryRoom({ load: true })
   const items = ref(new Map<number, string>())
+  // Results the library has, asked only while it is full.
+  const inLibrary = ref(new Set<number>())
   const saving = ref(new Set<number>())
   let checked = new Set<number>()
 
@@ -45,15 +51,22 @@ export function useTrackedGames(
     const asked = checked
     ids.forEach((id) => asked.add(id))
     try {
-      const found = await collections.tracked(ids, {
-        collectionId: target.value?.collectionId,
-        list: target.value?.list,
-      })
+      const [found, held] = await Promise.all([
+        collections.tracked(ids, {
+          collectionId: target.value?.collectionId,
+          list: target.value?.list,
+        }),
+        libraryFull.value ? collections.tracked(ids) : [],
+      ])
       // The target changed while this was in flight.
       if (asked !== checked) return
       const next = new Map(items.value)
       found.forEach(({ igdbId, itemId }) => next.set(igdbId, itemId))
       items.value = next
+      inLibrary.value = new Set([
+        ...inLibrary.value,
+        ...held.map(({ igdbId }) => igdbId),
+      ])
     } catch {
       // Only a hint. Adding still works, and the menu loads the real state.
       ids.forEach((id) => asked.delete(id))
@@ -63,18 +76,16 @@ export function useTrackedGames(
   function reset() {
     checked = new Set()
     items.value = new Map()
+    inLibrary.value = new Set()
   }
 
   onMounted(() => {
     onNuxtReady(() => {
       watch(games, () => void check(), { immediate: true })
-      watch(
-        () => target.value?.slug,
-        () => {
-          reset()
-          void check()
-        },
-      )
+      watch([() => target.value?.slug, libraryFull], () => {
+        reset()
+        void check()
+      })
     })
   })
 
@@ -85,6 +96,12 @@ export function useTrackedGames(
     else next.delete(igdbId)
     items.value = next
   }
+
+  /** Whether the game can't be added: the library is full and lacks it. */
+  const blocked = (game: GameSummary) =>
+    libraryFull.value &&
+    !items.value.has(game.id) &&
+    !inLibrary.value.has(game.id)
 
   /** Adds the game to the target, or removes it if it's there. */
   async function toggle(game: GameSummary) {
@@ -119,5 +136,5 @@ export function useTrackedGames(
     }
   }
 
-  return { items, saving, mark, toggle }
+  return { items, saving, blocked, libraryFull, mark, toggle }
 }

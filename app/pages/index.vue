@@ -180,6 +180,7 @@ const resultsLabel = computed(() => {
         :targets="targets"
         :username="auth.me.value.username"
         :room="room"
+        :library-full="tracked.libraryFull.value"
         @change="changeTarget"
       />
     </div>
@@ -273,6 +274,7 @@ const resultsLabel = computed(() => {
                 :label="toggleLabel(game)"
                 :disabled="
                   tracked.saving.value.has(game.id) ||
+                  tracked.blocked(game) ||
                   (room === 0 && !tracked.items.value.has(game.id))
                 "
                 @click="tracked.toggle(game)"

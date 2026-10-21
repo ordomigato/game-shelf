@@ -140,6 +140,7 @@
     "gamesMeter": "Games: {total} of {limit} ({owned} owned, {wishlisted} wishlisted)",
     "overGamesHelp": "You can keep and remove games, but you can't add more until it's down to {limit}.",
     "overLibraryHelp": "You can keep and remove games, but you can't add more until you're down to {limit}.",
+    "libraryFull": "Your library is full. Remove a game to add another.",
     "collections": "Collections",
     "games": "Games",
     "fields": "Extra fields per game",
@@ -500,7 +501,8 @@
     "wantedOn": "Wishlisted on",
     "full": "Full",
     "roomLeft": "Room for {count} more game | Room for {count} more games",
-    "collectionFull": "This one is full. Remove a game to add another."
+    "collectionFull": "This one is full. Remove a game to add another.",
+    "libraryFull": "Your library is full. Only games you already have can be added."
   },
   "itemCollections": {
     "title": "Collections for {name}",

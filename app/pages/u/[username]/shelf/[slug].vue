@@ -37,8 +37,12 @@ const proGames = PLAN_LIMITS.pro.gamesPerCollection
 const overGames = computed(
   () => (data.value?.itemCount ?? 0) > limits.value.gamesPerCollection,
 )
+const { full: libraryFull } = useLibraryRoom({ load: true })
+// Adding is off when the collection or the whole library is full.
 const fullGames = computed(
-  () => (data.value?.itemCount ?? 0) >= limits.value.gamesPerCollection,
+  () =>
+    (data.value?.itemCount ?? 0) >= limits.value.gamesPerCollection ||
+    libraryFull.value,
 )
 const existingIgdbIds = computed(() =>
   (data.value?.items ?? []).flatMap((item) =>
@@ -455,6 +459,13 @@ async function deleteCollection() {
             >
             <span v-else>{{ $t('shelf.gameCount', data.itemCount) }}</span>
           </div>
+          <p
+            v-if="data.isOwner && libraryFull"
+            class="text-sm font-medium text-destructive"
+            data-testid="library-full"
+          >
+            {{ $t('limits.libraryFull') }}
+          </p>
           <p v-if="data.description" class="max-w-prose whitespace-pre-line">
             {{ data.description }}
           </p>

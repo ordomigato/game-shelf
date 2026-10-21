@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner'
-import type { CollectionSummary, ListName } from '#shared/types/collection'
+import type { CollectionSummary, ListCounts } from '#shared/types/collection'
 
 // Browser only. The newest request for the list until it's answered, so
 // `load` can wait for it instead of asking again.
@@ -24,10 +24,7 @@ export function useMyCollections() {
     'my-collections',
     () => null,
   )
-  const counts = useState<Record<ListName, number> | null>(
-    'list-counts',
-    () => null,
-  )
+  const counts = useState<ListCounts | null>('list-counts', () => null)
   // Whether the list is from the server, not the empty one kept after a
   // failed try.
   const fromServer = useState('my-collections-loaded', () => false)
@@ -35,7 +32,7 @@ export function useMyCollections() {
   /** Only a number in the sidebar, so a failed try just keeps the old one. */
   async function refreshCounts() {
     try {
-      counts.value = await auth.apiFetch<Record<ListName, number>>('/api/lists')
+      counts.value = await auth.apiFetch<ListCounts>('/api/lists')
     } catch {
       // The sidebar shows no number.
     }
@@ -64,6 +61,11 @@ export function useMyCollections() {
       })
     latest = asked
     return asked
+  }
+
+  /** The counts, asking the server only if it hasn't been asked yet. */
+  async function loadCounts() {
+    if (!counts.value) await refreshCounts()
   }
 
   async function refresh() {
@@ -161,5 +163,15 @@ export function useMyCollections() {
     }
   }
 
-  return { list, counts, refresh, load, pinned, unpinned, pin, unpin }
+  return {
+    list,
+    counts,
+    refresh,
+    load,
+    loadCounts,
+    pinned,
+    unpinned,
+    pin,
+    unpin,
+  }
 }

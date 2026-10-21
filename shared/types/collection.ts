@@ -59,6 +59,9 @@ export type CollectionVisibility = 'private' | 'public'
  */
 export type ListName = 'owned' | 'wishlist'
 
+/** How many games are on each list, and in the whole library (each once). */
+export type ListCounts = Record<ListName, number> & { library: number }
+
 /** What saving new account fields would change. */
 export interface FieldsImpact {
   /** Per field (by its current name), how many games would lose a value. */

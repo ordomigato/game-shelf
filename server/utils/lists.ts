@@ -14,6 +14,7 @@ import type {
   CollectionVisibility,
   FieldDefinition,
   LibraryItem,
+  ListCounts,
   ListDetail,
   ListName,
   ListSummary,
@@ -367,18 +368,25 @@ export async function listForExport(
   )
 }
 
-/** How many games are on each list, for the sidebar. */
-export async function listCounts(
-  ownerId: string,
-): Promise<Record<ListName, number>> {
+/**
+ * How many games are on each list, for the sidebar, and in the library:
+ * every game is on at least one list, so that is every row, and it is what
+ * the games limit counts.
+ */
+export async function listCounts(ownerId: string): Promise<ListCounts> {
   const [row] = await useDb()
     .select({
       owned: sql<number>`count(*) filter (where ${libraryItems.owned})::int`,
       wishlist: sql<number>`count(*) filter (where ${libraryItems.wishlisted})::int`,
+      library: sql<number>`count(*)::int`,
     })
     .from(libraryItems)
     .where(eq(libraryItems.ownerId, ownerId))
-  return { owned: row?.owned ?? 0, wishlist: row?.wishlist ?? 0 }
+  return {
+    owned: row?.owned ?? 0,
+    wishlist: row?.wishlist ?? 0,
+    library: row?.library ?? 0,
+  }
 }
 
 /** The custom collections a game is in, for the question before removing it. */

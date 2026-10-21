@@ -8,7 +8,9 @@
  * Memory is bounded: past `maxKeys`, expired windows go first, then the
  * oldest, so a flood of distinct clients can't grow it without limit. The
  * cost is that a flood can reset an honest client's count, which only lets
- * that client through, never locks anyone out.
+ * that client through, never locks anyone out. Keys hit with `pinned` (the
+ * few instance-wide ceilings) live apart and are never evicted, or a flood
+ * of made-up clients would reset the very ceiling meant to stop it.
  */
 export interface Verdict {
   allowed: boolean
@@ -28,6 +30,7 @@ export function createMemoryLimiter({
   // A Map iterates in insertion order. Windows are re-inserted when they
   // reset, so the first keys are always the oldest.
   const entries = new Map<string, Entry>()
+  const pinnedEntries = new Map<string, Entry>()
 
   function makeRoom(time: number) {
     if (entries.size < maxKeys) return
@@ -42,14 +45,15 @@ export function createMemoryLimiter({
 
   return {
     /** Counts one hit on `key` and says whether it is within `limit`. */
-    hit(key: string, limit: number, windowMs: number): Verdict {
+    hit(key: string, limit: number, windowMs: number, pinned = false): Verdict {
       const time = now()
-      let entry = entries.get(key)
+      const map = pinned ? pinnedEntries : entries
+      let entry = map.get(key)
       if (!entry || entry.resetAt <= time) {
-        entries.delete(key)
-        makeRoom(time)
+        map.delete(key)
+        if (!pinned) makeRoom(time)
         entry = { count: 0, resetAt: time + windowMs }
-        entries.set(key, entry)
+        map.set(key, entry)
       }
       entry.count++
       return {

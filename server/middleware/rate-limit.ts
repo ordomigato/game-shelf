@@ -4,6 +4,8 @@ import {
   LIMIT_WINDOW_MS,
   REQUEST_LIMITS,
   clientIp,
+  clientKey,
+  hasBearerToken,
   isWrite,
   limitGroupFor,
 } from '../utils/request-limits'
@@ -29,19 +31,24 @@ export default defineEventHandler((event) => {
   const group = limitGroupFor(
     event.method,
     event.path,
-    !!getHeader(event, 'authorization'),
+    hasBearerToken(getHeader(event, 'authorization')),
   )
   if (!group) return
   if (isWrite(event.method, event.path)) event.context.limitUserWrites = true
+  // Requests with no known address share one bucket, so they are limited too.
   const ip = clientIp(event)
-  if (!ip) return
+  const who = ip ? clientKey(ip) : 'unknown'
 
   const { perClient, perInstance } = REQUEST_LIMITS[group]
-  const client = memoryLimiter.hit(`${group}:${ip}`, perClient, LIMIT_WINDOW_MS)
+  const client = memoryLimiter.hit(
+    `${group}:${who}`,
+    perClient,
+    LIMIT_WINDOW_MS,
+  )
   // Refused requests don't count toward the instance-wide ceiling, so one
   // noisy client can't use it up for everyone else.
   const everyone = client.allowed
-    ? memoryLimiter.hit(group, perInstance, LIMIT_WINDOW_MS)
+    ? memoryLimiter.hit(group, perInstance, LIMIT_WINDOW_MS, true)
     : client
   if (everyone.allowed) return
 

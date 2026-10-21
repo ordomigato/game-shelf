@@ -131,9 +131,26 @@ only sees CloudFront's address, so the `edge.viewerRequest.injection` in
 `sst.config.ts` copies `event.viewer.ip` into an `x-viewer-ip` request
 header, overwriting anything the browser sent. No origin request policy
 change is needed (SST's forwards all viewer headers except Host). The
-Lambda URL is public, so a direct call can forge the header. The
-per-instance ceilings in `server/utils/request-limits.ts` bound that. To
-turn the limits off, set `NUXT_RATE_LIMIT_ENABLED=false`.
+per-instance ceilings in `server/utils/request-limits.ts` stay as a second
+line. To turn the limits off, set `NUXT_RATE_LIMIT_ENABLED=false`.
+
+**Only CloudFront may reach the server.** The Lambda URL is public, so the
+same injection also sets `x-origin-secret`, and
+`server/middleware/origin-check.ts` (it runs before the limiter) answers a
+bare 403 to anything without it, using a constant-time compare. Because
+only CloudFront gets through, `x-viewer-ip` can be trusted on deployed
+stages. The secret is an HMAC of the `DatabaseUrl` secret (in
+`sst.config.ts`), so it is stable between deploys, differs per stage and
+needs no extra provider or value to set. It reaches the server as
+`NUXT_ORIGIN_SECRET` (an environment value) and CloudFront's function as
+code. The check is skipped under `nuxt dev` (`import.meta.dev`, which is
+what `sst dev` runs), and a built server run locally or in e2e needs
+`NUXT_ORIGIN_CHECK=false`. A deployed server with no secret refuses
+everything. The server's own calls to itself while rendering must forward
+the visitor's headers (`useRequestFetch()`, not a bare `$fetch`), or they
+get this 403. Direct hits still wake the Lambda, so they count as
+invocations for the kill switch. Closing that gap is the parked "Lock the
+Lambda URL" item (OAC).
 
 ## Domain
 

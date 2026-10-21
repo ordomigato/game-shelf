@@ -45,7 +45,13 @@ export default defineNitroPlugin((nitroApp) => {
 
   nitroApp.hooks.hook('afterResponse', (event) => {
     const start = event.context.requestStart
-    if (start === undefined || SKIPPED.test(event.path)) return
+    // Requests the origin check refused are not worth a line each.
+    if (
+      start === undefined ||
+      SKIPPED.test(event.path) ||
+      event.context.originRefused
+    )
+      return
     const coldStart = !warm
     warm = true
     log('info', 'http.request', {

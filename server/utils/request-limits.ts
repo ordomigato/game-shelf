@@ -4,9 +4,7 @@ import { getHeader, type H3Event } from 'h3'
  * How many requests a client may make per minute, by kind of request. Kept
  * together so they're easy to tune. `perClient` is counted per viewer IP
  * (changes by signed-in user id, see `USER_WRITE_LIMIT`). `perInstance` is a
- * ceiling on everyone together in one Lambda instance, which still holds if
- * someone invents many IPs by calling the Lambda URL directly (see
- * `clientIp`).
+ * ceiling on everyone together in one Lambda instance.
  */
 export const LIMIT_WINDOW_MS = 60_000
 export const REQUEST_LIMITS = {
@@ -27,28 +25,46 @@ export type LimitGroup = keyof typeof REQUEST_LIMITS
 /** Signed-in users' changes per minute, counted once the token is verified. */
 export const USER_WRITE_LIMIT = 60
 
-const SKIPPED = /^\/(_nuxt|__nuxt|_ipx|favicon)/
+/** Build files and the site icon, which CloudFront serves without the Lambda. */
+const SKIPPED = /^\/(_nuxt|__nuxt|_ipx)(\/|$)|^\/favicon\.(ico|svg|png)$/
 const IGDB_ROUTES = /^\/api\/(games|library-items\/igdb|import\/match)(\/|$)/
 const PUBLIC_ROUTES = /^\/(api\/)?(u|explore)(\/|$|\.)/
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+const JWT_BEARER = /^Bearer [\w-]+\.[\w-]+\.[\w-]+$/i
+
+/** The path without query, repeated slashes or a trailing slash. */
+export function normalizePath(rawPath: string): string {
+  const path = (rawPath.split(/[?#]/)[0] ?? '').replace(/\/{2,}/g, '/')
+  return path.length > 1 ? path.replace(/\/+$/, '') : path || '/'
+}
 
 /** Whether a request changes data. Only API routes are counted as changes. */
 export function isWrite(method: string, rawPath: string): boolean {
-  return rawPath.startsWith('/api/') && !SAFE_METHODS.has(method.toUpperCase())
+  return (
+    normalizePath(rawPath).startsWith('/api/') &&
+    !SAFE_METHODS.has(method.toUpperCase())
+  )
+}
+
+/** Whether the header looks like a Cognito token (three dotted parts). */
+export function hasBearerToken(header: string | undefined): boolean {
+  return !!header && JWT_BEARER.test(header.trim())
 }
 
 /**
  * Which limit a request counts against, or null for none (build files).
- * A change that carries a sign-in token counts against the backstop here
- * and against its user's own limit once the token is verified, so people
- * sharing one IP don't use up each other's changes.
+ * A change that carries a well-formed token counts against the backstop
+ * here, and against its user's own limit once the token is verified. That
+ * way signed-in people sharing one IP (a home, a school) don't use up each
+ * other's changes. A made-up token only gets the backstop's larger
+ * allowance, and still fails to sign in.
  */
 export function limitGroupFor(
   method: string,
   rawPath: string,
   hasToken = false,
 ): LimitGroup | null {
-  const path = rawPath.split(/[?#]/)[0] ?? rawPath
+  const path = normalizePath(rawPath)
   if (SKIPPED.test(path)) return null
   if (path === '/api/vitals') return 'vitals'
   if (IGDB_ROUTES.test(path)) return 'igdb'
@@ -60,29 +76,47 @@ export function limitGroupFor(
 const ADDRESS = /^[0-9a-fA-F:.]{2,45}$/
 
 /**
- * The viewer's IP. The Lambda's own sourceIp is CloudFront's address, so
- * the site's CloudFront function copies the viewer's IP into `x-viewer-ip`
- * (see sst.config.ts), replacing anything the browser sent. Without that
- * header (local runs, or a direct call to the Lambda URL) the connection's
- * own address is used. Null when neither is known, like an internal call a
- * page makes to its own API: those aren't limited.
- *
- * The Lambda URL is public, so a direct caller can set `x-viewer-ip` to
- * anything and pick its own bucket. Nothing in the request tells that apart
- * from CloudFront, which is why `perInstance` exists. Closing the URL to
- * everything but CloudFront is the real fix.
+ * What a client's counts are filed under: an IPv4 address as it is, an IPv6
+ * address as its /64. A home gets a whole /64, so single addresses would be
+ * free to rotate.
+ */
+export function clientKey(ip: string): string {
+  const mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i)
+  if (mapped) return mapped[1]!
+  if (!ip.includes(':')) return ip
+  const [head = '', tail] = ip.toLowerCase().split('::')
+  const front = head ? head.split(':') : []
+  const back = tail ? tail.split(':') : []
+  const groups =
+    tail === undefined
+      ? front
+      : [
+          ...front,
+          ...Array<string>(Math.max(0, 8 - front.length - back.length)).fill(
+            '0',
+          ),
+          ...back,
+        ]
+  const prefix = groups
+    .slice(0, 4)
+    .map((group) => group.replace(/^0+(?=.)/, ''))
+  return `${prefix.join(':')}::/64`
+}
+
+/**
+ * The viewer's IP. The Lambda only sees CloudFront's address, so the site's
+ * CloudFront function copies the viewer's IP into `x-viewer-ip` (see
+ * sst.config.ts), replacing anything the browser sent. On deployed stages
+ * the origin check (server/middleware/origin-check.ts) refuses anything
+ * that did not come through that function, so the header can be trusted.
+ * The server's own calls to itself while rendering a page forward it too
+ * (use `useRequestFetch`, not a bare `$fetch`, so they count as the
+ * viewer). Without the header (local runs) the connection's address is
+ * used, and null when that is unknown too.
  */
 export function clientIp(event: H3Event): string | null {
   const header = getHeader(event, 'x-viewer-ip')?.trim()
-  if (header && ADDRESS.test(header)) return header.toLowerCase()
-  const req = event.node.req as {
-    __unenv__?: {
-      event?: { requestContext?: { http?: { sourceIp?: string } } }
-    }
-    socket?: { remoteAddress?: string }
-  }
-  const direct =
-    req.__unenv__?.event?.requestContext?.http?.sourceIp ??
-    req.socket?.remoteAddress
-  return direct && ADDRESS.test(direct) ? direct.toLowerCase() : null
+  if (header && ADDRESS.test(header)) return header
+  const direct = event.node.req.socket?.remoteAddress
+  return direct && ADDRESS.test(direct) ? direct : null
 }

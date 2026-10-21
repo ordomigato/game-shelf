@@ -63,4 +63,13 @@ describe('createMemoryLimiter', () => {
     limiter.hit('ip999', 1, 60_000)
     expect(limiter.hit('ip999', 1, 60_000).allowed).toBe(false)
   })
+
+  it('keeps pinned ceilings through a flood of distinct keys', () => {
+    const { limiter } = setup(100)
+    limiter.hit('ceiling', 2, 60_000, true)
+    limiter.hit('ceiling', 2, 60_000, true)
+    for (let i = 0; i < 12_000; i++) limiter.hit(`ip${i}`, 5, 60_000)
+    expect(limiter.size).toBe(100)
+    expect(limiter.hit('ceiling', 2, 60_000, true).allowed).toBe(false)
+  })
 })

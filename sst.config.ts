@@ -173,6 +173,17 @@ export default $config({
       },
     })
 
+    // The handshake that lets only CloudFront reach the server: CloudFront's
+    // viewer-request function adds this value as x-origin-secret and the
+    // server refuses requests without it. Derived from the database URL, so
+    // it is stable between deploys, differs per stage, needs no extra
+    // provider and no value to set by hand. It changes if the database
+    // password does, and the next deploy updates both sides together.
+    const { createHmac } = await import('node:crypto')
+    const originSecret = databaseUrl.value.apply((url) =>
+      createHmac('sha256', url).update('origin-secret').digest('hex'),
+    )
+
     const site = new sst.aws.Nuxt('Site', {
       // DNS lives at Namecheap, so SST doesn't create records (dns: false).
       // The certificate was validated there by hand. www is served by the
@@ -195,6 +206,7 @@ export default $config({
         userPoolClient,
       ],
       environment: {
+        NUXT_ORIGIN_SECRET: originSecret,
         NUXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.id,
         NUXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.id,
         NUXT_PUBLIC_COGNITO_DOMAIN: authDomain,
@@ -211,11 +223,17 @@ export default $config({
       },
       // CloudFront's address is all the Lambda sees as the caller, so the
       // viewer's IP is copied into a header the server's request limits
-      // read (server/utils/request-limits.ts). Set here, it replaces any
-      // x-viewer-ip the browser sends.
+      // read (server/utils/request-limits.ts), next to the secret that
+      // proves the request came through CloudFront
+      // (server/middleware/origin-check.ts). Set here, both replace any
+      // header of the same name the browser sends.
       edge: {
         viewerRequest: {
-          injection: `event.request.headers["x-viewer-ip"] = { value: event.viewer.ip };`,
+          injection: originSecret.apply(
+            (secret) =>
+              `event.request.headers["x-viewer-ip"] = { value: event.viewer.ip };
+  event.request.headers["x-origin-secret"] = { value: "${secret}" };`,
+          ),
         },
       },
       server: {

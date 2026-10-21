@@ -1,4 +1,3 @@
-import { ofetch } from 'ofetch'
 import type { NitroFetchOptions, NitroFetchRequest } from 'nitropack'
 import type { ChartWidget } from '#shared/types/charts'
 import type {
@@ -64,7 +63,7 @@ export function useCollections() {
     await auth.ensureLoaded()
     return auth.status.value === 'signedIn'
       ? auth.apiFetch<T>(url, options)
-      : (ofetch<T>(url, options as object) as Promise<T>)
+      : ($fetch<T>(url, options as object) as Promise<T>)
   }
 
   const userPath = (username: string) =>
@@ -77,7 +76,7 @@ export function useCollections() {
 
     /** What anyone can see about a user. */
     profile: (username: string) =>
-      ofetch<PublicProfile>(`/api/u/${encodeURIComponent(username)}`),
+      $fetch<PublicProfile>(`/api/u/${encodeURIComponent(username)}`),
 
     list: (username: string) =>
       viewerFetch<CollectionSummary[]>(userPath(username)),

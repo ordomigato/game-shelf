@@ -166,6 +166,8 @@
     "notFoundBody": "We couldn't find this page.",
     "genericTitle": "Something went wrong",
     "genericBody": "Please try again in a moment.",
+    "tooManyTitle": "Too many requests",
+    "tooManyBody": "Wait a minute and try again.",
     "backHome": "Back to home"
   },
   "search": {

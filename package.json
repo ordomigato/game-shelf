@@ -32,6 +32,7 @@
     "@vueuse/core": "^15.0.0",
     "aws-amplify": "^6.22.1",
     "aws-jwt-verify": "^5.2.1",
+    "barcode-detector": "^3.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
@@ -50,7 +51,8 @@
     "vue-router": "^5.3.1",
     "vue-sonner": "^2.0.9",
     "web-vitals": "^6.2.3",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zxing-wasm": "3.1.6"
   },
   "engines": {
     "node": ">=24"

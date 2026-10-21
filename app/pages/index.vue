@@ -202,7 +202,17 @@ const resultsLabel = computed(() => {
           :placeholder="$t('search.placeholder')"
           autocomplete="off"
           autofocus
-          class="h-14 bg-card pl-12 text-lg md:text-lg"
+          class="h-14 bg-card pr-14 pl-12 text-lg md:text-lg"
+        />
+        <ScanButton
+          icon-only
+          :list="target?.list"
+          :collection="
+            target?.collectionId
+              ? { id: target.collectionId, title: target.title }
+              : undefined
+          "
+          class="absolute top-1/2 right-2 -translate-y-1/2"
         />
       </form>
       <p v-if="showTooShort" class="mt-3 text-sm text-muted-foreground">

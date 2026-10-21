@@ -45,6 +45,10 @@ const linkClass =
       <p>{{ $t('privacy.others') }}</p>
     </ProseSection>
 
+    <ProseSection :title="$t('privacy.scanningTitle')">
+      <p>{{ $t('privacy.scanning') }}</p>
+    </ProseSection>
+
     <ProseSection :title="$t('privacy.controlTitle')">
       <i18n-t scope="global" keypath="privacy.control" tag="p">
         <template #settings>

@@ -1,6 +1,7 @@
 import type { BarcodeResult, BulkAddResult } from '#shared/types/barcode'
 import type { ListName } from '#shared/types/collection'
 import { MAX_SCAN_BATCH, normalizeBarcode } from '#shared/utils/barcode'
+import { SCAN_STORAGE_KEY as STORAGE_KEY } from '~/utils/scan-storage'
 import {
   canTick,
   defaultTicked,
@@ -9,9 +10,38 @@ import {
   type ScanRow,
 } from '~/utils/scan-rows'
 
-const STORAGE_KEY = 'gameshelf:scan-list'
 /** A refusal that says to wait longer than this is the daily cap. */
 const DAILY_CAP_WAIT_SECONDS = 600
+/** A refusal asking for less than this is waited out once, automatically. */
+const SHORT_WAIT_SECONDS = 10
+/** Lookups in flight at once. */
+const MAX_LOOKUPS = 3
+
+// Lookups wait here for one of the `MAX_LOOKUPS` places.
+let running = 0
+const waiting: (() => void)[] = []
+async function takePlace() {
+  if (running >= MAX_LOOKUPS) {
+    await new Promise<void>((resolve) => waiting.push(resolve))
+  } else running += 1
+}
+function givePlace() {
+  const next = waiting.shift()
+  if (next) next()
+  else running -= 1
+}
+
+function refusal(error: unknown): { limited: boolean; wait: number } {
+  const { status, statusCode, response } = error as {
+    status?: number
+    statusCode?: number
+    response?: { headers?: Headers }
+  }
+  return {
+    limited: (statusCode ?? status) === 429,
+    wait: Number(response?.headers?.get('retry-after') ?? 0),
+  }
+}
 
 /** The collection a scan was started from, which the batch also joins. */
 export interface ScanCollection {
@@ -110,14 +140,26 @@ export function useBarcodeScanner() {
   }
 
   async function lookup(code: string) {
+    await takePlace()
     try {
-      const { match } = await auth.apiFetch<BarcodeResult>(
-        `/api/barcodes/${code}`,
-        // The row's Try again button asks again, so a failure isn't repeated
-        // on its own.
-        { retry: 0 },
-      )
-      if (!rows.value.some((row) => row.code === code)) return
+      const row = rows.value.find((r) => r.code === code)
+      const path = `/api/barcodes/${row?.query ?? code}`
+      // Asked again by the row's Try again button, not on its own, except
+      // once after a short wait when the server asks for one.
+      const ask = () => auth.apiFetch<BarcodeResult>(path, { retry: 0 })
+      let result: BarcodeResult
+      try {
+        result = await ask()
+      } catch (error) {
+        const { limited, wait } = refusal(error)
+        if (!limited || wait > SHORT_WAIT_SECONDS) throw error
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.max(wait, 1) * 1000),
+        )
+        result = await ask()
+      }
+      const { match } = result
+      if (!rows.value.some((r) => r.code === code)) return
       update(
         code,
         match
@@ -130,18 +172,14 @@ export function useBarcodeScanner() {
           : { status: 'none', ticked: false },
       )
     } catch (error) {
-      const { status, statusCode, response } = error as {
-        status?: number
-        statusCode?: number
-        response?: { headers?: Headers }
-      }
-      const limited = (statusCode ?? status) === 429
-      const wait = Number(response?.headers?.get('retry-after') ?? 0)
+      const { limited, wait } = refusal(error)
       update(code, {
         status: 'error',
         ticked: false,
         problem: limited && wait > DAILY_CAP_WAIT_SECONDS ? 'limit' : 'failed',
       })
+    } finally {
+      givePlace()
     }
     save()
   }
@@ -151,16 +189,22 @@ export function useBarcodeScanner() {
    * highlights its row. `invalid` means it isn't a real barcode, and `full`
    * that the list holds as many as one batch can.
    */
-  function scan(raw: string): ScanOutcome {
-    const code = normalizeBarcode(raw)
+  function scan(raw: string, format?: string): ScanOutcome {
+    const code = normalizeBarcode(raw, format)
     if (!code) return 'invalid'
+    // A UPC or EAN-13 is looked up as scanned, anything else by its key.
+    const digits = raw.replace(/\s+/g, '')
+    const query = /^\d{12,13}$/.test(digits) ? digits : code
     if (rows.value.some((row) => row.code === code)) {
       highlight(code)
       return 'duplicate'
     }
     if (isFull.value) return 'full'
     navigator.vibrate?.(40)
-    rows.value = [{ code, status: 'loading', ticked: false }, ...rows.value]
+    rows.value = [
+      { code, query, status: 'loading', ticked: false },
+      ...rows.value,
+    ]
     highlight(code)
     void lookup(code)
     return 'added'
@@ -216,8 +260,14 @@ export function useBarcodeScanner() {
       },
     )
     clear()
-    useGameMemberships().clear()
-    await Promise.all([useMyCollections().refresh(), refreshNuxtData()])
+    // The games are added whatever happens here, so a failed refresh must
+    // not look like a failed add.
+    try {
+      useGameMemberships().clear()
+      await Promise.all([useMyCollections().refresh(), refreshNuxtData()])
+    } catch {
+      // The views catch up the next time they load.
+    }
     return result
   }
 

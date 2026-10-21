@@ -1,8 +1,12 @@
 /** Reads the barcodes visible in one video frame. */
-export type BarcodeReader = (video: HTMLVideoElement) => Promise<string[]>
+export type BarcodeReader = (
+  video: HTMLVideoElement,
+) => Promise<{ value: string; format: string }[]>
 
 interface Detector {
-  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>
+  detect(
+    source: HTMLVideoElement,
+  ): Promise<{ rawValue: string; format: string }[]>
 }
 interface DetectorClass {
   new (options: { formats: string[] }): Detector
@@ -41,5 +45,8 @@ export async function createBarcodeReader(): Promise<BarcodeReader> {
   }
   const detector = new Detector({ formats: FORMATS })
   return async (video) =>
-    (await detector.detect(video)).map((found) => found.rawValue)
+    (await detector.detect(video)).map((found) => ({
+      value: found.rawValue,
+      format: found.format,
+    }))
 }

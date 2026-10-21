@@ -7,9 +7,13 @@ import type { BarcodeReader } from '~/lib/barcode-reader'
  * this mounts and stops when it unmounts or the tab is hidden.
  */
 const emit = defineEmits<{
-  scan: [value: string]
+  scan: [value: string, format: string]
   /** The camera can't be used: blocked, missing or not supported. */
   unavailable: [reason: 'denied' | 'none']
+}>()
+const props = defineProps<{
+  /** Frames are not read while this is true (a question is open). */
+  paused?: boolean
 }>()
 
 /** How often a frame is read, and how long the same code is ignored. */
@@ -21,70 +25,87 @@ const ready = ref(false)
 let stream: MediaStream | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
 let reader: BarcodeReader | undefined
-let running = false
+// Each start gets a number. Stopping or starting again makes older ones
+// stale, and a stale start gives back anything it received after its
+// awaits, so there is never more than one stream and the camera light
+// goes off.
+let token = 0
 let last = { value: '', at: 0 }
 
+function release(received: MediaStream | undefined) {
+  received?.getTracks().forEach((track) => track.stop())
+}
+
 function stop() {
-  running = false
+  token += 1
   clearTimeout(timer)
-  stream?.getTracks().forEach((track) => track.stop())
+  release(stream)
   stream = undefined
   if (video.value) video.value.srcObject = null
   ready.value = false
 }
 
-async function readFrame() {
-  if (!running || !reader || !video.value) return
+async function readFrame(mine: number) {
+  if (mine !== token || !reader || !video.value) return
   try {
-    if (video.value.readyState >= 2) {
-      for (const value of await reader(video.value)) {
+    if (!props.paused && video.value.readyState >= 2) {
+      for (const { value, format } of await reader(video.value)) {
+        if (mine !== token || props.paused) break
         const now = Date.now()
         if (value === last.value && now - last.at < REPEAT_AFTER_MS) continue
         last = { value, at: now }
-        emit('scan', value)
+        emit('scan', value, format)
       }
     }
   } catch {
     // A frame that can't be read is skipped.
   }
-  if (running) timer = setTimeout(readFrame, READ_EVERY_MS)
+  if (mine === token) timer = setTimeout(() => readFrame(mine), READ_EVERY_MS)
 }
 
 async function start() {
-  if (running) return
+  stop()
+  const mine = token
   if (!navigator.mediaDevices?.getUserMedia) {
     emit('unavailable', 'none')
     return
   }
-  running = true
+  let received: MediaStream
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    received = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' } },
       audio: false,
     })
   } catch (error) {
-    running = false
+    if (mine !== token) return
     const denied = (error as { name?: string }).name === 'NotAllowedError'
     emit('unavailable', denied ? 'denied' : 'none')
     return
   }
-  if (!running || !video.value) {
-    stop()
+  if (mine !== token || !video.value) {
+    release(received)
     return
   }
-  video.value.srcObject = stream!
+  stream = received
+  video.value.srcObject = received
   try {
     await video.value.play()
+    if (mine !== token) return
     reader ??= await (
       await import('~/lib/barcode-reader')
     ).createBarcodeReader()
-  } catch {
+  } catch (error) {
+    // Play is interrupted when the video is reset: a cancel, not a failure.
+    if (mine !== token || (error as { name?: string }).name === 'AbortError') {
+      return
+    }
     stop()
     emit('unavailable', 'none')
     return
   }
+  if (mine !== token) return
   ready.value = true
-  void readFrame()
+  void readFrame(mine)
 }
 
 function onVisibility() {

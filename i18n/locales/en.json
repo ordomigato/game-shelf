@@ -39,8 +39,9 @@
     "closeKeep": "Close",
     "added": "Added {count} to {list}.",
     "addedToCollection": "{count} joined {collection}.",
-    "skippedAlready": "{count} were already there.",
-    "skippedOther": "{count} couldn't be added.",
+    "withoutPlatform": "{count} was added without a platform. | {count} were added without a platform.",
+    "skippedAlready": "{count} was already there. | {count} were already there.",
+    "skippedOther": "{count} couldn't be added. | {count} couldn't be added.",
     "addFailed": "Couldn't add these. Try again.",
     "gone": "That collection no longer exists."
   },

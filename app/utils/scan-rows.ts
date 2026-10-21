@@ -5,6 +5,8 @@ import type { ListName } from '#shared/types/collection'
 export interface ScanRow {
   /** The normalised barcode, which is also the row's identity. */
   code: string
+  /** The digits to look up, as scanned. Not kept in session storage. */
+  query?: string
   status: 'loading' | 'match' | 'none' | 'error'
   /** Why a lookup failed: the caps were reached, or something broke. */
   problem?: 'limit' | 'failed'

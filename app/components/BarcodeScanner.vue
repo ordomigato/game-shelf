@@ -39,8 +39,8 @@ function submitTyped() {
   if (outcome === 'added' || outcome === 'duplicate') typed.value = ''
 }
 
-function onCameraScan(value: string) {
-  const outcome = scanner.scan(value)
+function onCameraScan(value: string, format: string) {
+  const outcome = scanner.scan(value, format)
   // Misreads fail the check digit and are ignored.
   typedProblem.value = outcome === 'full' ? 'full' : null
 }
@@ -125,8 +125,15 @@ async function add() {
           collection: joined.title,
         })
       : null,
-    already ? t('scan.skippedAlready', { count: already }) : null,
-    other ? t('scan.skippedOther', { count: other }) : null,
+    result.withoutPlatform
+      ? t(
+          'scan.withoutPlatform',
+          { count: result.withoutPlatform },
+          result.withoutPlatform,
+        )
+      : null,
+    already ? t('scan.skippedAlready', { count: already }, already) : null,
+    other ? t('scan.skippedOther', { count: other }, other) : null,
   ]
   toast.success(parts.filter(Boolean).join(' '))
 }
@@ -146,6 +153,7 @@ async function add() {
 
       <BarcodeCamera
         v-if="!cameraProblem"
+        :paused="confirmingClose"
         @scan="onCameraScan"
         @unavailable="cameraProblem = $event"
       />

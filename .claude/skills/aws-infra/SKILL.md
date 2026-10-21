@@ -57,6 +57,10 @@ don't deploy anything there. SST signs in with the `gameshelf` profile in
 command at another account. If a command fails on credentials, the session
 expired: `aws sso login --profile gameshelf`.
 
+Every stage needs `ScanDexToken` (barcode lookups) set, or `--fallback`, or
+the Nuxt server fails on its first barcode lookup and a deploy of that stage
+has nothing to link.
+
 Secrets are per stage: `npx sst secret set <Name> <value> [--stage x]`,
 or `--fallback` to set a default for every stage.
 

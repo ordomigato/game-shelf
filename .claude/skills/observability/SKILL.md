@@ -42,10 +42,17 @@ All lines go through `log()` in `server/utils/log.ts`.
   `NUXT_PUBLIC_VITALS_SAMPLE_RATE`). To test, set localStorage
   `gameshelf:vitals` to `always`.
 - **`http.rate_limited`**, one per request the in-memory limiter refused
-  (`server/middleware/rate-limit.ts`): `group` only (`igdb`, `vitals`,
-  `public`, `write`, `other`, or `user-write`), never an IP or user id.
+  (`server/middleware/rate-limit.ts`): `group` only (`igdb`, `barcodes`,
+  `vitals`, `public`, `write`, `other`, or `user-write`), never an IP or user id.
   Watch it to see whether the limits fire: `filter event = "http.rate_limited"
 | stats count() by group`. Limits are in `server/utils/request-limits.ts`.
+- **`barcode.lookup`**, one per barcode lookup (`server/utils/barcodes.ts`):
+  `outcome` (`cache_hit`, `scandex_match`, `scandex_no_match`, `error`,
+  `error_stale_used` or `cache_stale_at_cap`) and, when ScanDex was asked,
+  `scandexMs`. Never the barcode or a user id. `barcode.cache_failed` is a
+  warning when an answer could not be saved. Count how often ScanDex is
+  called against its 50,000 a month with
+  `filter event = "barcode.lookup" and outcome like /scandex|error/ | stats count()`.
 - **Existing events:** `igdb.slow`, `igdb.rate_limited`, `twitch.*`,
   `server.error` (unexpected errors only), `preview.failed`.
 

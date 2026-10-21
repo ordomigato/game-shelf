@@ -54,6 +54,7 @@ export function useAuth() {
     hint.value = null
     clearNuxtState('my-collections')
     useGameMemberships().clear()
+    clearScanState()
   }
 
   async function accessToken(): Promise<string | null> {

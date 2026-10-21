@@ -68,6 +68,13 @@ function gradient(): string {
   return `data:image/png;base64,${png.toString('base64')}`
 }
 
+// The wordmark's viewBox is x y w h around a line of text 100 units tall.
+const [wx, wy, , wh] = brand('wordmark-dark.svg')
+  .match(/viewBox="([^"]+)"/)![1]!
+  .split(' ')
+  .map(Number) as [number, number, number, number]
+const [wordH, wordTop, wordLeft] = [wh * 1.04, wy * 1.04, wx * 1.04]
+
 const html = `<!doctype html>
 <html>
 <head>
@@ -87,9 +94,10 @@ const html = `<!doctype html>
   }
   svg { height: 365px; width: auto; flex: none; }
   .words { display: flex; flex-direction: column; }
-  /* The wordmark's box is one em tall, so its height is the text size. */
+  /* The text is 104px tall; the wordmark's box is taller (room for the "y"
+     tail), so it is sized by the same scale and moved back up. */
   .logo { height: 104px; margin-bottom: 38px; }
-  .logo svg { height: 104px; }
+  .logo svg { height: ${wordH}px; margin-top: ${wordTop}px; margin-left: ${wordLeft}px; }
   .tagline { font-size: 38px; font-weight: 600; color: #72bdf4; margin-bottom: 26px; }
   .sub { font-size: 25px; font-weight: 400; color: #a6b0be; }
 </style>

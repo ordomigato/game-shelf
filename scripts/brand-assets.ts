@@ -86,9 +86,15 @@ const list = (items: string[]) =>
 
 const round = (n: number) => Math.round(n * 100) / 100
 
+/** Space kept around the wordmark's real outline, in em/100 units. */
+const WORD_PAD = 2
+
 /**
- * The wordmark outlined in a box 1em tall (100 units), like a line of text
- * with `line-height: 1`. The box's width is the text's advance.
+ * The wordmark outlined in a line box 1em tall (100 units), like a line of
+ * text with `line-height: 1`; the baseline and sizes come from the font's
+ * metrics. `box` is what the SVGs show: the outlines' real bounding box (the
+ * "y" tail and the raised "this" reach outside the line box) plus even
+ * padding, in the line box's coordinates.
  */
 function wordmark() {
   const em = 100
@@ -113,9 +119,15 @@ function wordmark() {
     kerning: true,
   })
   const width = playX + bold.getAdvanceWidth('PlayShelf', em, { kerning: true })
+  const [a, b] = [thisPath.getBoundingBox(), playPath.getBoundingBox()]
+  const x1 = Math.floor(Math.min(a.x1, b.x1)) - WORD_PAD
+  const y1 = Math.floor(Math.min(a.y1, b.y1)) - WORD_PAD
+  const x2 = Math.ceil(Math.max(a.x2, b.x2)) + WORD_PAD
+  const y2 = Math.ceil(Math.max(a.y2, b.y2)) + WORD_PAD
   return {
     width: round(width),
     height: em,
+    box: { x: x1, y: y1, w: x2 - x1, h: y2 - y1 },
     thisD: thisPath.toPathData(2),
     playD: playPath.toPathData(2),
   }
@@ -135,6 +147,8 @@ const wordShapes = (t: (typeof THEMES)[Theme]) =>
 const svg = (viewBox: string, label: string, inner: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" role="img" aria-label="${label}">${inner}</svg>\n`
 
+const wb = word.box
+const wordBox = `${wb.x} ${wb.y} ${wb.w} ${wb.h}`
 const m = MARK_VIEWBOX
 const markBox = `${m.x} ${m.y} ${m.w} ${m.h}`
 
@@ -144,7 +158,15 @@ const unitsPerPx = m.h / APP.markPx
 const textScale = (APP.textPx * unitsPerPx) / word.height
 const textX = m.x + m.w + APP.gapPx * unitsPerPx
 const textY = m.y + m.h / 2 - (word.height * textScale) / 2
-const logoBox = `${m.x} ${m.y} ${round(textX + word.width * textScale - m.x)} ${m.h}`
+// The box is the mark's and the wordmark's outlines together, with the
+// mark's own padding (6 units) kept around the wordmark too.
+const wordTop = textY + wb.y * textScale
+const wordBottom = textY + (wb.y + wb.h) * textScale
+const pad = -m.x
+const logoY = Math.floor(Math.min(m.y, wordTop - pad))
+const logoBottom = Math.ceil(Math.max(m.y + m.h, wordBottom + pad))
+const logoRight = textX + (wb.x + wb.w) * textScale + pad
+const logoBox = `${m.x} ${logoY} ${round(logoRight - m.x)} ${logoBottom - logoY}`
 const logoWordTransform = `translate(${round(textX)} ${round(textY)}) scale(${round(textScale * 1e4) / 1e4})`
 
 const files = new Map<string, string>()
@@ -160,7 +182,7 @@ for (const theme of ['light', 'dark'] as const) {
   )
   files.set(
     `public/brand/wordmark-${theme}.svg`,
-    svg(`0 0 ${word.width} ${word.height}`, 'ThisPlayShelf', wordShapes(t)),
+    svg(wordBox, 'ThisPlayShelf', wordShapes(t)),
   )
   files.set(
     `public/brand/logo-${theme}.svg`,
@@ -190,8 +212,14 @@ export const markViewBox = '${markBox}'
 export const markWalls = ${list(WALLS)}
 export const markShelves = ${list(SHELVES)}
 
-/** The wordmark in a box 1em tall: scale the box to the text's font size. */
-export const wordmarkViewBox = '0 0 ${word.width} ${word.height}'
+/**
+ * The wordmark's SVG box, with room for the "y" tail. Its coordinates are
+ * those of a line of text 100 units tall (the font size, line-height 1), so
+ * scale by the font size / 100 and shift by \`y\` to line it up as text.
+ */
+export const wordmarkViewBox = '${wordBox}'
+export const wordmarkBox = { x: ${wb.x}, y: ${wb.y}, w: ${wb.w}, h: ${wb.h} }
+/** The text's own width (its advance), inside that box. */
 export const wordmarkWidth = ${word.width}
 export const wordmarkThis = '${word.thisD}'
 export const wordmarkThisOpacity = ${THIS.opacity}

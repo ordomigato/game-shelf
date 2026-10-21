@@ -3,10 +3,12 @@ import {
   markShelves,
   markViewBox,
   markWalls,
+  wordmarkBox,
   wordmarkPlay,
   wordmarkThis,
   wordmarkThisOpacity,
   wordmarkViewBox,
+  wordmarkWidth,
 } from '~/assets/brand/logo-paths'
 
 /**
@@ -16,7 +18,7 @@ import {
  * its colours from the --logo-* variables in tailwind.css and the wordmark
  * from the surrounding text colour, so both follow the theme.
  */
-defineProps<{
+const props = defineProps<{
   /** Only the mark, for tight spaces. */
   compact?: boolean
   /** Only the mark on phones. */
@@ -24,6 +26,19 @@ defineProps<{
   /** Smaller, for tight bars like the phone header. */
   small?: boolean
 }>()
+
+// The wordmark's box is bigger than its line of text (room for the "y" tail),
+// so it is sized from the font size and the extra is taken back out in
+// negative margins: the baseline, cap height and gaps stay where a plain
+// line of text would put them.
+const wordStyle = computed(() => {
+  const k = (props.small ? 16 : 20) / 100
+  const b = wordmarkBox
+  return {
+    height: `${b.h * k}px`,
+    margin: `${b.y * k}px ${(wordmarkWidth - b.x - b.w) * k}px ${(100 - b.y - b.h) * k}px ${b.x * k}px`,
+  }
+})
 
 // Each logo on the page needs its own gradient id.
 const glass = `logo-glass-${useId()}`
@@ -75,10 +90,8 @@ const glass = `logo-glass-${useId()}`
       :viewBox="wordmarkViewBox"
       fill="currentColor"
       class="w-auto shrink-0"
-      :class="[
-        small ? 'h-4' : 'h-5',
-        { hidden: compact, 'max-sm:hidden': compactOnPhone },
-      ]"
+      :style="wordStyle"
+      :class="{ hidden: compact, 'max-sm:hidden': compactOnPhone }"
       aria-hidden="true"
     >
       <path :d="wordmarkThis" :fill-opacity="wordmarkThisOpacity" />

@@ -95,6 +95,7 @@ describe('an export imports back', () => {
     const fields: FieldDefinition[] = [
       { id: 'g', name: 'Genre', type: 'text' },
       { id: 'p', name: 'Platforms', type: 'text' },
+      { id: 'l', name: 'List', type: 'text' },
     ]
     const csv = collectionCsv(
       fields,
@@ -103,7 +104,9 @@ describe('an export imports back', () => {
           name: 'Zelda',
           igdbId: 1022,
           addedAt: '2026-01-01T00:00:00Z',
-          data: { g: 'Mine', p: 'Shelf 2' },
+          data: { g: 'Mine', p: 'Shelf 2', l: 'Backlog' },
+          owned: true,
+          wishlisted: true,
           releaseDate: '1991-11-21',
           releasePrecision: 'day',
           genres: ['Adventure'],
@@ -124,6 +127,7 @@ describe('an export imports back', () => {
         'Genre',
         'Platforms',
         'Wishlist platforms',
+        'List',
       ],
     )
     const parsed = Papa.parse<string[]>(csv.replace(/^\uFEFF/, ''), {
@@ -134,7 +138,13 @@ describe('an export imports back', () => {
     const imported = planImport(headers, body, targets, fields)
     expect(imported.problems).toEqual([])
     // Core columns come first, so the user's own fields keep their values.
-    expect(imported.rows[0]!.values).toEqual({ g: 'Mine', p: 'Shelf 2' })
+    expect(imported.rows[0]!.values).toEqual({
+      g: 'Mine',
+      p: 'Shelf 2',
+      l: 'Backlog',
+    })
+    // The core List column says where the game goes.
+    expect(imported.rows[0]!.list).toBe('both')
     const result = planPlatforms(
       imported.rows,
       () => zelda,

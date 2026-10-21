@@ -8,9 +8,10 @@ import { platformsOf } from './platforms'
 import type { ReleasePrecision } from './release-date'
 
 /**
- * The columns every export starts with, before the collection's fields. The
- * last four are the core columns: IGDB's release date, genres, and the
- * platforms the game is owned on and wanted on.
+ * The columns every export starts with, before the collection's fields. After
+ * the name, IGDB id and date added come the core columns: IGDB's release
+ * date and genres, the platforms the game is owned on and wanted on, and
+ * which of the two lists it is on.
  */
 export const FIXED_COLUMNS: Message[] = [
   { key: 'export.columns.name' },
@@ -20,6 +21,7 @@ export const FIXED_COLUMNS: Message[] = [
   { key: 'export.columns.genre' },
   { key: 'export.columns.platforms' },
   { key: 'export.columns.wishlistPlatforms' },
+  { key: 'export.columns.list' },
 ]
 
 /** Joins a multiple-choice value in a cell. Choices can contain commas. */
@@ -77,7 +79,8 @@ export function exportValue(
 
 /**
  * A game as an export needs it. The catalog's facts and the platforms are
- * missing for a game added by hand, and a visitor gets no platforms.
+ * missing for a game added by hand. `owned` and `wishlisted` are the
+ * owner's place on the lists, left out when the exporter can't see them.
  */
 export interface ExportItem extends Pick<CollectionEntry, 'name' | 'data'> {
   igdbId: number | null
@@ -86,6 +89,8 @@ export interface ExportItem extends Pick<CollectionEntry, 'name' | 'data'> {
   releaseDate?: string | null
   releasePrecision?: ReleasePrecision | null
   genres?: string[]
+  owned?: boolean
+  wishlisted?: boolean
   ownedOn?: number[]
   wantedOn?: number[]
   catalogPlatforms?: CollectionEntry['catalogPlatforms']
@@ -115,6 +120,27 @@ export function releasedText(
   }
 }
 
+/**
+ * The words in the List column. The import reads them back in any case, so
+ * they stay English whatever language the headers are in.
+ */
+export const LIST_CELL = {
+  owned: 'Owned',
+  wishlist: 'Wishlist',
+  both: 'Owned; Wishlist',
+}
+
+/** Which lists a game is on, as the List column writes it. */
+export function listCell(item: ExportItem): string {
+  if (item.owned === undefined || item.wishlisted === undefined) return ''
+  if (item.owned && item.wishlisted) return LIST_CELL.both
+  return item.owned
+    ? LIST_CELL.owned
+    : item.wishlisted
+      ? LIST_CELL.wishlist
+      : ''
+}
+
 /** The platforms a game is owned on and wanted on, by their short names. */
 export function exportPlatformNames(item: ExportItem) {
   const { owned, wanted } = platformsOf({
@@ -130,8 +156,9 @@ export function exportPlatformNames(item: ExportItem) {
 
 /**
  * A collection as CSV: a row per game, in the order given, with its name,
- * IGDB id, date added, release date, genres, owned platforms and wishlist
- * platforms, then a column per field. `columns` are the first seven names, already in
+ * IGDB id, date added, release date, genres, owned platforms, wishlist
+ * platforms and list, then a column per field. `columns` are the first
+ * eight names, already in
  * the reader's language. Used in the browser for one collection and on the
  * server for "Export all" and the lists.
  */
@@ -151,6 +178,7 @@ export function collectionCsv(
       safeText((item.genres ?? []).join(CHOICE_SEPARATOR)),
       safeText(platforms.owned.join(CHOICE_SEPARATOR)),
       safeText(platforms.wanted.join(CHOICE_SEPARATOR)),
+      listCell(item),
       ...fields.map((field) => exportValue(field, item.data[field.id])),
     ]
   })

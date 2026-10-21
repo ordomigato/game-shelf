@@ -309,6 +309,8 @@ export async function setListColumns(
  */
 export async function exportItemsOf(
   rows: (Pick<ExportItem, 'name' | 'igdbId' | 'addedAt' | 'data'> & {
+    owned: boolean
+    wishlisted: boolean
     ownedOn: number[]
     wantedOn: number[]
     game: typeof catalogGames.$inferSelect | null
@@ -342,6 +344,8 @@ export async function listForExport(
       name: itemName,
       addedAt: libraryItems.createdAt,
       data: libraryItems.data,
+      owned: libraryItems.owned,
+      wishlisted: libraryItems.wishlisted,
       ownedOn: libraryItems.ownedOn,
       wantedOn: libraryItems.wantedOn,
       game: catalogGames,

@@ -3,6 +3,7 @@ import type { FieldDefinition, FieldType } from '../types/collection'
 import {
   collectionCsv,
   exportValue,
+  listCell,
   releasedText,
   safeText,
   toCsv,
@@ -80,6 +81,8 @@ describe('collectionCsv', () => {
           releaseDate: '2017-03-03',
           releasePrecision: 'day',
           genres: ['Adventure', 'Puzzle'],
+          owned: true,
+          wishlisted: true,
           ownedOn: [130],
           wantedOn: [19],
           catalogPlatforms: [
@@ -102,13 +105,26 @@ describe('collectionCsv', () => {
         'Genre',
         'Platforms',
         'Wishlist platforms',
+        'List',
       ],
     )
     expect(csv).toBe(
-      '\uFEFFName,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms,Condition,Price\r\n' +
-        '"Zelda, The",1022,2026-01-15,2017-03-03,Adventure; Puzzle,Switch,SNES,Loose,40.00\r\n' +
-        'Homebrew,,2026-02-01,,,,,,\r\n',
+      '\uFEFFName,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms,List,Condition,Price\r\n' +
+        '"Zelda, The",1022,2026-01-15,2017-03-03,Adventure; Puzzle,Switch,SNES,Owned; Wishlist,Loose,40.00\r\n' +
+        'Homebrew,,2026-02-01,,,,,,,\r\n',
     )
+  })
+
+  it('writes which list a game is on, and nothing when that is not known', () => {
+    const game = { name: 'A', igdbId: null, addedAt: '', data: {} }
+    expect(listCell({ ...game, owned: true, wishlisted: false })).toBe('Owned')
+    expect(listCell({ ...game, owned: false, wishlisted: true })).toBe(
+      'Wishlist',
+    )
+    expect(listCell({ ...game, owned: true, wishlisted: true })).toBe(
+      'Owned; Wishlist',
+    )
+    expect(listCell(game)).toBe('')
   })
 })
 

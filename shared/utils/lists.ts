@@ -49,6 +49,36 @@ export function newListState(list: ListName, platforms: number[]): ListState {
     : { owned: false, wishlisted: true, ownedOn: [], wantedOn: named }
 }
 
+/** The lists an import file puts a new game on. */
+export type ImportList = ListName | 'both'
+
+/**
+ * The lists a new game from an import file lands on, given the list it
+ * names and the platforms it ticks. Without a list, the platforms decide: a
+ * game with only wishlist platforms is wishlisted, any other is owned.
+ * With one, the game goes on that list, and platforms can add the other.
+ * The result always follows the database's rules: a game on both lists
+ * needs a wishlist platform, so without one it is owned only, and
+ * `conflict` says the file asked for more.
+ */
+export function importedListState(
+  list: ImportList | undefined,
+  ownedOn: number[],
+  wantedOn: number[],
+): { owned: boolean; wishlisted: boolean; conflict: boolean } {
+  if (!list) {
+    return {
+      owned: ownedOn.length > 0 || wantedOn.length === 0,
+      wishlisted: wantedOn.length > 0,
+      conflict: false,
+    }
+  }
+  const owned = list !== 'wishlist' || ownedOn.length > 0
+  const wishlisted = list !== 'owned' || wantedOn.length > 0
+  const conflict = owned && wishlisted && wantedOn.length === 0
+  return { owned, wishlisted: wishlisted && !conflict, conflict }
+}
+
 /** Whether a state follows all of the database's rules. */
 export function listStateValid(state: ListState): boolean {
   const apart = !state.ownedOn.some((id) => state.wantedOn.includes(id))

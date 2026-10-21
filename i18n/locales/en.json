@@ -814,7 +814,8 @@
       "released": "Released",
       "genre": "Genre",
       "platforms": "Platforms",
-      "wishlistPlatforms": "Wishlist platforms"
+      "wishlistPlatforms": "Wishlist platforms",
+      "list": "List"
     }
   },
   "import": {
@@ -844,6 +845,7 @@
       "new": "New field",
       "platforms": "Owned platforms",
       "wishlistPlatforms": "Wishlist platforms",
+      "list": "List (Owned or Wishlist)",
       "skip": "Don't import"
     },
     "needsName": "Choose which column holds the game's name.",
@@ -864,6 +866,7 @@
       "doesNotFit": "Doesn't fit the field"
     },
     "platformProblemsTitle": "{count} platform wasn't added | {count} platforms weren't added",
+    "listConflicts": "{count} game was added as Owned only. The file put it on both lists without a Wishlist platform. Row: {rows}. | {count} games were added as Owned only. The file put them on both lists without a Wishlist platform. Rows: {rows}.",
     "moreProblems": "and {count} more | and {count} more",
     "platformProblems": {
       "unknownPlatform": "IGDB doesn't list this game on that platform",

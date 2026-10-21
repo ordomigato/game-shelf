@@ -255,3 +255,184 @@ test('a visitor who taps Scan is sent to sign in', async ({ page }) => {
     await expect(page).toHaveURL(/\/login\?redirect=/, { timeout: 1000 })
   }).toPass()
 })
+
+const ZELDA = {
+  id: 77,
+  name: 'Zelda Found',
+  coverId: null,
+  year: 2017,
+  platforms: ['Switch'],
+}
+
+/** Answers the game search and the per-game platform lookup. */
+async function stubFindIt(page: Page) {
+  const searched: string[] = []
+  await page.route('**/api/games/search?**', (route) => {
+    searched.push(new URL(route.request().url()).searchParams.get('q') ?? '')
+    return route.fulfill({
+      json: { games: [ZELDA], page: 1, hasMore: false },
+    })
+  })
+  await page.route('**/api/library-items/igdb/*', (route) =>
+    route.fulfill({
+      json: {
+        item: null,
+        collectionIds: [],
+        platforms: [
+          { id: 130, name: 'Switch' },
+          { id: 167, name: 'PS5' },
+        ],
+      },
+    }),
+  )
+  return searched
+}
+
+async function findGame(page: Page, buttonName: string, platform?: string) {
+  await page.getByRole('button', { name: buttonName }).click()
+  await page.getByLabel('Search for the game').fill('zelda')
+  await page.getByTestId('scan-find-result').click()
+  if (platform) await page.getByLabel(platform).check()
+  await page.getByTestId('scan-find-use').click()
+}
+
+test('Find it fixes a barcode with no match, and the pick is added with its barcode', async ({
+  page,
+}) => {
+  const asked = await stubLookups(page, () => ({ match: null }))
+  const searched = await stubFindIt(page)
+  let body: unknown
+  await page.route('**/api/library-items/bulk', (route) => {
+    body = route.request().postDataJSON()
+    return route.fulfill({
+      json: { added: 1, withoutPlatform: 0, skipped: [], inCollection: 0 },
+    })
+  })
+  await openOwnedScanner(page)
+  await type(page, ean(3))
+  await expect(page.getByText(`No match for ${ean(3)}`)).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Add 0 to Owned' }),
+  ).toBeDisabled()
+
+  await page
+    .getByRole('button', { name: `Find the game for ${ean(3)}` })
+    .click()
+  await page.getByLabel('Search for the game').fill('zelda')
+  await page.getByTestId('scan-find-result').click()
+  // Nothing is chosen by default, and choosing none is allowed.
+  await expect(page.getByLabel('No platform')).toBeChecked()
+  await page.getByLabel('Switch').check()
+  await page.getByTestId('scan-find-use').click()
+
+  await expect(page.getByTestId('scan-row')).toHaveCount(1)
+  await expect(page.getByText('Zelda Found')).toBeVisible()
+  await expect(page.getByText('Your match')).toBeVisible()
+  await expect(page.getByText('No match for')).toHaveCount(0)
+  await expect(page.getByLabel('Add Zelda Found')).toBeChecked()
+
+  await page.getByRole('button', { name: 'Add 1 to Owned' }).click()
+  await expect(page.getByText('Added 1 to Owned.')).toBeVisible()
+  expect(searched).toEqual(['zelda'])
+  expect(asked).toHaveLength(1)
+  expect(body).toEqual({
+    list: 'owned',
+    items: [{ igdbId: 77, platformId: 130, barcode: ean(3), own: true }],
+  })
+})
+
+test('a game found with no platform is added without one and not reported as missing one', async ({
+  page,
+}) => {
+  await stubLookups(page, () => ({ match: null }))
+  await stubFindIt(page)
+  let body: { items: unknown[] } | undefined
+  await page.route('**/api/library-items/bulk', (route) => {
+    body = route.request().postDataJSON() as { items: unknown[] }
+    return route.fulfill({
+      json: { added: 1, withoutPlatform: 0, skipped: [], inCollection: 0 },
+    })
+  })
+  await openOwnedScanner(page)
+  await type(page, ean(3))
+  await findGame(page, `Find the game for ${ean(3)}`)
+  await page.getByRole('button', { name: 'Add 1 to Owned' }).click()
+  await expect(page.getByText('Added 1 to Owned.')).toBeVisible()
+  await expect(page.getByText('without a platform')).toHaveCount(0)
+  expect(body?.items).toEqual([
+    { igdbId: 77, platformId: null, barcode: ean(3), own: true },
+  ])
+})
+
+test('Change corrects a wrong match, and picking a game already listed merges the rows', async ({
+  page,
+}) => {
+  await stubLookups(page)
+  await stubFindIt(page)
+  await openOwnedScanner(page)
+  await type(page, ean(1))
+  await expect(page.getByText('Game 1')).toBeVisible()
+  await findGame(page, 'Change the game for Game 1', 'Switch')
+  await expect(page.getByText('Game 1')).toHaveCount(0)
+  await expect(page.getByText('Zelda Found')).toBeVisible()
+  await expect(page.getByTestId('scan-row')).toHaveCount(1)
+
+  // A second box fixed to the same game and platform merges into the first.
+  await type(page, ean(2))
+  await findGame(page, 'Change the game for Game 2', 'Switch')
+  await expect(page.getByTestId('scan-row')).toHaveCount(1)
+  await expect(
+    page.getByText(
+      'That game is already in the list, so these two were merged.',
+    ),
+  ).toBeVisible()
+})
+
+test('a barcode the user matched before comes back marked as their match', async ({
+  page,
+}) => {
+  await stubLookups(page, (n) => ({ match: match(n), own: true }))
+  await openOwnedScanner(page)
+  await type(page, ean(4))
+  await expect(page.getByText('Game 4')).toBeVisible()
+  await expect(page.getByText('Your match')).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Change the game for Game 4' }),
+  ).toBeVisible()
+})
+
+test('ScanDex is credited in the scanner and on the About page', async ({
+  page,
+}) => {
+  await stubLookups(page)
+  await openOwnedScanner(page)
+  const credit = page.getByTestId('scanner').getByRole('link', {
+    name: 'ScanDex',
+  })
+  await expect(credit).toHaveAttribute('href', 'https://scandex.gamery.app')
+  await expect(credit).toHaveAttribute('target', '_blank')
+  await expect(credit).toHaveAttribute('rel', /noopener/)
+
+  await page.goto('/about')
+  await expect(
+    page.getByRole('article').getByRole('link', { name: 'ScanDex' }),
+  ).toHaveAttribute('href', 'https://scandex.gamery.app')
+})
+
+test('the platform step has a Back button that returns to the list', async ({
+  page,
+}) => {
+  await stubLookups(page, () => ({ match: null }))
+  await stubFindIt(page)
+  await openOwnedScanner(page)
+  await type(page, ean(3))
+  await page
+    .getByRole('button', { name: `Find the game for ${ean(3)}` })
+    .click()
+  await page.getByLabel('Search for the game').fill('zelda')
+  await page.getByTestId('scan-find-result').click()
+  await expect(page.getByLabel('No platform')).toBeChecked()
+  await page.getByRole('button', { name: 'Back to the list' }).click()
+  await expect(page.getByTestId('scan-find')).toHaveCount(0)
+  await expect(page.getByText(`No match for ${ean(3)}`)).toBeVisible()
+})

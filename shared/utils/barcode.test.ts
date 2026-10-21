@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BARCODE_MATCH_TTL_MS,
   BARCODE_NO_MATCH_TTL_MS,
   barcodeCacheFresh,
   normalizeBarcode,
@@ -60,14 +59,10 @@ describe('barcodeCacheFresh', () => {
   const ago = (ms: number) => new Date(now.getTime() - ms)
   const DAY = 24 * 60 * 60 * 1000
 
-  it('reuses a match for 30 days', () => {
-    expect(BARCODE_MATCH_TTL_MS).toBe(30 * DAY)
+  it('keeps a match for good', () => {
     expect(
-      barcodeCacheFresh({ igdbId: 1, fetchedAt: ago(29 * DAY) }, now),
+      barcodeCacheFresh({ igdbId: 1, fetchedAt: ago(3650 * DAY) }, now),
     ).toBe(true)
-    expect(
-      barcodeCacheFresh({ igdbId: 1, fetchedAt: ago(30 * DAY) }, now),
-    ).toBe(false)
   })
 
   it('reuses "no match" for one day', () => {

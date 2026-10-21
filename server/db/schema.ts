@@ -40,6 +40,10 @@ export const users = pgTable(
     /** Chosen after the first sign-in. Null until then. */
     username: text('username').unique(),
     displayName: text('display_name'),
+    /** May suggest games to ScanDex. Set by hand, off for everyone else. */
+    contributesBarcodes: boolean('contributes_barcodes')
+      .notNull()
+      .default(false),
     /** What the account may store (shared/utils/plans.ts). */
     plan: text('plan')
       .$type<'free' | 'pro' | 'max'>()
@@ -308,4 +312,32 @@ export const barcodeLookups = pgTable(
       sql`${table.igdbId} is not null or (${table.platformId} is null and ${table.platformName} is null)`,
     ),
   ],
+)
+
+/**
+ * A game a user matched to a barcode themselves (Find it or Change in the
+ * scanner), kept for that user only so scanning the box again is instant.
+ * It is never shared, never copied into `barcode_lookups` and never sent to
+ * ScanDex. A row is written only in a bulk add, for a game that is in the
+ * user's library then. Rows are keyed by barcode, so the library doesn't
+ * bound them: `bulkAdd` stops saving new ones once a user holds as many as
+ * their plan's game limit. Every query is scoped by `owner_id`. Keys are
+ * normalised like `barcode_lookups.code`.
+ */
+export const userBarcodes = pgTable(
+  'user_barcodes',
+  {
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    igdbId: integer('igdb_id').notNull(),
+    platformId: integer('platform_id'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** When the pick was suggested to ScanDex. Null if it never was. */
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.ownerId, table.code] })],
 )

@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { barcodeCacheFresh } from '../../shared/utils/barcode'
-import type { BarcodeMatch } from '../../shared/types/barcode'
-import { barcodeLookups, libraryItems } from '../db/schema'
+import type { BarcodeMatch, BarcodeResult } from '../../shared/types/barcode'
+import { barcodeLookups, libraryItems, userBarcodes } from '../db/schema'
 import { ensureCatalogGames } from './catalog'
 import { platformNames } from './collections'
 import { log } from './log'
@@ -18,6 +18,28 @@ function toAnswer(row: CacheRow): ScanDexAnswer {
         platformId: row.platformId,
         platformName: row.platformName,
       }
+}
+
+/**
+ * The game this user matched to the barcode themselves, if any. Scoped to
+ * the user: nobody else's pick is ever returned.
+ */
+export async function findOwnPick(
+  ownerId: string,
+  code: string,
+): Promise<Extract<ScanDexAnswer, { kind: 'match' }> | null> {
+  const [row] = await useDb()
+    .select()
+    .from(userBarcodes)
+    .where(and(eq(userBarcodes.ownerId, ownerId), eq(userBarcodes.code, code)))
+  return row
+    ? {
+        kind: 'match',
+        igdbId: row.igdbId,
+        platformId: row.platformId,
+        platformName: null,
+      }
+    : null
 }
 
 /**
@@ -137,4 +159,33 @@ export async function describeMatch(
     ownedOn: item?.ownedOn ?? [],
     wantedOn: item?.wantedOn ?? [],
   }
+}
+
+/**
+ * What a barcode stands for for this user. Their own pick comes first, then
+ * our cache, then ScanDex. A pick costs no ScanDex call and isn't counted
+ * by `beforeScanDex`. A pick whose game IGDB no longer knows is ignored.
+ */
+export async function resolveBarcode(
+  ownerId: string,
+  barcode: { code: string; scanned: string },
+  beforeScanDex: () => Promise<void>,
+): Promise<BarcodeResult> {
+  const own = await findOwnPick(ownerId, barcode.code)
+  if (own) {
+    try {
+      const match = await describeMatch(ownerId, own)
+      if (match) return { match, own: true }
+    } catch {
+      // IGDB or the catalog failed: the cache and ScanDex can still answer.
+      log('warn', 'barcode.own_pick_failed')
+    }
+  }
+  const answer = await lookupBarcode(
+    barcode.code,
+    beforeScanDex,
+    barcode.scanned,
+  )
+  if (answer.kind === 'none') return { match: null }
+  return { match: await describeMatch(ownerId, answer) }
 }

@@ -12,6 +12,10 @@ export interface ScanRow {
   problem?: 'limit' | 'failed'
   match?: BarcodeMatch
   ticked: boolean
+  /** The user matched this barcode themselves (Find it, Change, or an earlier pick). */
+  own?: boolean
+  /** Barcodes the user matched to this same game, merged into this row. */
+  extraCodes?: string[]
 }
 
 /** Where a matched game stands on the chosen list, on the box's platform. */
@@ -61,6 +65,114 @@ export function entriesToAdd(rows: ScanRow[], list: ListName): BulkAddEntry[] {
   return entries
 }
 
+/** The barcodes the user matched to a row's game themselves. */
+function ownCodes(row: ScanRow): string[] {
+  return [...(row.own ? [row.code] : []), ...(row.extraCodes ?? [])]
+}
+
+/**
+ * What one bulk request sends: the games `entriesToAdd` adds, each carrying
+ * one barcode the user matched to it, and a `rememberOnly` entry for every
+ * other barcode of theirs. Those are never added. The server saves them
+ * only if the game is in the library. A row unticked on purpose is left
+ * out, but one that can't be ticked because the game is already on the
+ * list still has its barcodes remembered. A ScanDex match sends none.
+ */
+export function batchEntries(rows: ScanRow[], list: ListName): BulkAddEntry[] {
+  const adds = new Map<string, BulkAddEntry>()
+  const remembered: BulkAddEntry[] = []
+  for (const row of rows) {
+    if (!row.match) continue
+    const igdbId = row.match.igdbId
+    const platformId = row.match.platform?.id ?? null
+    let codes = ownCodes(row)
+    if (row.ticked && canTick(row, list)) {
+      const key = `${igdbId}:${platformId ?? ''}`
+      let entry = adds.get(key)
+      if (!entry) {
+        entry = { igdbId, platformId }
+        adds.set(key, entry)
+      }
+      if (codes.length && !entry.own) {
+        entry.barcode = codes[0]
+        entry.own = true
+        codes = codes.slice(1)
+      }
+    } else if (rowHold(row.match, list) === 'ready') {
+      codes = []
+    }
+    for (const barcode of codes) {
+      remembered.push({
+        igdbId,
+        platformId,
+        barcode,
+        own: true,
+        rememberOnly: true,
+      })
+    }
+  }
+  return [...adds.values(), ...remembered]
+}
+
+/**
+ * Sets a row to a game the user chose. If another row already holds the same
+ * game and platform the two merge: this row goes, its barcode moves to the other
+ * row (`extraCodes`), and the other is named in `merged`.
+ */
+export function pickGame(
+  rows: ScanRow[],
+  code: string,
+  match: BarcodeMatch,
+  list: ListName,
+): { rows: ScanRow[]; merged: string | null } {
+  const platform = match.platform?.id ?? null
+  const twin = rows.find(
+    (row) =>
+      row.code !== code &&
+      row.match?.igdbId === match.igdbId &&
+      (row.match.platform?.id ?? null) === platform,
+  )
+  if (twin) {
+    // The barcode isn't lost: the twin keeps it for the user.
+    const gone = rows.find((row) => row.code === code)
+    const carried = [
+      ...(twin.extraCodes ?? []),
+      code,
+      ...(gone?.extraCodes ?? []),
+    ]
+    return {
+      rows: rows
+        .filter((row) => row.code !== code)
+        .map((row) =>
+          row === twin
+            ? {
+                ...row,
+                extraCodes: [...new Set(carried)].filter((c) => c !== row.code),
+              }
+            : row,
+        ),
+      merged: twin.code,
+    }
+  }
+  return {
+    rows: rows.map((row) =>
+      row.code === code
+        ? {
+            code,
+            status: 'match',
+            match,
+            ticked: defaultTicked(match, list),
+            own: true,
+          }
+        : row,
+    ),
+    merged: null,
+  }
+}
+
+const isStrings = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((s) => typeof s === 'string')
+
 const isNumbers = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every((n) => typeof n === 'number')
 
@@ -98,6 +210,9 @@ export function parseStoredRows(raw: unknown): ScanRow[] {
           status: 'match',
           match: row.match,
           ticked: row.ticked === true,
+          ...(row.own === true && { own: true }),
+          ...(isStrings(row.extraCodes) &&
+            row.extraCodes.length > 0 && { extraCodes: row.extraCodes }),
         },
       ]
     }

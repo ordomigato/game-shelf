@@ -1,7 +1,11 @@
 import { Resource } from 'sst'
+import { log } from './log'
 
 const LOOKUP_URL = 'https://scandex.gamery.app/api/v2/lookup'
+const CREATE_URL = 'https://scandex.gamery.app/api/v2/create'
 const TIMEOUT_MS = 5000
+/** The person who pressed Send waits for this, so keep it short. */
+const CREATE_TIMEOUT_MS = 5000
 
 /** What ScanDex knows about a barcode. */
 export type ScanDexAnswer =
@@ -98,5 +102,94 @@ export async function askScanDex(
   } catch (error) {
     if (error instanceof ScanDexError) return first
     throw error
+  }
+}
+
+/** What ScanDex is told about a box it didn't know. */
+export interface ScanDexSuggestion {
+  igdbId: number
+  platformId: number
+  /** The IGDB platform's name. */
+  platform: string
+  /** The IGDB game's name. */
+  name: string
+  /** The normalised barcode, as digits. */
+  code: string
+}
+
+/** How a suggestion went. `status` is 0 when ScanDex couldn't be reached. */
+export type ScanDexSubmitResult =
+  { ok: true } | { ok: false; status: number; message: string | null }
+
+/** The most of ScanDex's error text that is kept. */
+const MESSAGE_CHARS = 200
+
+/**
+ * ScanDex's own words for why it said no: a JSON `message`, `error` or
+ * `detail`, else the plain text, trimmed. Null when it said nothing.
+ */
+export function readErrorMessage(raw: string): string | null {
+  let text = raw
+  try {
+    const body: unknown = JSON.parse(raw)
+    if (isRecord(body)) {
+      const found = [body.message, body.error, body.detail].find(
+        (value) => typeof value === 'string' && value.trim(),
+      )
+      if (typeof found === 'string') text = found
+    }
+  } catch {
+    // Not JSON: the text is used as it is.
+  }
+  const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, MESSAGE_CHARS)
+  return trimmed || null
+}
+
+/** The same text with every digit hidden, which is safe to log. */
+export const maskDigits = (text: string) => text.replace(/\d/g, '#')
+
+/**
+ * Suggests a game for a barcode to ScanDex. Any 2xx is success. Anything
+ * else, or no answer within a few seconds, is a failure that carries
+ * ScanDex's status and error text for the person who chose to share. The
+ * log gets the status and that text with every digit masked, never the
+ * barcode or the game. The request body is built here and nowhere else.
+ * Never throws.
+ */
+export async function submitToScanDex(
+  suggestion: ScanDexSuggestion,
+): Promise<ScanDexSubmitResult> {
+  // ScanDex reads fields the way its lookup does, not from a JSON body (a
+  // JSON post answered "The parameter 'value' is required"). They go both in
+  // the address and as a form body. The barcode goes as text, keeping its
+  // leading zeros.
+  const fields = new URLSearchParams({
+    igdb_id: String(suggestion.igdbId),
+    platform_id: String(suggestion.platformId),
+    platform: suggestion.platform,
+    name: suggestion.name,
+    value: suggestion.code,
+  })
+  try {
+    const response = await fetch(`${CREATE_URL}?${fields}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${Resource.ScanDexToken.value}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: fields,
+      signal: AbortSignal.timeout(CREATE_TIMEOUT_MS),
+    })
+    if (response.status >= 200 && response.status <= 299) return { ok: true }
+    const message = readErrorMessage(await response.text().catch(() => ''))
+    log('warn', 'barcode.suggest_failed', {
+      status: response.status,
+      ...(message && { message: maskDigits(message) }),
+    })
+    return { ok: false, status: response.status, message }
+  } catch {
+    log('warn', 'barcode.suggest_failed', { status: 0 })
+    return { ok: false, status: 0, message: null }
   }
 }

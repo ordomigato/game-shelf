@@ -1,9 +1,10 @@
 /** Barcode lengths a game box can carry: EAN-8, UPC-A, EAN-13, GTIN-14. */
 const LENGTHS = new Set([8, 12, 13, 14])
 
-/** How long a barcode ScanDex matched is reused before asking again. */
-export const BARCODE_MATCH_TTL_MS = 30 * 24 * 60 * 60 * 1000
-/** How long a barcode ScanDex had no game for is remembered. */
+/**
+ * How long a barcode ScanDex had no game for is remembered, so games it adds
+ * later are found. A barcode it matched is kept for good.
+ */
 export const BARCODE_NO_MATCH_TTL_MS = 24 * 60 * 60 * 1000
 
 /** The most barcodes the scanner keeps and adds in one go. */
@@ -70,9 +71,11 @@ export interface CachedBarcode {
   fetchedAt: Date
 }
 
-/** Whether a cached answer can still be used, or ScanDex is asked again. */
+/**
+ * Whether a cached answer can still be used, or ScanDex is asked again. A
+ * match never goes stale. "No match" does after `BARCODE_NO_MATCH_TTL_MS`.
+ */
 export function barcodeCacheFresh(row: CachedBarcode, now: Date): boolean {
-  const ttl =
-    row.igdbId === null ? BARCODE_NO_MATCH_TTL_MS : BARCODE_MATCH_TTL_MS
-  return now.getTime() - row.fetchedAt.getTime() < ttl
+  if (row.igdbId !== null) return true
+  return now.getTime() - row.fetchedAt.getTime() < BARCODE_NO_MATCH_TTL_MS
 }

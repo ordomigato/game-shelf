@@ -69,6 +69,17 @@ useSeoMeta({
           >
         </template>
       </i18n-t>
+      <i18n-t scope="global" keypath="about.barcodes" tag="p">
+        <template #scandex>
+          <a
+            href="https://scandex.gamery.app"
+            :class="linkClass"
+            target="_blank"
+            rel="noopener"
+            >ScanDex</a
+          >
+        </template>
+      </i18n-t>
     </ProseSection>
 
     <ProseSection :title="$t('about.contactTitle')">

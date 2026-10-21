@@ -15,12 +15,20 @@ export interface BarcodeMatch {
 /** The answer to a barcode lookup. `match` is null when no game has it. */
 export interface BarcodeResult {
   match: BarcodeMatch | null
+  /** True when the user matched this barcode themselves, which beats ScanDex. */
+  own?: boolean
 }
 
 /** One game to add in bulk. */
 export interface BulkAddEntry {
   igdbId: number
   platformId: number | null
+  /** With `own`, the barcode the user matched to this game themselves. */
+  barcode?: string
+  /** The user picked this game for `barcode` (Find it or Change). */
+  own?: boolean
+  /** Only remember `barcode` for the user. Never adds the game. */
+  rememberOnly?: boolean
 }
 
 /** Why a game in a bulk add was left alone. */
@@ -41,3 +49,23 @@ export interface BulkAddResult {
   /** Games newly put in the collection, when one was asked for. */
   inCollection: number
 }
+
+/** A pick of the user's that ScanDex could be told about. */
+export interface BarcodeSuggestion {
+  code: string
+  igdbId: number
+  /** The game's name in our catalog. */
+  name: string
+  coverId: string | null
+  /** The platform's name in our catalog. */
+  platform: string
+}
+
+/**
+ * How sharing one pick went. `status` is ScanDex's HTTP status, or 0 when it
+ * wasn't reached or the pick could no longer be sent. `message` is ScanDex's
+ * own error text, trimmed to about 200 characters.
+ */
+export type SuggestionResult =
+  | { code: string; result: 'sent' }
+  | { code: string; result: 'failed'; status: number; message: string | null }

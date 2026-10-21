@@ -9,7 +9,8 @@ import {
 } from '../../shared/utils/bulk-add'
 import type { ListState } from '../../shared/utils/lists'
 import type { PlanLimits } from '../../shared/utils/plans'
-import { collectionItems, libraryItems } from '../db/schema'
+import { normalizeBarcode } from '../../shared/utils/barcode'
+import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
 import { ensureCatalogGames } from './catalog'
 import { assertOwnsCollections, lastPositions } from './collections'
 
@@ -19,6 +20,64 @@ function noRoomFor(where: keyof typeof BULK_NO_ROOM, fit: number): never {
     statusCode: 403,
     statusMessage: 'Plan limit reached',
     data: { key: BULK_NO_ROOM[where].key, params: { fit: Math.max(0, fit) } },
+  })
+}
+
+/**
+ * The barcodes the user matched themselves, for games that end up in the
+ * library (added, or already there). Unknown games leave no trace, and a
+ * ScanDex match is never kept here. The platform is kept only
+ * if the catalog lists it for the game, as the add does. For a barcode named
+ * twice in a batch, the last pick wins.
+ */
+function ownPicks(
+  entries: BulkAddEntry[],
+  present: Set<number>,
+  catalog: Map<number, { platformIds: number[] }>,
+) {
+  const byCode = new Map<
+    string,
+    { code: string; igdbId: number; platformId: number | null }
+  >()
+  for (const entry of entries) {
+    if (!entry.own || !entry.barcode || !present.has(entry.igdbId)) continue
+    const code = normalizeBarcode(entry.barcode)
+    if (!code) continue
+    const known =
+      entry.platformId !== null &&
+      catalog.get(entry.igdbId)?.platformIds.includes(entry.platformId)
+    byCode.set(code, {
+      code,
+      igdbId: entry.igdbId,
+      platformId: known ? entry.platformId : null,
+    })
+  }
+  return [...byCode.values()]
+}
+
+/**
+ * Stored picks are capped per user at the plan's game limit, since they are
+ * keyed by barcode and a library of games doesn't bound them. Once a user is
+ * at the cap, a pick for a barcode they have no pick for yet is left out.
+ * Changing a pick they already have still works.
+ */
+async function withRoomForPicks<T extends { code: string }>(
+  ownerId: string,
+  limits: PlanLimits,
+  picks: T[],
+): Promise<T[]> {
+  if (!picks.length) return picks
+  const stored = await useDb()
+    .select({ code: userBarcodes.code })
+    .from(userBarcodes)
+    .where(eq(userBarcodes.ownerId, ownerId))
+  const known = new Set(stored.map((row) => row.code))
+  let room = Math.max(0, limits.games - known.size)
+  return picks.filter((pick) => {
+    if (known.has(pick.code)) return true
+    if (room <= 0) return false
+    room -= 1
+    return true
   })
 }
 
@@ -34,27 +93,44 @@ function noRoomFor(where: keyof typeof BULK_NO_ROOM, fit: number): never {
 export async function bulkAdd(
   ownerId: string,
   limits: PlanLimits,
-  input: { list: ListName; collectionId?: string; entries: BulkAddEntry[] },
+  input: {
+    list: ListName
+    collectionId?: string
+    entries: BulkAddEntry[]
+  },
 ): Promise<BulkAddResult> {
   const db = useDb()
-  const entries = dedupeEntries(input.entries)
-  const igdbIds = [...new Set(entries.map((entry) => entry.igdbId))]
+  // `rememberOnly` entries only carry a barcode and are never added.
+  const entries = dedupeEntries(
+    input.entries.filter((entry) => !entry.rememberOnly),
+  )
+  const igdbIds = [
+    ...new Set([
+      ...entries.map((entry) => entry.igdbId),
+      ...input.entries.map((entry) => entry.igdbId),
+    ]),
+  ]
+  const addIds = new Set(entries.map((entry) => entry.igdbId))
   if (input.collectionId) {
     await assertOwnsCollections(ownerId, [input.collectionId])
   }
 
-  const [catalogRows, existingRows] = await Promise.all([
-    ensureCatalogGames(igdbIds),
-    db
-      .select()
-      .from(libraryItems)
-      .where(
-        and(
-          eq(libraryItems.ownerId, ownerId),
-          inArray(libraryItems.igdbId, igdbIds),
-        ),
+  const existingRows = await db
+    .select()
+    .from(libraryItems)
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        inArray(libraryItems.igdbId, igdbIds),
       ),
-  ])
+    )
+  // The catalog (and so IGDB) is asked about the games being added, and about
+  // remember-only games only if they are already in the library. A request
+  // can't make us fetch arbitrary games just to remember a barcode.
+  const inLibraryNow = new Set(existingRows.map((row) => row.igdbId!))
+  const catalogRows = await ensureCatalogGames(
+    igdbIds.filter((id) => addIds.has(id) || inLibraryNow.has(id)),
+  )
   const catalog = new Map(catalogRows.map((game) => [game.igdbId, game]))
   const existing = new Map<number, ListState>(
     existingRows.map((row) => [row.igdbId!, row]),
@@ -147,6 +223,29 @@ export async function bulkAdd(
             sql`, `,
           )})
         on conflict do nothing`),
+    )
+  }
+  // A barcode is remembered for a game that is now in the library: one just
+  // added, or one that was already there.
+  const inLibrary = new Set([...plan.present, ...existing.keys()])
+  const picks = await withRoomForPicks(
+    ownerId,
+    limits,
+    ownPicks(input.entries, inLibrary, catalog),
+  )
+  if (picks.length) {
+    statements.push(
+      db
+        .insert(userBarcodes)
+        .values(picks.map((pick) => ({ ownerId, ...pick })))
+        .onConflictDoUpdate({
+          target: [userBarcodes.ownerId, userBarcodes.code],
+          set: {
+            igdbId: sql`excluded.igdb_id`,
+            platformId: sql`excluded.platform_id`,
+            updatedAt: new Date(),
+          },
+        }),
     )
   }
   if (statements.length) {

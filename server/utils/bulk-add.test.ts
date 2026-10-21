@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { limitsFor } from '../../shared/utils/plans'
-import { collectionItems, libraryItems } from '../db/schema'
+import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
 
 const ensureCatalogGames = vi.fn()
+const submitToScanDex = vi.fn()
+vi.mock('./scandex', () => ({ submitToScanDex }))
+const fetchMock = vi.fn()
+vi.stubGlobal('fetch', fetchMock)
 const assertOwnsCollections = vi.fn()
 vi.mock('./catalog', () => ({ ensureCatalogGames }))
 vi.mock('./collections', () => ({
@@ -15,6 +19,8 @@ interface Fake {
   libraryCount: number
   inCollection: { itemId: string }[]
   collectionCount: number
+  /** Codes the user already has picks for. */
+  stored: string[]
 }
 let fake: Fake
 const batches: unknown[][] = []
@@ -32,13 +38,21 @@ vi.stubGlobal('useDb', () => ({
           reads.push(fields?.n ? 'collection count' : 'collection items')
           return fields?.n ? [{ n: fake.collectionCount }] : fake.inCollection
         }
+        if (table === userBarcodes) {
+          return fake.stored.map((code) => ({ code }))
+        }
         return []
       },
     }),
   }),
-  insert: () => ({
+  insert: (table: unknown) => ({
     values: (values: unknown) => ({
-      onConflictDoUpdate: () => ({ kind: 'upsert', values }),
+      onConflictDoUpdate: (config: unknown) => ({
+        kind: 'upsert',
+        table,
+        values,
+        config,
+      }),
     }),
   }),
   execute: () => ({ kind: 'collection insert' }),
@@ -60,9 +74,17 @@ const game = (igdbId: number) => ({
 })
 
 beforeEach(() => {
-  fake = { existing: [], libraryCount: 0, inCollection: [], collectionCount: 0 }
+  fake = {
+    existing: [],
+    libraryCount: 0,
+    inCollection: [],
+    collectionCount: 0,
+    stored: [],
+  }
   batches.length = 0
   reads.length = 0
+  submitToScanDex.mockReset()
+  fetchMock.mockReset()
   ensureCatalogGames.mockReset()
   ensureCatalogGames.mockImplementation(async (ids: number[]) => ids.map(game))
   assertOwnsCollections.mockReset()
@@ -205,5 +227,280 @@ describe('bulkAdd', () => {
     })
     expect(result.added).toBe(1)
     expect(result.skipped).toEqual([{ igdbId: 2, reason: 'notFound' }])
+  })
+
+  describe('barcodes the user matched themselves', () => {
+    const picks = () =>
+      (
+        batches[0] as { table: unknown; values: Record<string, unknown>[] }[]
+      ).find((statement) => statement.table === userBarcodes)
+
+    it('are saved in the same batch as the add, for that user', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: '0045496590048',
+            own: true,
+          },
+          { igdbId: 2, platformId: SWITCH },
+        ],
+      })
+      expect(batches).toHaveLength(1)
+      expect(picks()?.values).toEqual([
+        {
+          ownerId: 'u1',
+          code: '0045496590048',
+          igdbId: 1,
+          platformId: SWITCH,
+        },
+      ])
+    })
+
+    it('never keep a plain ScanDex match, even with its barcode sent', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: '0045496590048' }],
+      })
+      expect(picks()).toBeUndefined()
+    })
+
+    it('are not saved for a game IGDB does not know, or a bad barcode', async () => {
+      ensureCatalogGames.mockImplementation(async (ids: number[]) =>
+        ids.filter((id) => id !== 9).map(game),
+      )
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          { igdbId: 9, platformId: null, barcode: '0045496590048', own: true },
+          { igdbId: 1, platformId: null, barcode: '123', own: true },
+          { igdbId: 2, platformId: null },
+        ],
+      })
+      expect(picks()).toBeUndefined()
+    })
+
+    it('are saved for a game already in the library, and drop an unlisted platform', async () => {
+      fake.existing = [
+        {
+          id: 'i1',
+          igdbId: 1,
+          owned: true,
+          wishlisted: false,
+          ownedOn: [SWITCH],
+          wantedOn: [],
+        },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: '0045496590048',
+            own: true,
+          },
+          { igdbId: 2, platformId: 999, barcode: '0045496590055', own: true },
+        ],
+      })
+      expect(picks()?.values).toEqual([
+        { ownerId: 'u1', code: '0045496590048', igdbId: 1, platformId: SWITCH },
+        { ownerId: 'u1', code: '0045496590055', igdbId: 2, platformId: null },
+      ])
+    })
+
+    it('are not saved when the add is refused', async () => {
+      fake.libraryCount = free.games
+      await expect(
+        bulkAdd('u1', free, {
+          list: 'owned',
+          entries: [
+            {
+              igdbId: 1,
+              platformId: SWITCH,
+              barcode: '0045496590048',
+              own: true,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ statusCode: 403 })
+      expect(batches).toEqual([])
+    })
+  })
+
+  describe('remembering barcodes', () => {
+    type Statement = {
+      table: unknown
+      values: Record<string, unknown>[]
+      config: { target: unknown[] }
+    }
+    const pickStatement = () =>
+      (batches[0] as Statement[] | undefined)?.find(
+        (statement) => statement.table === userBarcodes,
+      )
+    const code = '0045496590048'
+
+    it('upserts on (owner_id, code), so one user never overwrites another', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.config.target).toEqual([
+        userBarcodes.ownerId,
+        userBarcodes.code,
+      ])
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({ ownerId: 'u1', code }),
+      ])
+      // The same barcode from another user is a row of their own.
+      batches.length = 0
+      await bulkAdd('u2', free, {
+        list: 'owned',
+        entries: [{ igdbId: 2, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({ ownerId: 'u2', code, igdbId: 2 }),
+      ])
+    })
+
+    it('saves a remember-only barcode for a game already in the library, without adding it', async () => {
+      fake.existing = [
+        {
+          id: 'i1',
+          igdbId: 1,
+          owned: true,
+          wishlisted: false,
+          ownedOn: [SWITCH],
+          wantedOn: [],
+        },
+      ]
+      const result = await bulkAdd('u1', free, {
+        list: 'wishlist',
+        entries: [
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: code,
+            own: true,
+            rememberOnly: true,
+          },
+        ],
+      })
+      expect(result).toEqual({
+        added: 0,
+        withoutPlatform: 0,
+        skipped: [],
+        inCollection: 0,
+      })
+      expect(batches[0]).toHaveLength(1)
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({ code, igdbId: 1 }),
+      ])
+    })
+
+    it('does not save a remember-only barcode for a game that is not in the library', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          { igdbId: 2, platformId: null },
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: code,
+            own: true,
+            rememberOnly: true,
+          },
+        ],
+      })
+      expect(pickStatement()).toBeUndefined()
+    })
+
+    it('reads only the added games and library games from IGDB, never a remember-only stranger', async () => {
+      fake.existing = [
+        {
+          id: 'i1',
+          igdbId: 1,
+          owned: true,
+          wishlisted: false,
+          ownedOn: [SWITCH],
+          wantedOn: [],
+        },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          { igdbId: 2, platformId: null },
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: code,
+            own: true,
+            rememberOnly: true,
+          },
+          {
+            igdbId: 999,
+            platformId: SWITCH,
+            barcode: '0045496590055',
+            own: true,
+            rememberOnly: true,
+          },
+        ],
+      })
+      expect(ensureCatalogGames).toHaveBeenCalledOnce()
+      expect(ensureCatalogGames.mock.calls[0]![0].sort()).toEqual([1, 2])
+    })
+
+    it('stops saving new barcodes at the plan’s game limit, but updates existing ones and still adds', async () => {
+      fake.stored = Array.from({ length: free.games - 1 }, (_, i) => `s${i}`)
+      fake.stored.push('0045496590055')
+      const result = await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          { igdbId: 1, platformId: SWITCH, barcode: code, own: true },
+          {
+            igdbId: 2,
+            platformId: SWITCH,
+            barcode: '0045496590055',
+            own: true,
+          },
+          {
+            igdbId: 3,
+            platformId: SWITCH,
+            barcode: '0036000291452',
+            own: true,
+          },
+        ],
+      })
+      expect(result.added).toBe(3)
+      // The user is at the cap: only the barcode they already had is kept.
+      expect(pickStatement()?.values.map((v) => v.code)).toEqual([
+        '0045496590055',
+      ])
+    })
+  })
+
+  describe('sharing with ScanDex', () => {
+    it('never calls ScanDex, even for an allowed account with a pick ScanDex did not know', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: '0045496590048',
+            own: true,
+          },
+        ],
+      })
+      // The pick is saved as always, and nothing is sent.
+      const saved = (
+        batches[0] as { table: unknown; values: { code: string }[] }[]
+      ).find((statement) => statement.table === userBarcodes)
+      expect(saved?.values.map((v) => v.code)).toEqual(['0045496590048'])
+      expect(submitToScanDex).not.toHaveBeenCalled()
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 })

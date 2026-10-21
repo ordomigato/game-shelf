@@ -468,6 +468,9 @@ async function runImport() {
         <p class="text-sm text-muted-foreground">
           {{ $t('import.mapHint', { file: fileName, count: rows.length }) }}
         </p>
+        <p class="text-sm text-muted-foreground">
+          {{ $t('import.listNote') }}
+        </p>
         <p
           class="rounded-md border border-primary/40 bg-accent px-3 py-2 text-sm"
         >

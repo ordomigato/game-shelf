@@ -148,7 +148,11 @@ what `sst dev` runs), and a built server run locally or in e2e needs
 `NUXT_ORIGIN_CHECK=false`. A deployed server with no secret refuses
 everything. The server's own calls to itself while rendering must forward
 the visitor's headers (`useRequestFetch()`, not a bare `$fetch`), or they
-get this 403. Direct hits still wake the Lambda, so they count as
+get this 403. That covers any data call that can run during server
+rendering: use `useRequestFetch()` or `useFetch`, which forward headers.
+The deploy smoke test loads `/?q=zelda` to catch a miss. Rotating the
+`DatabaseUrl` secret changes the origin secret, so expect a few minutes of
+403s while CloudFront and the Lambda catch up. Direct hits still wake the Lambda, so they count as
 invocations for the kill switch. Closing that gap is the parked "Lock the
 Lambda URL" item (OAC).
 

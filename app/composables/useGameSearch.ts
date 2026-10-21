@@ -87,11 +87,14 @@ export function useGameSearch() {
     ...filterQuery.value,
   }))
 
+  // The request's own fetch: while rendering on the server it passes the
+  // visitor's headers on, which the origin check and request limits need.
+  const requestFetch = useRequestFetch()
   const { data, status, refresh } = useAsyncData(
     'game-search',
     async (_nuxtApp, { signal }) => {
       if (!isSearchable.value) return null
-      return $fetch<GameSearchResponse>('/api/games/search', {
+      return requestFetch<GameSearchResponse>('/api/games/search', {
         query: apiQuery.value,
         signal,
       })

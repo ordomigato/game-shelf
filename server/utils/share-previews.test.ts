@@ -120,4 +120,19 @@ describe('previewHead', () => {
       ),
     ).toBe(false)
   })
+
+  it('uses the real address, whatever case it was asked for in', () => {
+    const head = previewHead(
+      { ...preview, path: '/u/retro_fan/shelf/nes' },
+      '/u/Retro_FAN/shelf/nes',
+      site,
+    ).join('\n')
+    expect(head).toContain(
+      '<link rel="canonical" href="https://thisplayshelf.test/u/retro_fan/shelf/nes">',
+    )
+    expect(head).toContain(
+      '<meta property="og:url" content="https://thisplayshelf.test/u/retro_fan/shelf/nes">',
+    )
+    expect(head).not.toContain('Retro_FAN')
+  })
 })

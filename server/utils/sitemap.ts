@@ -93,6 +93,16 @@ export function setSitemapHeaders(event: H3Event) {
   })
 }
 
+/**
+ * CloudFront keeps a copy per query string, so `?x=1`, `?x=2` would each
+ * rebuild the sitemap. A request with one is sent to the bare address, which
+ * is cheap and cached. This is that address, or null when there is no query.
+ */
+export function bareSitemapPath(event: H3Event): string | null {
+  const { pathname, search } = getRequestURL(event)
+  return search ? pathname : null
+}
+
 const escapeXml = (value: string) =>
   value
     .replace(/&/g, '&amp;')

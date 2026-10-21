@@ -7,6 +7,11 @@ export interface SharePreview {
   description: Message
   /** An image URL for the preview, when there is one. */
   image?: string
+  /**
+   * The page's own address, with the owner's real username and the real
+   * slug, so every spelling of the address shares one canonical link.
+   */
+  path?: string
   /** The first games of a collection or list, for its structured data. */
   games?: ListedGame[]
 }

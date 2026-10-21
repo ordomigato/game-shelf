@@ -10,6 +10,8 @@ const paramsSchema = z.object({
 
 /** One file of a sitemap too big for one (see `/sitemap.xml`). */
 export default defineEventHandler(async (event) => {
+  const bare = bareSitemapPath(event)
+  if (bare) return sendRedirect(event, bare, 301)
   const { file: n } = await getValidatedRouterParams(event, paramsSchema.parse)
   const chunk = chunkEntries(sitemapEntries(await loadSitemapData()))[n - 1]
   if (!chunk) throw createError({ statusCode: 404, statusMessage: 'Not found' })

@@ -5,6 +5,8 @@
  * CloudFront keeps a copy for a few hours (`setSitemapHeaders`).
  */
 export default defineEventHandler(async (event) => {
+  const bare = bareSitemapPath(event)
+  if (bare) return sendRedirect(event, bare, 301)
   const site = siteUrl(event)
   const chunks = chunkEntries(sitemapEntries(await loadSitemapData()))
   setSitemapHeaders(event)

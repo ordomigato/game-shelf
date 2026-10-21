@@ -7,7 +7,9 @@ const site = useSiteUrl()
 // Defaults for every page. Pages with something better to say (a game, a
 // shared collection) set their own description, title and image.
 useHead({
-  link: [{ rel: 'canonical', href: () => `${site.value}${route.path}` }],
+  link: [
+    { rel: 'canonical', href: () => canonicalUrl(site.value, route.path) },
+  ],
 })
 useSeoMeta({
   description: () => t('preview.site'),

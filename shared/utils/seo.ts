@@ -40,7 +40,10 @@ export function robotsFor(
   query: Record<string, unknown>,
 ): string | undefined {
   const isHome = (path.split(/[?#]/)[0] || '/').replace(/\/+$/, '') === ''
-  return isHome && Object.keys(query).length > 0 ? 'noindex, follow' : undefined
+  // Only a real search. Tracking parameters (utm_*, fbclid) and `to` show
+  // the home page, whose canonical link already drops them.
+  const searching = typeof query.q === 'string' && query.q.trim() !== ''
+  return isHome && searching ? 'noindex, follow' : undefined
 }
 
 /** JSON for a `<script type="application/ld+json">`, safe to put in HTML. */
@@ -155,7 +158,11 @@ export function collectionJsonLd(input: {
     name: input.name,
     url: input.url,
     ...(input.description && { description: input.description }),
-    isPartOf: { '@id': `${input.site}/#website` },
+    isPartOf: {
+      '@type': 'WebSite',
+      name: SITE_NAME,
+      url: `${input.site}/`,
+    },
     mainEntity: {
       '@type': 'ItemList',
       numberOfItems: input.games.length,
@@ -179,11 +186,22 @@ type Translate = (key: string, params?: Record<string, unknown>) => string
 
 /**
  * A plain description of a game for search results, 50 to 160 characters:
- * its name, year and genres, where it came out, and a nudge to track it.
- * Parts that don't fit are dropped, platforms first.
+ * its name, year and genres, where it is, and a nudge to track it. The year
+ * and "Released on" are only for games already out. A game that is not out
+ * yet, or has no date, names no year. Parts that don't fit are dropped,
+ * platforms first.
  */
-export function gameDescription(game: GameDetails, t: Translate): string {
-  const year = game.releaseDate?.slice(0, 4)
+export function gameDescription(
+  game: GameDetails,
+  t: Translate,
+  today = new Date(),
+): string {
+  const published = datePublished(game.releaseDate, game.releasePrecision)
+  const out =
+    !!game.releaseDate &&
+    game.releasePrecision !== 'tbd' &&
+    game.releaseDate <= today.toISOString().slice(0, 10)
+  const year = out ? published?.slice(0, 4) : undefined
   const genres = game.genres.slice(0, MAX_NAMED).join(', ')
   const platforms = game.platforms.slice(0, MAX_NAMED).join(', ')
   const values = { name: game.name, year, genres }
@@ -193,8 +211,13 @@ export function gameDescription(game: GameDetails, t: Translate): string {
     : t('seo.game.noYearGenres', values)
   const intro = genres ? withGenres : plain
   const track = t('seo.game.track')
+  const where = out
+    ? t('seo.game.platforms', { platforms })
+    : game.releaseDate || game.releasePrecision === 'tbd'
+      ? t('seo.game.platformsComing', { platforms })
+      : t('seo.game.platformsOn', { platforms })
   const tries = [
-    [intro, platforms && t('seo.game.platforms', { platforms }), track],
+    [intro, platforms && where, track],
     [intro, track],
     [plain, track],
   ].map((parts) => parts.filter(Boolean).join(' '))

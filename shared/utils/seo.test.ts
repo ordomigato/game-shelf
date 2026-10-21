@@ -50,7 +50,12 @@ describe('canonicalUrl', () => {
 describe('robotsFor', () => {
   it('keeps search results on the home page out of the index', () => {
     expect(robotsFor('/', { q: 'zelda' })).toBe('noindex, follow')
-    expect(robotsFor('/', { to: 'owned' })).toBe('noindex, follow')
+  })
+
+  it('lets the home page with tracking or other parameters be indexed', () => {
+    expect(robotsFor('/', { utm_source: 'x', fbclid: 'y' })).toBeUndefined()
+    expect(robotsFor('/', { to: 'owned' })).toBeUndefined()
+    expect(robotsFor('/', { q: '' })).toBeUndefined()
   })
 
   it('leaves every other page alone', () => {
@@ -158,6 +163,11 @@ describe('collectionJsonLd', () => {
       site,
     })
     expect(data['@type']).toBe('CollectionPage')
+    expect(data.isPartOf).toEqual({
+      '@type': 'WebSite',
+      name: 'ThisPlayShelf',
+      url: `${site}/`,
+    })
     expect(data.mainEntity).toEqual({
       '@type': 'ItemList',
       numberOfItems: 2,
@@ -188,6 +198,45 @@ describe('gameDescription', () => {
     )
     expect(text).toBe(
       'Metroid (1991): Puzzle, Adventure. Released on NES, Wii. Track it in your ThisPlayShelf collection.',
+    )
+  })
+
+  const today = new Date('2026-10-21T00:00:00Z')
+
+  it('names no year and no release for a game that is not out', () => {
+    const base = { ...zelda, name: 'Metroid', platforms: ['NES'] }
+    const soon = gameDescription(
+      { ...base, releaseDate: '2027-03-01', releasePrecision: 'day' },
+      t,
+      today,
+    )
+    expect(soon).toBe(
+      'Metroid: Puzzle, Adventure. Coming to NES. Track it in your ThisPlayShelf collection.',
+    )
+    const tbd = gameDescription(
+      { ...base, releaseDate: '2030-01-01', releasePrecision: 'tbd' },
+      t,
+      today,
+    )
+    expect(tbd).toBe(soon)
+    expect(tbd).not.toMatch(/\d{4}|Released/)
+  })
+
+  it('says only where a game is when its date is unknown', () => {
+    expect(
+      gameDescription(
+        {
+          ...zelda,
+          name: 'Metroid',
+          platforms: ['NES'],
+          releaseDate: null,
+          releasePrecision: null,
+        },
+        t,
+        today,
+      ),
+    ).toBe(
+      'Metroid: Puzzle, Adventure. On NES. Track it in your ThisPlayShelf collection.',
     )
   })
 

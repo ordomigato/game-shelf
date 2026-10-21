@@ -105,7 +105,7 @@ export function previewHead(
   path: string,
   site: string,
 ): string[] {
-  const url = canonicalUrl(site, path)
+  const url = canonicalUrl(site, preview.path ?? path)
   return [
     `<link rel="canonical" href="${escape(url)}">`,
     ...previewTags(preview, url, site),
@@ -190,6 +190,7 @@ export async function findSharePreview(
   const owner = await findUserByUsername(target.username)
   if (!owner?.username) return null
   const ownerName = owner.displayName || owner.username
+  const shelfPath = `/u/${owner.username}/shelf`
   const db = useDb()
 
   if (!target.slug) {
@@ -202,11 +203,15 @@ export async function findSharePreview(
           eq(collections.visibility, 'public'),
         ),
       )
-    return shelfPreview({ owner: ownerName, collectionCount: value })
+    return {
+      ...shelfPreview({ owner: ownerName, collectionCount: value }),
+      path: shelfPath,
+    }
   }
 
   if (target.slug === 'owned' || target.slug === 'wishlist') {
-    return listPreview(owner, target.slug, ownerName)
+    const preview = await listPreview(owner, target.slug, ownerName)
+    return preview && { ...preview, path: `${shelfPath}/${target.slug}` }
   }
 
   const [collection] = await db
@@ -238,11 +243,14 @@ export async function findSharePreview(
       .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
       .limit(LISTED_GAMES),
   ])
-  return collectionPreview({
-    collection: collection.title,
-    owner: ownerName,
-    description: collection.description,
-    itemCount,
-    ...previewGames(first),
-  })
+  return {
+    ...collectionPreview({
+      collection: collection.title,
+      owner: ownerName,
+      description: collection.description,
+      itemCount,
+      ...previewGames(first),
+    }),
+    path: `${shelfPath}/${encodeURIComponent(collection.slug)}`,
+  }
 }

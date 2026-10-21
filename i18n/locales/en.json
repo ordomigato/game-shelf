@@ -730,6 +730,8 @@
       "yearGenres": "{name} ({year}): {genres}.",
       "noYearGenres": "{name}: {genres}.",
       "platforms": "Released on {platforms}.",
+      "platformsComing": "Coming to {platforms}.",
+      "platformsOn": "On {platforms}.",
       "track": "Track it in your ThisPlayShelf collection.",
       "more": "Search, track and share games."
     }

@@ -18,6 +18,8 @@ describe('limitGroupFor', () => {
   it('puts IGDB routes in their own group', () => {
     expect(limitGroupFor('GET', '/api/games/search?q=zelda')).toBe('igdb')
     expect(limitGroupFor('GET', '/api/games/123')).toBe('igdb')
+    expect(limitGroupFor('GET', '/sitemap.xml?x=1')).toBe('sitemap')
+    expect(limitGroupFor('GET', '/sitemaps/2.xml')).toBe('sitemap')
     expect(limitGroupFor('GET', '/api/library-items/igdb/55')).toBe('igdb')
     expect(limitGroupFor('POST', '/api/import/match')).toBe('igdb')
   })

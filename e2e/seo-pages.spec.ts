@@ -163,3 +163,22 @@ test('a sitemap file by number exists only as far as the pages go', async ({
   expect((await request.get('/sitemaps/1.xml')).status()).toBe(200)
   expect((await request.get('/sitemaps/2.xml')).status()).toBe(404)
 })
+
+test('a sitemap asked for with a query goes to the bare address', async ({
+  request,
+}) => {
+  for (const path of ['/sitemap.xml', '/sitemaps/1.xml']) {
+    const response = await request.get(`${path}?x=1`, { maxRedirects: 0 })
+    expect(response.status()).toBe(301)
+    expect(response.headers().location).toBe(path)
+  }
+})
+
+test('the home page keeps tracking parameters indexable', async ({
+  request,
+  baseURL,
+}) => {
+  const html = await (await request.get('/?utm_source=x')).text()
+  expect(html).toContain(`<link rel="canonical" href="${baseURL}/">`)
+  expect(meta(html, 'name', 'robots')).toBeUndefined()
+})

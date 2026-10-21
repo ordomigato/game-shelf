@@ -38,6 +38,7 @@
     "drizzle-orm": "^0.45.4",
     "echarts": "^6.1.0",
     "fflate": "^0.8.3",
+    "h3": "^1.15.11",
     "nuxt": "^4.6.0",
     "papaparse": "^5.7.0",
     "reka-ui": "^2.11.0",
@@ -89,5 +90,8 @@
       "prettier --write"
     ],
     "*.{json,md,css,html,yml,yaml}": "prettier --write"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
   }
 }

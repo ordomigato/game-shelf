@@ -1,51 +1,122 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { barcodeLookups, platforms, userBarcodes } from '../db/schema'
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { createError, type H3Event } from 'h3'
+import type {
+  BarcodeSuggestion,
+  SuggestionResult,
+} from '../../shared/types/barcode'
+import { barcodeLookups, games, platforms, userBarcodes } from '../db/schema'
 import { log } from './log'
 import { submitToScanDex } from './scandex'
 
-interface Pick {
-  code: string
-  igdbId: number
-  platformId: number | null
-}
-
-/** The most suggestions one request sends. */
-const MAX_SENDS = 20
-/** How long the whole call may take, reading the database included. */
+/** The most picks one request lists or sends. */
+export const MAX_SENDS = 20
+/** How long sending may take, reading the database included. */
 const TOTAL_MS = 3000
 
+interface Eligible extends BarcodeSuggestion {
+  platformId: number
+}
+
 /**
- * Suggests the games a user matched to boxes ScanDex didn't know, so its
- * database can grow. Only the barcode and the IGDB game and platform go,
- * never anything about the user. A pick is sent when:
- * - it has a platform (ScanDex needs one),
- * - our shared cache says ScanDex had no game for the code (decided here,
- *   not by the browser, so a Change on a ScanDex match is never sent),
- * - and it hasn't been sent before. `submitted_at` is claimed in one
- *   statement before sending, so two requests never send the same code, and
- *   given back for a code whose send failed so a later add can try again.
- * At most 20 are sent, and the whole call gives up after 3 seconds. The game
- * and platform names come from our catalog. The caller decides whether the
- * account may contribute. Never throws: a failure is logged (never with the
- * database's error, which carries the barcodes) and the add that called this
- * is unaffected.
+ * The signed-in user, only if their account may share barcodes with ScanDex
+ * (`users.contributes_barcodes`, set by hand). Anyone else gets a 404, so the
+ * feature doesn't show itself to them.
  */
-export async function contributePicks(
+export async function requireContributor(event: H3Event) {
+  const { sub } = await requireAuth(event)
+  const user = await findOrCreateUser(sub)
+  if (!user.contributesBarcodes) {
+    throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  }
+  return user
+}
+
+/**
+ * The user's own picks that ScanDex could be told about, newest first, at
+ * most 20. Decided here and not by the browser. A pick is eligible when:
+ * - it has a platform (ScanDex needs one),
+ * - our shared cache says ScanDex had no game for the code, so a Change on a
+ *   ScanDex match is never eligible,
+ * - and it hasn't been sent (`submitted_at` is null).
+ * The game and platform names come from our catalog. `codes` narrows the
+ * list to those barcodes.
+ */
+async function findEligible(
   ownerId: string,
-  picks: Pick[],
-  gameNames: Map<number, string>,
-): Promise<void> {
-  const withPlatform = picks.filter((pick) => pick.platformId !== null)
-  if (!withPlatform.length) return
+  codes?: string[],
+): Promise<Eligible[]> {
+  if (codes && !codes.length) return []
+  const rows = await useDb()
+    .select({
+      code: userBarcodes.code,
+      igdbId: userBarcodes.igdbId,
+      name: games.name,
+      coverId: games.coverId,
+      platformId: platforms.igdbId,
+      platform: platforms.name,
+    })
+    .from(userBarcodes)
+    .innerJoin(barcodeLookups, eq(barcodeLookups.code, userBarcodes.code))
+    .innerJoin(games, eq(games.igdbId, userBarcodes.igdbId))
+    .innerJoin(platforms, eq(platforms.igdbId, userBarcodes.platformId))
+    .where(
+      and(
+        eq(userBarcodes.ownerId, ownerId),
+        isNull(userBarcodes.submittedAt),
+        isNull(barcodeLookups.igdbId),
+        codes ? inArray(userBarcodes.code, codes) : undefined,
+      ),
+    )
+    .orderBy(desc(userBarcodes.updatedAt))
+    .limit(MAX_SENDS)
+  return rows
+}
+
+/** The picks the user could share, for them to choose from. */
+export async function listSuggestions(
+  ownerId: string,
+): Promise<BarcodeSuggestion[]> {
+  const rows = await findEligible(ownerId)
+  return rows.map(({ code, igdbId, name, coverId, platform }) => ({
+    code,
+    igdbId,
+    name,
+    coverId,
+    platform,
+  }))
+}
+
+const failed = (
+  code: string,
+  status = 0,
+  message: string | null = null,
+): SuggestionResult => ({ code, result: 'failed', status, message })
+
+/**
+ * Sends the chosen picks (at most 20) to ScanDex and says how each went. Only
+ * the barcode and the IGDB game and platform go, never anything about the
+ * user. Eligibility is checked again here (see `findEligible`), and a code
+ * that isn't eligible comes back as failed with status 0. `submitted_at` is
+ * claimed in one statement before sending, so two requests never send the
+ * same code, and given back for a code whose send failed so it can be
+ * listed and sent again. The whole call gives up after 3 seconds. Never
+ * throws: a failure is logged (never with the database's error, which
+ * carries the barcodes) and shows as failed.
+ */
+export async function sendSuggestions(
+  ownerId: string,
+  codes: string[],
+): Promise<SuggestionResult[]> {
+  const wanted = [...new Set(codes)].slice(0, MAX_SENDS)
+  const results = new Map<string, SuggestionResult>()
   const claimed = new Set<string>()
-  const sent = new Set<string>()
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<'late'>((resolve) => {
     timer = setTimeout(() => resolve('late'), TOTAL_MS)
   })
   try {
     const outcome = await Promise.race([
-      send(ownerId, withPlatform, gameNames, claimed, sent),
+      send(ownerId, wanted, claimed, results),
       deadline,
     ])
     if (outcome === 'late')
@@ -58,65 +129,42 @@ export async function contributePicks(
   } finally {
     clearTimeout(timer)
   }
-  const failed = [...claimed].filter((code) => !sent.has(code))
-  if (!failed.length) return
-  try {
-    await useDb()
-      .update(userBarcodes)
-      .set({ submittedAt: null })
-      .where(
-        and(
-          eq(userBarcodes.ownerId, ownerId),
-          inArray(userBarcodes.code, failed),
-        ),
-      )
-  } catch (error) {
-    log('warn', 'barcode.suggest_failed', {
-      status: -1,
-      error: error instanceof Error ? error.name : 'unknown',
-    })
+  // A late answer from ScanDex no longer changes what the caller is told.
+  const done = new Map(results)
+  const release = [...claimed].filter(
+    (code) => done.get(code)?.result !== 'sent',
+  )
+  if (release.length) {
+    try {
+      await useDb()
+        .update(userBarcodes)
+        .set({ submittedAt: null })
+        .where(
+          and(
+            eq(userBarcodes.ownerId, ownerId),
+            inArray(userBarcodes.code, release),
+          ),
+        )
+    } catch (error) {
+      log('warn', 'barcode.suggest_failed', {
+        status: -1,
+        error: error instanceof Error ? error.name : 'unknown',
+      })
+    }
   }
+  return wanted.map((code) => done.get(code) ?? failed(code))
 }
 
 async function send(
   ownerId: string,
-  picks: Pick[],
-  gameNames: Map<number, string>,
+  codes: string[],
   claimed: Set<string>,
-  sent: Set<string>,
+  results: Map<string, SuggestionResult>,
 ): Promise<void> {
-  const db = useDb()
-  const codes = picks.map((pick) => pick.code)
-  const [unknown, platformRows] = await Promise.all([
-    db
-      .select({ code: barcodeLookups.code })
-      .from(barcodeLookups)
-      .where(
-        and(inArray(barcodeLookups.code, codes), isNull(barcodeLookups.igdbId)),
-      ),
-    db
-      .select({ id: platforms.igdbId, name: platforms.name })
-      .from(platforms)
-      .where(
-        inArray(
-          platforms.igdbId,
-          picks.map((pick) => pick.platformId!),
-        ),
-      ),
-  ])
-  const noMatch = new Set(unknown.map((row) => row.code))
-  const platformNames = new Map(platformRows.map((row) => [row.id, row.name]))
-  const candidates = picks
-    .filter(
-      (pick) =>
-        noMatch.has(pick.code) &&
-        gameNames.has(pick.igdbId) &&
-        platformNames.has(pick.platformId!),
-    )
-    .slice(0, MAX_SENDS)
+  const candidates = await findEligible(ownerId, codes)
   if (!candidates.length) return
 
-  const won = await db
+  const won = await useDb()
     .update(userBarcodes)
     .set({ submittedAt: new Date() })
     .where(
@@ -136,14 +184,19 @@ async function send(
     candidates
       .filter((pick) => claimed.has(pick.code))
       .map(async (pick) => {
-        const ok = await submitToScanDex({
+        const outcome = await submitToScanDex({
           igdbId: pick.igdbId,
-          platformId: pick.platformId!,
-          platform: platformNames.get(pick.platformId!)!,
-          name: gameNames.get(pick.igdbId)!,
-          value: Number(pick.code),
+          platformId: pick.platformId,
+          platform: pick.platform,
+          name: pick.name,
+          code: pick.code,
         })
-        if (ok) sent.add(pick.code)
+        results.set(
+          pick.code,
+          outcome.ok
+            ? { code: pick.code, result: 'sent' }
+            : failed(pick.code, outcome.status, outcome.message),
+        )
       }),
   )
 }

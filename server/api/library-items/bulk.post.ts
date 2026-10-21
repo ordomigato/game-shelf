@@ -48,6 +48,5 @@ export default defineEventHandler(async (event): Promise<BulkAddResult> => {
     list,
     collectionId,
     entries: items,
-    contributes: user.contributesBarcodes,
   })
 })

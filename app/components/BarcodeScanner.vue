@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BarcodeMatch, BulkAddResult } from '#shared/types/barcode'
+import type {
+  BarcodeMatch,
+  BarcodeSuggestion,
+  BulkAddResult,
+} from '#shared/types/barcode'
 import type { ListName } from '#shared/types/collection'
 import { MAX_SCAN_BATCH } from '#shared/utils/barcode'
-import { canTick, rowHold, type ScanRow } from '~/utils/scan-rows'
+import { batchEntries, canTick, rowHold, type ScanRow } from '~/utils/scan-rows'
 
 /**
  * Scan the barcodes on a stack of boxes, check the list, and add the ticked
@@ -12,6 +16,8 @@ import { canTick, rowHold, type ScanRow } from '~/utils/scan-rows'
  * and opened from any page (see `useBarcodeScanner`).
  */
 const { t } = useI18n()
+const auth = useAuth()
+const sharing = useBarcodeSharing()
 const scanner = useBarcodeScanner()
 const {
   open,
@@ -28,6 +34,9 @@ const cameraProblem = ref<'denied' | 'none' | null>(null)
 const typed = ref('')
 const typedProblem = ref<'invalid' | 'full' | null>(null)
 const adding = ref(false)
+// The picks offered to ScanDex after an add. While set, the share step
+// replaces the scanner's list inside the same dialog.
+const shareItems = ref<BarcodeSuggestion[] | null>(null)
 const confirmingClose = ref(false)
 // The barcode whose game is being chosen. While set, the search step
 // replaces the scanner's list inside the same dialog.
@@ -59,12 +68,22 @@ function onCameraScan(value: string, format: string) {
 
 function onOpenChange(next: boolean) {
   if (next) return
+  if (shareItems.value) {
+    closeSharing()
+    return
+  }
   if (finding.value) {
     finding.value = null
     return
   }
   if (rows.value.length) confirmingClose.value = true
   else open.value = false
+}
+
+/** Not now and Done: the picks not sent stay in Settings. */
+function closeSharing() {
+  shareItems.value = null
+  open.value = false
 }
 
 function closeKeeping() {
@@ -92,6 +111,7 @@ function chooseList(value: unknown) {
 watch(open, (isOpen) => {
   if (isOpen) {
     finding.value = null
+    shareItems.value = null
     cameraProblem.value = null
     typedProblem.value = null
   }
@@ -113,12 +133,31 @@ function year(row: ScanRow) {
   return row.match?.releaseDate?.slice(0, 4) ?? null
 }
 
+/**
+ * The picks from this batch that an allowed account could share with
+ * ScanDex. Empty for everyone else, and when the list can't be fetched,
+ * since the picks can still be shared from Settings.
+ */
+async function sharable(codes: Set<string>): Promise<BarcodeSuggestion[]> {
+  if (!auth.me.value?.contributesBarcodes || !codes.size) return []
+  try {
+    return (await sharing.list()).filter((item) => codes.has(item.code))
+  } catch {
+    return []
+  }
+}
+
 async function add() {
   if (adding.value || !toAdd.value.length) return
   adding.value = true
   const target: ListName = list.value
   const joined =
     collection.value && intoCollection.value ? collection.value : null
+  const ownCodes = new Set(
+    batchEntries(rows.value, target).flatMap((entry) =>
+      entry.own && entry.barcode ? [entry.barcode] : [],
+    ),
+  )
   let result: BulkAddResult
   try {
     result = await scanner.addTicked()
@@ -131,7 +170,9 @@ async function add() {
   } finally {
     adding.value = false
   }
-  open.value = false
+  const toShare = await sharable(ownCodes)
+  if (toShare.length) shareItems.value = toShare
+  else open.value = false
   const already = result.skipped.filter((s) => s.reason === 'already').length
   const other = result.skipped.length - already
   const parts = [
@@ -165,12 +206,31 @@ async function add() {
     >
       <DialogHeader>
         <DialogTitle>{{
-          finding ? $t('scan.findTitle') : $t('scan.title')
+          shareItems
+            ? $t(
+                'scanShare.title',
+                { count: shareItems.length },
+                shareItems.length,
+              )
+            : finding
+              ? $t('scan.findTitle')
+              : $t('scan.title')
         }}</DialogTitle>
         <DialogDescription>{{
-          finding ? $t('scan.findHint') : $t('scan.description')
+          shareItems
+            ? $t('scanShare.description')
+            : finding
+              ? $t('scan.findHint')
+              : $t('scan.description')
         }}</DialogDescription>
       </DialogHeader>
+
+      <BarcodeShare
+        v-if="shareItems"
+        :items="shareItems"
+        dismissable
+        @close="closeSharing"
+      />
 
       <BarcodeFindGame
         v-if="finding"
@@ -179,10 +239,10 @@ async function add() {
         @back="finding = null"
       />
 
-      <div v-show="!finding" class="contents">
+      <div v-show="!finding && !shareItems" class="contents">
         <BarcodeCamera
           v-if="!cameraProblem"
-          :paused="confirmingClose || !!finding"
+          :paused="confirmingClose || !!finding || !!shareItems"
           @scan="onCameraScan"
           @unavailable="cameraProblem = $event"
         />

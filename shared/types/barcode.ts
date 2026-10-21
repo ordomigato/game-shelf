@@ -49,3 +49,23 @@ export interface BulkAddResult {
   /** Games newly put in the collection, when one was asked for. */
   inCollection: number
 }
+
+/** A pick of the user's that ScanDex could be told about. */
+export interface BarcodeSuggestion {
+  code: string
+  igdbId: number
+  /** The game's name in our catalog. */
+  name: string
+  coverId: string | null
+  /** The platform's name in our catalog. */
+  platform: string
+}
+
+/**
+ * How sharing one pick went. `status` is ScanDex's HTTP status, or 0 when it
+ * wasn't reached or the pick could no longer be sent. `message` is ScanDex's
+ * own error text, trimmed to about 200 characters.
+ */
+export type SuggestionResult =
+  | { code: string; result: 'sent' }
+  | { code: string; result: 'failed'; status: number; message: string | null }

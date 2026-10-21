@@ -11,6 +11,8 @@ export interface Me {
   plan: Plan
   /** The limits in effect: the plan's, with any custom limits on top. */
   limits: PlanLimits
+  /** The account may share barcodes with ScanDex. Never on public data. */
+  contributesBarcodes: boolean
 }
 
 /** How much of their plan a user has used, for Settings. */

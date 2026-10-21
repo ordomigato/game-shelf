@@ -113,18 +113,52 @@ export interface ScanDexSuggestion {
   platform: string
   /** The IGDB game's name. */
   name: string
-  /** The barcode, as digits. */
-  value: number
+  /** The normalised barcode, as digits. */
+  code: string
 }
+
+/** How a suggestion went. `status` is 0 when ScanDex couldn't be reached. */
+export type ScanDexSubmitResult =
+  { ok: true } | { ok: false; status: number; message: string | null }
+
+/** The most of ScanDex's error text that is kept. */
+const MESSAGE_CHARS = 200
+
+/**
+ * ScanDex's own words for why it said no: a JSON `message`, `error` or
+ * `detail`, else the plain text, trimmed. Null when it said nothing.
+ */
+export function readErrorMessage(raw: string): string | null {
+  let text = raw
+  try {
+    const body: unknown = JSON.parse(raw)
+    if (isRecord(body)) {
+      const found = [body.message, body.error, body.detail].find(
+        (value) => typeof value === 'string' && value.trim(),
+      )
+      if (typeof found === 'string') text = found
+    }
+  } catch {
+    // Not JSON: the text is used as it is.
+  }
+  const trimmed = text.replace(/\s+/g, ' ').trim().slice(0, MESSAGE_CHARS)
+  return trimmed || null
+}
+
+/** The same text with every digit hidden, which is safe to log. */
+export const maskDigits = (text: string) => text.replace(/\d/g, '#')
 
 /**
  * Suggests a game for a barcode to ScanDex. Any 2xx is success. Anything
- * else, or no answer within a few seconds, is a failure that is only logged
- * (the status, never the barcode or the game). Never throws.
+ * else, or no answer within a few seconds, is a failure that carries
+ * ScanDex's status and error text for the person who chose to share. The
+ * log gets the status and that text with every digit masked, never the
+ * barcode or the game. The request body is built here and nowhere else.
+ * Never throws.
  */
 export async function submitToScanDex(
   suggestion: ScanDexSuggestion,
-): Promise<boolean> {
+): Promise<ScanDexSubmitResult> {
   try {
     const response = await fetch(CREATE_URL, {
       method: 'POST',
@@ -138,17 +172,19 @@ export async function submitToScanDex(
         platform_id: suggestion.platformId,
         platform: suggestion.platform,
         name: suggestion.name,
-        value: suggestion.value,
+        value: Number(suggestion.code),
       }),
       signal: AbortSignal.timeout(CREATE_TIMEOUT_MS),
     })
-    if (response.status < 200 || response.status > 299) {
-      log('warn', 'barcode.suggest_failed', { status: response.status })
-      return false
-    }
-    return true
+    if (response.status >= 200 && response.status <= 299) return { ok: true }
+    const message = readErrorMessage(await response.text().catch(() => ''))
+    log('warn', 'barcode.suggest_failed', {
+      status: response.status,
+      ...(message && { message: maskDigits(message) }),
+    })
+    return { ok: false, status: response.status, message }
   } catch {
     log('warn', 'barcode.suggest_failed', { status: 0 })
-    return false
+    return { ok: false, status: 0, message: null }
   }
 }

@@ -25,12 +25,15 @@ function toAnswer(row: CacheRow): ScanDexAnswer {
  * fresh, else from ScanDex (and kept for next time). `beforeScanDex` runs
  * just before a real ScanDex call, so a cap on those can refuse it. If
  * ScanDex fails and we hold an older answer, that one is used. Otherwise
- * the failure is thrown as a 502. Logs the outcome and ScanDex's time, never
+ * the failure is thrown as a 502. A cached answer is also used when the
+ * cap refuses the call. Logs the outcome and ScanDex's time, never
  * the barcode.
  */
 export async function lookupBarcode(
   code: string,
   beforeScanDex: () => Promise<void> = async () => {},
+  /** The digits as scanned, which ScanDex is asked with first. */
+  scanned: string = code,
 ): Promise<ScanDexAnswer> {
   const db = useDb()
   const [cached] = await db
@@ -41,10 +44,19 @@ export async function lookupBarcode(
     log('info', 'barcode.lookup', { outcome: 'cache_hit' })
     return toAnswer(cached)
   }
-  await beforeScanDex()
+  try {
+    await beforeScanDex()
+  } catch (error) {
+    // At a cap, a barcode we already know is still answered.
+    if (cached) {
+      log('info', 'barcode.lookup', { outcome: 'cache_stale_at_cap' })
+      return toAnswer(cached)
+    }
+    throw error
+  }
   const started = performance.now()
   try {
-    const answer = await askScanDex(code)
+    const answer = await askScanDex(scanned)
     const scandexMs = Math.round(performance.now() - started)
     log('info', 'barcode.lookup', {
       outcome: answer.kind === 'match' ? 'scandex_match' : 'scandex_no_match',
@@ -56,10 +68,15 @@ export async function lookupBarcode(
       platformName: answer.kind === 'match' ? answer.platformName : null,
       fetchedAt: new Date(),
     }
-    await db
-      .insert(barcodeLookups)
-      .values({ code, ...values })
-      .onConflictDoUpdate({ target: barcodeLookups.code, set: values })
+    try {
+      await db
+        .insert(barcodeLookups)
+        .values({ code, ...values })
+        .onConflictDoUpdate({ target: barcodeLookups.code, set: values })
+    } catch {
+      // Not keeping the answer only costs a later lookup.
+      log('warn', 'barcode.cache_failed')
+    }
     return answer
   } catch (error) {
     if (!(error instanceof ScanDexError)) throw error

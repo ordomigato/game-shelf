@@ -179,22 +179,46 @@ describe('planBulkAdd to the Wishlist', () => {
 })
 
 describe('planBulkAdd in general', () => {
-  it('skips games IGDB does not know and platforms the game is not on', () => {
+  it('skips games IGDB does not know', () => {
     const plan = planBulkAdd(
       'owned',
-      [
-        { igdbId: 99, platformId: SWITCH },
-        { igdbId: 2, platformId: PS5 },
-      ],
+      [{ igdbId: 99, platformId: SWITCH }],
       new Map(),
       catalog,
     )
     expect(plan.writes).toEqual([])
     expect(plan.present).toEqual([])
-    expect(plan.skipped).toEqual([
-      { igdbId: 99, reason: 'notFound' },
-      { igdbId: 2, reason: 'platform' },
-    ])
+    expect(plan.skipped).toEqual([{ igdbId: 99, reason: 'notFound' }])
+  })
+
+  it('adds a game with no platform when its platform is not one of the game’s', () => {
+    const plan = planBulkAdd(
+      'owned',
+      [
+        { igdbId: 2, platformId: PS5 },
+        { igdbId: 1, platformId: SWITCH },
+      ],
+      new Map(),
+      catalog,
+    )
+    expect(plan.added).toBe(2)
+    expect(plan.withoutPlatform).toBe(1)
+    expect(plan.writes[0]).toMatchObject({
+      igdbId: 2,
+      state: newListState('owned', []),
+    })
+  })
+
+  it('does not count a game already on the list as added without a platform', () => {
+    const plan = planBulkAdd(
+      'owned',
+      [{ igdbId: 2, platformId: PS5 }],
+      new Map([[2, state({ owned: true })]]),
+      catalog,
+    )
+    expect(plan.added).toBe(0)
+    expect(plan.withoutPlatform).toBe(0)
+    expect(plan.skipped).toEqual([{ igdbId: 2, reason: 'already' }])
   })
 
   it('counts a game once when two boxes are for different platforms', () => {

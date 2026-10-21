@@ -26,6 +26,15 @@ describe('normalizeBarcode', () => {
     expect(normalizeBarcode('04252614')).toBe('0042100005264')
   })
 
+  it('believes the scanner about 8-digit codes', () => {
+    // 01234565 is a good EAN-8 and also a good UPC-E.
+    expect(normalizeBarcode('01234565')).toBe('01234565')
+    expect(normalizeBarcode('01234565', 'ean_8')).toBe('01234565')
+    expect(normalizeBarcode('01234565', 'upc_e')).toBe('0012345000065')
+    expect(normalizeBarcode('04252614', 'ean_8')).toBeNull()
+    expect(normalizeBarcode('73513537', 'upc_e')).toBeNull()
+  })
+
   it('ignores spaces', () => {
     expect(normalizeBarcode(' 5901 2341 23457 ')).toBe('5901234123457')
   })

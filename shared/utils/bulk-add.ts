@@ -25,6 +25,8 @@ export interface BulkPlan {
   /** Games that end up in the library, so they can join a collection. */
   present: number[]
   added: number
+  /** Added games whose platform wasn't one of the game's, so none was set. */
+  withoutPlatform: number
   skipped: { igdbId: number; reason: BulkSkipReason }[]
 }
 
@@ -60,16 +62,21 @@ export function planBulkAdd(
   const skipped: BulkPlan['skipped'] = []
   const addedGames = new Set<number>()
 
-  for (const { igdbId, platformId } of dedupeEntries(entries)) {
+  const dropped = new Set<number>()
+
+  for (const entry of dedupeEntries(entries)) {
+    const { igdbId } = entry
     const game = catalog.get(igdbId)
     if (!game) {
       skipped.push({ igdbId, reason: 'notFound' })
       continue
     }
-    if (platformId !== null && !game.platformIds.includes(platformId)) {
-      skipped.push({ igdbId, reason: 'platform' })
-      continue
-    }
+    // A platform the catalog doesn't list for the game can't be shown, so
+    // the game is added without one.
+    const known =
+      entry.platformId !== null && game.platformIds.includes(entry.platformId)
+    const platformId = known ? entry.platformId : null
+    if (entry.platformId !== null && !known) dropped.add(igdbId)
     present.add(igdbId)
     const before = states.get(igdbId) ?? existing.get(igdbId)
     const platforms = platformId === null ? [] : [platformId]
@@ -119,5 +126,11 @@ export function planBulkAdd(
     }
     return { igdbId, state, isNew: !existing.has(igdbId) }
   })
-  return { writes, present: [...present], added: addedGames.size, skipped }
+  return {
+    writes,
+    present: [...present],
+    added: addedGames.size,
+    withoutPlatform: [...dropped].filter((id) => addedGames.has(id)).length,
+    skipped,
+  }
 }

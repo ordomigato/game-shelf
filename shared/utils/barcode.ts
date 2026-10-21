@@ -34,19 +34,29 @@ function expandUpcE(digits: string): string {
   return `${system}${body}${check}`
 }
 
+/** The UPC-A key of a UPC-E, or null when it isn't a valid one. */
+function upcEKey(digits: string): string | null {
+  if (!/^[01]/.test(digits)) return null
+  const upc = expandUpcE(digits)
+  return checkDigitOk(upc) ? `0${upc}` : null
+}
+
 /**
  * The key a barcode is looked up by, or null when it isn't a real barcode:
  * digits only, 8, 12, 13 or 14 long, with a correct check digit. A 12-digit
  * UPC and its 13-digit EAN (a leading 0) give the same key, so do a UPC-E
- * and the UPC it stands for, and a 14-digit GTIN with a leading 0.
+ * and the UPC it stands for, and a 14-digit GTIN with a leading 0. Eight
+ * digits can be an EAN-8 or a UPC-E: a scanner that says which (`format`)
+ * is believed. Typed digits have no format, so an 8-digit code with a good
+ * EAN-8 check digit is an EAN-8, and otherwise it may be a UPC-E.
  */
-export function normalizeBarcode(raw: string): string | null {
+export function normalizeBarcode(raw: string, format?: string): string | null {
   const digits = raw.replace(/\s+/g, '')
   if (!/^\d+$/.test(digits) || !LENGTHS.has(digits.length)) return null
-  if (digits.length === 8 && !checkDigitOk(digits)) {
-    if (!/^[01]/.test(digits)) return null
-    const upc = expandUpcE(digits)
-    return checkDigitOk(upc) ? `0${upc}` : null
+  if (digits.length === 8) {
+    if (format === 'upc_e') return upcEKey(digits)
+    if (format === 'ean_8') return checkDigitOk(digits) ? digits : null
+    return checkDigitOk(digits) ? digits : upcEKey(digits)
   }
   if (!checkDigitOk(digits)) return null
   if (digits.length === 12) return `0${digits}`

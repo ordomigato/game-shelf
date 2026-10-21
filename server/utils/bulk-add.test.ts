@@ -77,7 +77,12 @@ describe('bulkAdd', () => {
       list: 'owned',
       entries: entries(Array.from({ length: 40 }, (_, i) => i + 1)),
     })
-    expect(result).toEqual({ added: 40, skipped: [], inCollection: 0 })
+    expect(result).toEqual({
+      added: 40,
+      withoutPlatform: 0,
+      skipped: [],
+      inCollection: 0,
+    })
     expect(batches).toHaveLength(1)
     expect(batches[0]).toHaveLength(1)
     expect(ensureCatalogGames).toHaveBeenCalledOnce()
@@ -180,6 +185,16 @@ describe('bulkAdd', () => {
     expect(result.inCollection).toBe(0)
     expect(result.skipped).toEqual([{ igdbId: 1, reason: 'already' }])
     expect(batches).toEqual([])
+  })
+
+  it('adds a game without a platform when the catalog does not list the platform', async () => {
+    const result = await bulkAdd('u1', free, {
+      list: 'owned',
+      entries: [{ igdbId: 1, platformId: 167 }],
+    })
+    expect(result).toMatchObject({ added: 1, withoutPlatform: 1 })
+    const [upsert] = batches[0] as { values: { ownedOn: number[] }[] }[]
+    expect(upsert!.values[0]!.ownedOn).toEqual([])
   })
 
   it('reports games IGDB does not know without failing the rest', async () => {

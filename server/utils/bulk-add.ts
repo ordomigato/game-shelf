@@ -155,6 +155,7 @@ export async function bulkAdd(
 
   return {
     added: plan.added,
+    withoutPlatform: plan.withoutPlatform,
     skipped: plan.skipped,
     inCollection: toCollection.length,
   }

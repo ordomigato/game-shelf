@@ -9,7 +9,12 @@ const paramsSchema = z.object({
     .transform((value, ctx) => {
       const code = normalizeBarcode(value)
       if (!code) ctx.addIssue({ code: 'custom', message: 'Not a barcode' })
-      return code ?? ''
+      // A UPC or EAN-13 is asked about as it was scanned.
+      const digits = value.replace(/\s+/g, '')
+      return {
+        code: code ?? '',
+        scanned: /^\d{12,13}$/.test(digits) ? digits : (code ?? ''),
+      }
     }),
 })
 
@@ -24,13 +29,19 @@ const DAILY_LOOKUPS = 500
  */
 export default defineEventHandler(async (event): Promise<BarcodeResult> => {
   const { sub } = await requireAuth(event)
-  const { code } = await getValidatedRouterParams(event, paramsSchema.parse)
+  const { code: parsed } = await getValidatedRouterParams(
+    event,
+    paramsSchema.parse,
+  )
   const user = await findOrCreateUser(sub)
-  const answer = await lookupBarcode(code, () =>
-    rateLimit(event, `barcode:${user.id}`, {
-      limit: DAILY_LOOKUPS,
-      windowSeconds: 24 * 60 * 60,
-    }),
+  const answer = await lookupBarcode(
+    parsed.code,
+    () =>
+      rateLimit(event, `barcode:${user.id}`, {
+        limit: DAILY_LOOKUPS,
+        windowSeconds: 24 * 60 * 60,
+      }),
+    parsed.scanned,
   )
   if (answer.kind === 'none') return { match: null }
   return { match: await describeMatch(user.id, answer) }

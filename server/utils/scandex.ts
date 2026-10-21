@@ -11,7 +11,8 @@ export type ScanDexAnswer =
       platformId: number | null
       platformName: string | null
     }
-  | { kind: 'none' }
+  /** `notFound` is a 404: ScanDex has never seen the barcode. */
+  | { kind: 'none'; notFound?: true }
 
 /** ScanDex couldn't be asked, or didn't answer in a way we understand. */
 export class ScanDexError extends Error {}
@@ -33,7 +34,7 @@ export function mapScanDexResponse(
   status: number,
   body: unknown,
 ): ScanDexAnswer {
-  if (status === 404) return { kind: 'none' }
+  if (status === 404) return { kind: 'none', notFound: true }
   if (status !== 200 || !isRecord(body)) {
     throw new ScanDexError(`ScanDex answered ${status}`)
   }
@@ -71,13 +72,31 @@ async function ask(value: string): Promise<ScanDexAnswer> {
   return mapScanDexResponse(response.status, body)
 }
 
+/** The same barcode as an EAN-13 or UPC-A, or null when it has no other form. */
+export function otherForm(code: string): string | null {
+  if (/^\d{12}$/.test(code)) return `0${code}`
+  if (/^0\d{12}$/.test(code)) return code.slice(1)
+  return null
+}
+
 /**
- * Asks ScanDex about a normalised barcode. A UPC is a 13-digit EAN with a
- * leading 0, so an unknown 13-digit code that starts with 0 is asked once
- * more as the 12-digit UPC. The token never leaves the server.
+ * Asks ScanDex about a barcode in the form it was scanned (a 12-digit UPC
+ * as 12 digits, an EAN-13 as 13). A match or a known-but-unmatched answer
+ * costs one call. Only a 404 is asked again in the other form, and if that
+ * second call fails the first answer ("none") stands. The token never
+ * leaves the server.
  */
-export async function askScanDex(code: string): Promise<ScanDexAnswer> {
-  const answer = await ask(code)
-  if (answer.kind === 'match' || !/^0\d{12}$/.test(code)) return answer
-  return ask(code.slice(1))
+export async function askScanDex(
+  scanned: string,
+  fetchOne: (value: string) => Promise<ScanDexAnswer> = ask,
+): Promise<ScanDexAnswer> {
+  const first = await fetchOne(scanned)
+  const other = otherForm(scanned)
+  if (first.kind !== 'none' || !first.notFound || !other) return first
+  try {
+    return await fetchOne(other)
+  } catch (error) {
+    if (error instanceof ScanDexError) return first
+    throw error
+  }
 }

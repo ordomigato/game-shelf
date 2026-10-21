@@ -31,12 +31,12 @@ export type BulkSkipReason =
   | 'ownedHere'
   /** IGDB has no such game. */
   | 'notFound'
-  /** The platform isn't one of the game's. */
-  | 'platform'
 
 export interface BulkAddResult {
   /** Games put on the list (or moved to it from the other). */
   added: number
+  /** Of those, games added with no platform because theirs wasn't one of the game's. */
+  withoutPlatform: number
   skipped: { igdbId: number; reason: BulkSkipReason }[]
   /** Games newly put in the collection, when one was asked for. */
   inCollection: number

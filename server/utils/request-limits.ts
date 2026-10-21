@@ -14,7 +14,7 @@ export const REQUEST_LIMITS = {
    * Barcode lookups, which can reach ScanDex. A shelf is scanned at about a
    * box a second, so this is looser than IGDB's.
    */
-  barcodes: { perClient: 60, perInstance: 300 },
+  barcodes: { perClient: 120, perInstance: 600 },
   /** The browser's performance beacon. Over the limit it is dropped. */
   vitals: { perClient: 30, perInstance: 300 },
   /** The sitemap, rebuilt from the database whenever CloudFront misses. */

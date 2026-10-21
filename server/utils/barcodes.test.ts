@@ -16,6 +16,7 @@ vi.stubGlobal(
 )
 
 const DAY = 24 * 60 * 60 * 1000
+let failSave = false
 let cached: Record<string, unknown> | undefined
 const saved: Record<string, unknown>[] = []
 vi.stubGlobal('useDb', () => ({
@@ -25,6 +26,7 @@ vi.stubGlobal('useDb', () => ({
   insert: () => ({
     values: (values: Record<string, unknown>) => ({
       onConflictDoUpdate: async () => {
+        if (failSave) throw new Error('db down')
         saved.push(values)
       },
     }),
@@ -93,6 +95,33 @@ describe('lookupBarcode', () => {
       }),
     ).rejects.toBe(refused)
     expect(askScanDex).not.toHaveBeenCalled()
+  })
+
+  it('asks ScanDex with the barcode as scanned', async () => {
+    askScanDex.mockResolvedValue({ kind: 'none' })
+    await lookupBarcode('0036000291452', undefined, '036000291452')
+    expect(askScanDex).toHaveBeenCalledWith('036000291452')
+  })
+
+  it('answers a cached barcode even when the daily cap refuses', async () => {
+    cached = {
+      igdbId: 1,
+      platformId: 2,
+      platformName: 'X',
+      fetchedAt: new Date(Date.now() - 40 * DAY),
+    }
+    const answer = await lookupBarcode('0045496590048', async () => {
+      throw Object.assign(new Error('Too many requests'), { statusCode: 429 })
+    })
+    expect(answer).toMatchObject({ kind: 'match', igdbId: 1 })
+    expect(askScanDex).not.toHaveBeenCalled()
+  })
+
+  it('still returns ScanDex’s answer when keeping it fails', async () => {
+    askScanDex.mockResolvedValue(match)
+    failSave = true
+    expect(await lookupBarcode('0045496590048')).toEqual(match)
+    failSave = false
   })
 
   it('fails with a 502 when ScanDex fails and nothing is cached', async () => {

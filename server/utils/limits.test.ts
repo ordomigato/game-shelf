@@ -115,3 +115,53 @@ describe('assertLibraryRoom', () => {
     await expect((await room(10, 0, 10)).result).resolves.toBeUndefined()
   })
 })
+
+describe('assertRoomToAdd', () => {
+  // A stand-in database. The ownership check reads `from().where()`, and the
+  // room check reads `from().leftJoin().where().groupBy()`.
+  async function add(ownedRows: { id: string }[], full: boolean) {
+    let roomChecked = false
+    vi.resetModules()
+    vi.stubGlobal('useDb', () => ({
+      select: () => ({
+        from: () => ({
+          where: async () => ownedRows,
+          leftJoin: () => ({
+            where: () => ({
+              groupBy: async () => {
+                roomChecked = true
+                return [{ id: 'c1', n: full ? free.gamesPerCollection : 0 }]
+              },
+            }),
+          }),
+        }),
+      }),
+    }))
+    const { assertRoomToAdd } = await import('./limits')
+    const result = assertRoomToAdd('o', null, ['c1'], free)
+    await result.catch(() => {})
+    return { result, roomChecked: () => roomChecked }
+  }
+
+  it('answers 404, not a limit, for a full collection that is not the user’s', async () => {
+    const { result, roomChecked } = await add([], true)
+    await expect(result).rejects.toMatchObject({ statusCode: 404 })
+    expect(roomChecked()).toBe(false)
+  })
+
+  it('refuses the user’s own full collection with the limit', async () => {
+    const { result } = await add([{ id: 'c1' }], true)
+    await expect(result).rejects.toMatchObject({
+      statusCode: 403,
+      data: {
+        key: 'limits.reached.gamesPerCollection',
+        params: { limit: free.gamesPerCollection },
+      },
+    })
+  })
+
+  it('allows adding to the user’s own collection with room', async () => {
+    const { result } = await add([{ id: 'c1' }], false)
+    await expect(result).resolves.toBeUndefined()
+  })
+})

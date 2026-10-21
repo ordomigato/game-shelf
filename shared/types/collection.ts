@@ -105,9 +105,9 @@ export interface LibraryItem {
 }
 
 /**
- * A game in a collection. Its place on the lists is the owner's business:
- * visitors get only `wanted` (for a badge), and the flags and platforms
- * are left out.
+ * A game in a collection or on a list. Its place on the lists is the
+ * owner's business: visitors get `wanted` (for a badge) and the platforms
+ * they may see, and the flags are left out.
  */
 export interface CollectionEntry extends Omit<
   LibraryItem,
@@ -123,9 +123,9 @@ export interface CollectionEntry extends Omit<
   /** On Owned and the Wishlist: the custom collections the game is in. */
   inCollections?: CollectionLink[]
   /**
-   * Owner only: the platforms the catalog knows the game on, with short
-   * names. Empty for a game added by hand. `ownedOn` and `wantedOn` pick
-   * from these.
+   * The platforms the catalog knows the game on, with short names. Empty
+   * for a game added by hand. `ownedOn` and `wantedOn` pick from these. A
+   * visitor gets only the ones those name.
    */
   catalogPlatforms?: PlatformOption[]
 }
@@ -136,22 +136,36 @@ export interface PlatformOption {
   name: string
 }
 
+/** Whether Owned or the Wishlist is open to anyone with the link. */
+export interface ListSummary {
+  list: ListName
+  visibility: CollectionVisibility
+  itemCount: number
+}
+
 /**
- * One page of Owned or the Wishlist, as its owner sees it. The server sorts,
- * searches and filters, so `items` holds only the rows of this page.
+ * One page of Owned or the Wishlist, as its owner or a visitor sees it.
+ * The server sorts, searches and filters, so `items` holds only the rows
+ * of this page.
  */
 export interface ListDetail {
   list: ListName
+  visibility: CollectionVisibility
+  /** Whether the person viewing is the owner (and can edit). */
+  isOwner: boolean
   /** Every game on the list, whatever the search and filters. */
   itemCount: number
-  /** Every game in the library, owned or wishlisted, each once. */
-  libraryCount: number
+  /** Owner only: every game in the library, owned or wishlisted, each once. */
+  libraryCount?: number
   /** The games matching the search and filters. */
   total: number
   /** The page these items are, from 1. The server keeps it in range. */
   page: number
   size: number
-  /** All the owner's fields, hidden ones included. */
+  /**
+   * The owner gets all their fields, hidden ones included. A visitor gets
+   * the ones with a value on this list, never a hidden one.
+   */
   fields: FieldDefinition[]
   /** The platforms some game on this list is on, for the filter. */
   platforms: PlatformOption[]
@@ -159,7 +173,7 @@ export interface ListDetail {
   genres: string[]
   /** Keys of the columns the owner hides on this list. */
   hiddenColumns: string[]
-  items: OwnerEntry[]
+  items: CollectionEntry[]
 }
 
 /** A game as its owner sees it: with its place on the lists. */

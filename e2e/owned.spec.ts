@@ -226,11 +226,15 @@ test('Owned shows the shared columns, with the collections and platforms', async
   await search.fill('')
   await expect(rows).toHaveCount(3)
 
-  // No fields, order, charts, import or sharing.
+  // No fields, order, charts or import. The list can be shared, and the
+  // owner picks who can see it.
   await expect(
     page.getByRole('button', { name: 'Table', exact: true }),
   ).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Share' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Share' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Who can see this: Private' }),
+  ).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Collection actions' }),
   ).toHaveCount(0)

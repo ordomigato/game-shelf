@@ -34,11 +34,13 @@ const fields: FieldDefinition[] = [
   { id: 'note', name: 'Note', type: 'text', hidden: true },
 ]
 
-const parse = (raw: Record<string, unknown> = {}) => parseListQuery(raw, fields)
+const parse = (raw: Record<string, unknown> = {}) =>
+  parseListQuery(raw, fields, true)
 
 describe('parseListQuery', () => {
   it('defaults to the first page of 50, newest first', () => {
     expect(parse()).toEqual({
+      viewerIsOwner: true,
       page: 1,
       size: 50,
       sort: null,
@@ -384,5 +386,57 @@ describe('escapeLike', () => {
   it('escapes the characters LIKE treats as patterns', () => {
     expect(escapeLike('100%_\\')).toBe('100\\%\\_\\\\')
     expect(escapeLike('plain')).toBe('plain')
+  })
+})
+
+describe('as a visitor', () => {
+  // A visitor is only given the fields they may see: never the hidden one.
+  const shown = fields.filter((field) => !field.hidden)
+  const visit = (raw: Record<string, unknown> = {}) =>
+    parseListQuery(raw, shown, false)
+  const where = (
+    raw: Record<string, unknown> = {},
+    list: 'owned' | 'wishlist' = 'owned',
+  ) => render(listWhere(owner, list, visit(raw)))
+
+  it("leaves the owner's collections out of the filter and the sort", () => {
+    const query = visit({ collection: collection, sort: 'inCollections' })
+    expect(query.viewerIsOwner).toBe(false)
+    expect(query.collectionIds).toEqual([])
+    expect(query.sort).toBeNull()
+    expect(isFiltered(query)).toBe(false)
+    expect(visit({ sort: 'name' }).sort).toEqual({ column: 'name' })
+  })
+
+  it('cannot search, sort or filter by a hidden field', () => {
+    const query = visit({ sort: 'f.note', 'f.note': 'x' })
+    expect(query.sort).toBeNull()
+    expect(query.fieldFilters).toEqual([])
+    expect(query.searchFields.map((field) => field.id)).not.toContain('note')
+  })
+
+  it('does not search collection titles', () => {
+    const { sql } = where({ q: 'secret' })
+    expect(sql).not.toContain('collection')
+    expect(sql).toContain('"library_items"."owner_id" = $1')
+  })
+
+  it("only looks at the list's own platforms", () => {
+    const owned = where({ q: 'snes', platform: '19' })
+    expect(owned.sql).toContain('any(library_items.owned_on)')
+    expect(owned.sql).toContain('(library_items.owned_on) &&')
+    expect(owned.sql).not.toContain('wanted_on')
+    const wishlist = where({ q: 'snes', platform: '19' }, 'wishlist')
+    expect(wishlist.sql).toContain('any(library_items.wanted_on)')
+    expect(wishlist.sql).not.toContain('owned_on')
+  })
+
+  it("sorts platforms by the list's own first platform", () => {
+    const ordered = (list: 'owned' | 'wishlist') =>
+      renderAll(listOrder(owner, list, visit({ sort: 'platforms' })))[0]!.sql
+    expect(ordered('owned')).toContain('(library_items.owned_on)[1]')
+    expect(ordered('owned')).not.toContain('wanted_on')
+    expect(ordered('wishlist')).toContain('(library_items.wanted_on)[1]')
+    expect(ordered('wishlist')).not.toContain('owned_on')
   })
 })

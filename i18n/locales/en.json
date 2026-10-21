@@ -692,7 +692,7 @@
     "copied": "Link copied",
     "copyFailed": "Couldn't copy the link. Here it is: {url}",
     "makePublicTitle": "Make it public to share?",
-    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your collections page. You can make it private again at any time.",
+    "makePublicBody": "Anyone with the link will be able to see this, and it will be listed on your collections page. You can make it private again at any time.",
     "makePublicConfirm": "Make public and share"
   },
   "preview": {
@@ -908,7 +908,8 @@
     "exportFailed": "Couldn't prepare your download. Try again.",
     "actions": "List actions",
     "exportAll": "Export {count} game | Export all {count} games",
-    "onlyYou": "Private",
+    "nowPublic": "{list} is now public",
+    "nowPrivate": "{list} is now private",
     "ownedHint": "Every game you own. Collections can hold games you only want too.",
     "wishlistHint": "Games you want. They can also be in your collections, so you can see what's missing.",
     "ownedEmptyHint": "Search for a game and add it to Owned.",

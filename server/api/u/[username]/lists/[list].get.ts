@@ -8,8 +8,10 @@ const paramsSchema = z.object({
 
 /**
  * One page of Owned or the Wishlist at `/u/<username>/shelf/<list>`, sorted,
- * searched and filtered by the query (see `parseListQuery`). Only the owner
- * sees them. Anyone else gets a 404, like a private collection.
+ * searched and filtered by the query (see `parseListQuery`). The owner
+ * always sees it. Anyone else sees it only when the owner made it public,
+ * with the fields and platforms a visitor may see. Otherwise it's a 404,
+ * like a private collection.
  */
 export default defineEventHandler(async (event): Promise<ListDetail> => {
   const { username, list } = await getValidatedRouterParams(
@@ -20,10 +22,13 @@ export default defineEventHandler(async (event): Promise<ListDetail> => {
     findUserByUsername(username),
     optionalAuth(event),
   ])
-  if (!owner || claims?.sub !== owner.cognitoSub) {
-    throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  }
-  const fields = await getUserFields(owner.id)
-  const query = parseListQuery(getQuery(event), fields)
-  return getListPage(owner.id, list, query, fields, owner.listColumns)
+  if (!owner) throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  const viewerIsOwner = claims?.sub === owner.cognitoSub
+  assertCanViewList(owner, list, viewerIsOwner)
+  const allFields = await getUserFields(owner.id)
+  const fields = viewerIsOwner
+    ? allFields
+    : await visitorFieldsOfList(owner.id, list, allFields)
+  const query = parseListQuery(getQuery(event), fields, viewerIsOwner)
+  return getListPage(owner, list, query, fields)
 })

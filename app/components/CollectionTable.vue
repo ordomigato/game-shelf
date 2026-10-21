@@ -63,9 +63,8 @@ import { formatReleased, releaseSortDate } from '#shared/utils/release-date'
  * hand, and put games in their own order by dragging or from the row menu.
  * Games the owner wants but doesn't have yet are marked and faded.
  *
- * Every game shows its release date and genres from the catalog. The owner
- * also sees the platforms the game is owned and wanted on, and can change
- * them from the cell. Visitors don't get platforms.
+ * Every game shows its release date, genres and platforms. The owner can
+ * change the platforms from the cell.
  *
  * The same table shows Owned and the Wishlist (`mode`), which have no
  * fields and no order of their own: they list which collections each game
@@ -176,10 +175,19 @@ const showWanted = computed(
 )
 const STATE_FILTER = '__state'
 
-/** Whether rows list the collections each game is in (on the lists). */
-const showCollections = computed(() => isList.value)
-// Platforms are the owner's business, so visitors' tables have no such column.
-const showPlatforms = computed(() => props.editable)
+/** Whether rows list the collections each game is in (on the owner's lists). */
+const showCollections = computed(() => isList.value && props.editable)
+// Visitors see the platforms the server sent them, read-only, so the column
+// only shows when some game has one.
+const showPlatforms = computed(
+  () =>
+    props.editable ||
+    (props.server
+      ? props.server.platforms.length > 0
+      : props.items.some(
+          (item) => item.ownedOn?.length || item.wantedOn?.length,
+        )),
+)
 
 /** Whether a game is only wanted, so it's marked and faded. */
 const isWanted = (item: CollectionEntry) =>

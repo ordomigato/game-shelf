@@ -123,30 +123,74 @@ describe('toCollectionEntry', () => {
     })
   })
 
-  it('gives a visitor only whether the game is wanted', () => {
+  it('gives a visitor whether the game is wanted, but not the flags', () => {
     const entry = toCollectionEntry(both, game, new Date(0), false)
     expect(entry.wanted).toBe(true)
-    for (const key of [
-      'owned',
-      'wishlisted',
-      'ownedOn',
-      'wantedOn',
-      'catalogPlatforms',
-    ]) {
+    for (const key of ['owned', 'wishlisted']) {
       expect(entry).not.toHaveProperty(key)
     }
     expect(toCollectionEntry(item, game, new Date(0), false).wanted).toBe(false)
   })
 
-  it('shows a visitor the release date and genres but no platforms', () => {
-    const names = new Map([[19, 'SNES']])
-    const entry = toCollectionEntry(both, game, new Date(0), false, names)
+  it('shows a visitor the release date, genres and platforms it is on', () => {
+    const names = new Map([
+      [19, 'SNES'],
+      [4, 'N64'],
+      [12, 'Switch'],
+      [48, 'PS4'],
+    ])
+    const entry = toCollectionEntry(
+      both,
+      { ...game, platformIds: [19, 4, 12, 48] },
+      new Date(0),
+      false,
+      names,
+    )
     expect(entry).toMatchObject({
       releaseDate: '1991-11-21',
       releasePrecision: 'day',
       genres: ['Adventure', 'Role-playing (RPG)'],
+      ownedOn: [12],
+      wantedOn: [48],
     })
-    expect(JSON.stringify(entry)).not.toContain('SNES')
+    // Only the platforms it is owned or wanted on are named, not every one
+    // the catalog knows it on.
+    expect(entry.catalogPlatforms).toEqual([
+      { id: 48, name: 'PS4' },
+      { id: 12, name: 'Switch' },
+    ])
+  })
+
+  it("shows a visitor of Owned only that list's platforms", () => {
+    const names = new Map([
+      [12, 'Switch'],
+      [48, 'PS4'],
+    ])
+    const catalog = { ...game, platformIds: [12, 48] }
+    const owned = toCollectionEntry(
+      both,
+      catalog,
+      new Date(0),
+      false,
+      names,
+      'owned',
+    )
+    expect(owned).toMatchObject({ ownedOn: [12], wantedOn: [], wanted: false })
+    expect(owned.catalogPlatforms).toEqual([{ id: 12, name: 'Switch' }])
+    const wishlist = toCollectionEntry(
+      both,
+      catalog,
+      new Date(0),
+      false,
+      names,
+      'wishlist',
+    )
+    expect(wishlist).toMatchObject({
+      ownedOn: [],
+      wantedOn: [48],
+      wanted: true,
+    })
+    expect(wishlist.catalogPlatforms).toEqual([{ id: 48, name: 'PS4' }])
   })
 
   it('gives the owner the catalog platforms to pick from, named', () => {

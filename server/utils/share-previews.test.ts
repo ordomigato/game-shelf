@@ -19,6 +19,11 @@ describe('translate', () => {
     expect(games(12)).toBe('12 games on ThisPlayShelf')
   })
 
+  it('names the lists for their previews', () => {
+    expect(translate({ key: 'shelf.owned' })).toBe('Owned')
+    expect(translate({ key: 'shelf.wishlist' })).toBe('Wishlist')
+  })
+
   it('returns the key for an unknown message', () => {
     expect(translate({ key: 'nope.missing' })).toBe('nope.missing')
   })

@@ -10,12 +10,13 @@ import {
 } from 'drizzle-orm'
 import { createError } from 'h3'
 import type {
-  OwnerEntry,
   CollectionLink,
+  CollectionVisibility,
   FieldDefinition,
   LibraryItem,
   ListDetail,
   ListName,
+  ListSummary,
 } from '../../shared/types/collection'
 import {
   applyListAction,
@@ -23,6 +24,7 @@ import {
   type ListState,
 } from '../../shared/utils/lists'
 import { knownHiddenColumns } from '../../shared/utils/columns'
+import { dataFor, visitorFields } from '../../shared/utils/field-values'
 import type { ExportItem } from '../../shared/utils/csv'
 import {
   games as catalogGames,
@@ -33,16 +35,102 @@ import {
 import { useDb } from './db'
 import {
   catalogJoin,
-  catalogPlatformsOf,
   customCollectionsOf,
   getOwnedItem,
   itemName,
+  notFound,
   platformNames,
+  toCollectionEntry,
   toLibraryItem,
 } from './collections'
 import { isFiltered, listOrder, listWhere, type ListQuery } from './list-query'
 
 type ItemRow = typeof libraryItems.$inferSelect
+type UserRow = typeof users.$inferSelect
+
+/** Whether the owner has opened a list to anyone with the link. */
+export function listVisibility(
+  owner: Pick<UserRow, 'ownedPublic' | 'wishlistPublic'>,
+  list: ListName,
+): CollectionVisibility {
+  return (list === 'owned' ? owner.ownedPublic : owner.wishlistPublic)
+    ? 'public'
+    : 'private'
+}
+
+/**
+ * Lets the owner see their own list, and anyone else only a public one.
+ * Anything else is a 404, like a private collection, so a private list's
+ * existence isn't revealed.
+ */
+export function assertCanViewList(
+  owner: Pick<UserRow, 'ownedPublic' | 'wishlistPublic'>,
+  list: ListName,
+  viewerIsOwner: boolean,
+): void {
+  if (!viewerIsOwner && listVisibility(owner, list) !== 'public') {
+    throw notFound()
+  }
+}
+
+/** Makes Owned or the Wishlist private or public. */
+export async function setListVisibility(
+  ownerId: string,
+  list: ListName,
+  visibility: CollectionVisibility,
+): Promise<void> {
+  await useDb()
+    .update(users)
+    .set(
+      list === 'owned'
+        ? { ownedPublic: visibility === 'public' }
+        : { wishlistPublic: visibility === 'public' },
+    )
+    .where(eq(users.id, ownerId))
+}
+
+/**
+ * The lists a viewer can open, with their sizes: both for the owner, only
+ * the public ones for anyone else.
+ */
+export async function listSummaries(
+  owner: UserRow,
+  viewerIsOwner: boolean,
+): Promise<ListSummary[]> {
+  const counts = await listCounts(owner.id)
+  return (['owned', 'wishlist'] as const)
+    .filter((list) => viewerIsOwner || listVisibility(owner, list) === 'public')
+    .map((list) => ({
+      list,
+      visibility: listVisibility(owner, list),
+      itemCount: counts[list],
+    }))
+}
+
+/** The rows a list holds, as a condition on `library_items`. */
+const onListOf = (ownerId: string, list: ListName) =>
+  and(
+    eq(libraryItems.ownerId, ownerId),
+    eq(list === 'owned' ? libraryItems.owned : libraryItems.wishlisted, true),
+  )
+
+/**
+ * The fields a visitor may see on a list: those some game on it has a
+ * value for, never a hidden one (the same rule as a public collection).
+ */
+export async function visitorFieldsOfList(
+  ownerId: string,
+  list: ListName,
+  fields: FieldDefinition[],
+): Promise<FieldDefinition[]> {
+  const rows = await useDb()
+    .selectDistinct({
+      id: sql<string>`jsonb_object_keys(${libraryItems.data})`,
+    })
+    .from(libraryItems)
+    .where(onListOf(ownerId, list))
+  return visitorFields(fields, new Set(rows.map((row) => row.id)))
+}
 
 /** A row's place on the two lists. */
 export function listStateOf(row: ItemRow): ListState {
@@ -61,22 +149,19 @@ export function listStateOf(row: ItemRow): ListState {
 async function platformChoices(
   ownerId: string,
   list: ListName,
+  viewerIsOwner: boolean,
 ): Promise<{ id: number; name: string }[]> {
   const db = useDb()
+  // A visitor sees only the list's own platforms.
+  const shown = viewerIsOwner
+    ? sql`${libraryItems.ownedOn} || ${libraryItems.wantedOn}`
+    : list === 'owned'
+      ? sql`${libraryItems.ownedOn}`
+      : sql`${libraryItems.wantedOn}`
   const onList = db
-    .select({
-      id: sql<number>`unnest(${libraryItems.ownedOn} || ${libraryItems.wantedOn})`,
-    })
+    .select({ id: sql<number>`unnest(${shown})` })
     .from(libraryItems)
-    .where(
-      and(
-        eq(libraryItems.ownerId, ownerId),
-        eq(
-          list === 'owned' ? libraryItems.owned : libraryItems.wishlisted,
-          true,
-        ),
-      ),
-    )
+    .where(onListOf(ownerId, list))
   const rows = await db
     .select({
       id: platforms.igdbId,
@@ -96,39 +181,32 @@ async function genreChoices(
     .selectDistinct({ name: sql<string>`unnest(${catalogGames.genres})` })
     .from(libraryItems)
     .innerJoin(catalogGames, catalogJoin)
-    .where(
-      and(
-        eq(libraryItems.ownerId, ownerId),
-        eq(
-          list === 'owned' ? libraryItems.owned : libraryItems.wishlisted,
-          true,
-        ),
-      ),
-    )
+    .where(onListOf(ownerId, list))
   return rows.map((row) => row.name).sort((a, b) => a.localeCompare(b))
 }
 
 /**
- * One page of Owned or the Wishlist: the user's games on that list that
- * match the search and filters, in the asked order, with the custom
- * collections each is in and the platforms for that list. A page past the
- * end comes back as the last one. The sort, search and filters run in SQL
- * (see `list-query.ts`), so only this page's rows leave the database.
+ * One page of Owned or the Wishlist: the owner's games on that list that
+ * match the search and filters, in the asked order. The owner also gets
+ * the custom collections each game is in and the platforms to pick from.
+ * A visitor (`query.viewerIsOwner` false, on a public list) gets neither:
+ * only the list's own platforms and the `fields` they may see. A page past
+ * the end comes back as the last one. The sort, search and filters run in
+ * SQL (see `list-query.ts`), so only this page's rows leave the database.
+ * Every query is scoped to `owner`, never to anything the browser sent.
  */
 export async function getListPage(
-  ownerId: string,
+  owner: Pick<UserRow, 'id' | 'listColumns' | 'ownedPublic' | 'wishlistPublic'>,
   list: ListName,
   query: ListQuery,
   fields: FieldDefinition[],
-  listColumns: Partial<Record<ListName, string[]>> = {},
 ): Promise<ListDetail> {
   const db = useDb()
+  const ownerId = owner.id
+  const viewerIsOwner = query.viewerIsOwner
   const where = listWhere(ownerId, list, query)
   const order = listOrder(ownerId, list, query)
-  const onList = and(
-    eq(libraryItems.ownerId, ownerId),
-    eq(list === 'owned' ? libraryItems.owned : libraryItems.wishlisted, true),
-  )
+  const onList = onListOf(ownerId, list)
   const countWhere = (condition: SQL | undefined) =>
     db
       .select({ value: count() })
@@ -150,12 +228,14 @@ export async function getListPage(
       countWhere(where),
       isFiltered(query) ? countWhere(onList) : null,
       pageOf(query.page),
-      platformChoices(ownerId, list),
+      platformChoices(ownerId, list, viewerIsOwner),
       genreChoices(ownerId, list),
-      db
-        .select({ value: count() })
-        .from(libraryItems)
-        .where(eq(libraryItems.ownerId, ownerId)),
+      viewerIsOwner
+        ? db
+            .select({ value: count() })
+            .from(libraryItems)
+            .where(eq(libraryItems.ownerId, ownerId))
+        : null,
     ])
   const total = matching[0]?.value ?? 0
   const itemCount = listSize ? (listSize[0]?.value ?? 0) : total
@@ -163,23 +243,38 @@ export async function getListPage(
   const rows = page === query.page ? firstTry : await pageOf(page)
 
   const [inCollections, names] = await Promise.all([
-    customCollectionsOf(
-      ownerId,
-      rows.map(({ item }) => item.id),
+    viewerIsOwner
+      ? customCollectionsOf(
+          ownerId,
+          rows.map(({ item }) => item.id),
+        )
+      : null,
+    platformNames(
+      rows.flatMap(({ item, game }) => [
+        ...(viewerIsOwner ? (game?.platformIds ?? []) : []),
+        ...item.ownedOn,
+        ...item.wantedOn,
+      ]),
     ),
-    platformNames(rows.flatMap(({ game }) => game?.platformIds ?? [])),
   ])
-  const items: OwnerEntry[] = rows.map(({ item, game }) => ({
-    ...toLibraryItem(item, game),
-    addedAt: item.createdAt.toISOString(),
-    wanted: item.wishlisted,
-    inCollections: inCollections.get(item.id) ?? [],
-    catalogPlatforms: catalogPlatformsOf(game, names),
+  const items = rows.map(({ item, game }) => ({
+    ...toCollectionEntry(
+      item,
+      game,
+      item.createdAt,
+      viewerIsOwner,
+      names,
+      viewerIsOwner ? undefined : list,
+    ),
+    ...(inCollections && { inCollections: inCollections.get(item.id) ?? [] }),
+    data: dataFor(viewerIsOwner, fields, item.data),
   }))
   return {
     list,
+    visibility: listVisibility(owner, list),
+    isOwner: viewerIsOwner,
     itemCount,
-    libraryCount: library[0]?.value ?? 0,
+    ...(library && { libraryCount: library[0]?.value ?? 0 }),
     total,
     page,
     size: query.size,
@@ -187,7 +282,7 @@ export async function getListPage(
     platforms: platformOptions,
     genres: genreOptions,
     hiddenColumns: knownHiddenColumns(
-      listColumns[list],
+      owner.listColumns[list],
       'list',
       fields.map((field) => field.id),
     ),

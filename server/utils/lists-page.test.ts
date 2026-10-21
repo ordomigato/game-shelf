@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { FieldDefinition } from '../../shared/types/collection'
 
 // Each select answers by the shape of what it picks, so the order the
 // queries are sent in doesn't matter.
@@ -55,10 +56,16 @@ vi.mock('./collections', async (importOriginal) => ({
   platformNames: async () => new Map([[19, 'SNES']]),
 }))
 
-const { getListPage } = await import('./lists')
+const { assertCanViewList, getListPage, listVisibility } =
+  await import('./lists')
 const { parseListQuery } = await import('./list-query')
 
-const owner = '00000000-0000-4000-8000-000000000001'
+const owner = {
+  id: '00000000-0000-4000-8000-000000000001',
+  listColumns: {},
+  ownedPublic: false,
+  wishlistPublic: false,
+}
 const row = (n: number) => ({
   item: {
     id: `30000000-0000-4000-8000-00000000000${n}`,
@@ -90,7 +97,7 @@ describe('getListPage', () => {
     const result = await getListPage(
       owner,
       'owned',
-      parseListQuery({ page: '2', size: '25' }, []),
+      parseListQuery({ page: '2', size: '25' }, [], true),
       [],
     )
     expect(countCalls).toBe(2)
@@ -115,7 +122,7 @@ describe('getListPage', () => {
     const result = await getListPage(
       owner,
       'owned',
-      parseListQuery({ q: 'zelda' }, []),
+      parseListQuery({ q: 'zelda' }, [], true),
       [],
     )
     expect(countCalls).toBe(3)
@@ -128,7 +135,7 @@ describe('getListPage', () => {
     const result = await getListPage(
       owner,
       'wishlist',
-      parseListQuery({ page: '9', size: '50' }, []),
+      parseListQuery({ page: '9', size: '50' }, [], true),
       [],
     )
     expect(asked.map((call) => call.offset)).toEqual([400, 50])
@@ -142,7 +149,7 @@ describe('getListPage', () => {
     const result = await getListPage(
       owner,
       'owned',
-      parseListQuery({ page: '4' }, []),
+      parseListQuery({ page: '4' }, [], true),
       [],
     )
     expect(result).toMatchObject({ page: 1, total: 0, itemCount: 0, items: [] })
@@ -166,7 +173,12 @@ describe('getListPage', () => {
         },
       },
     ])
-    const result = await getListPage(owner, 'owned', parseListQuery({}, []), [])
+    const result = await getListPage(
+      owner,
+      'owned',
+      parseListQuery({}, [], true),
+      [],
+    )
     // Platform 5 has no name in the platforms table, so it can't be shown.
     expect(result.items[0]).toMatchObject({
       releaseDate: '1991-11-21',
@@ -174,5 +186,107 @@ describe('getListPage', () => {
       genres: ['Adventure'],
       catalogPlatforms: [{ id: 19, name: 'SNES' }],
     })
+  })
+})
+
+describe('getListPage for a visitor', () => {
+  const visitorOf = (raw: Record<string, unknown> = {}) =>
+    parseListQuery(raw, [], false)
+  const both = () => ({
+    ...row(1),
+    item: {
+      ...row(1).item,
+      igdbId: 1026,
+      wishlisted: true,
+      ownedOn: [19],
+      wantedOn: [130],
+    },
+    game: {
+      igdbId: 1026,
+      name: 'A Link to the Past',
+      coverId: null,
+      releaseDate: '1991-11-21',
+      releasePrecision: 'day',
+      genres: ['Adventure'],
+      platformIds: [19, 130],
+      fetchedAt: new Date(0),
+    },
+  })
+
+  it("shows Owned only the owned platforms, and nothing of the owner's collections or library", async () => {
+    counts = [1]
+    pages.push([both()])
+    const result = await getListPage(
+      { ...owner, ownedPublic: true },
+      'owned',
+      visitorOf(),
+      [],
+    )
+    expect(result).toMatchObject({
+      list: 'owned',
+      visibility: 'public',
+      isOwner: false,
+      itemCount: 1,
+    })
+    // The library count is the owner's, so it isn't even asked for.
+    expect(result).not.toHaveProperty('libraryCount')
+    expect(countCalls).toBe(1)
+    const [entry] = result.items
+    expect(entry).toMatchObject({ ownedOn: [19], wantedOn: [], wanted: false })
+    expect(entry!.catalogPlatforms).toEqual([{ id: 19, name: 'SNES' }])
+    for (const key of ['owned', 'wishlisted', 'inCollections']) {
+      expect(entry).not.toHaveProperty(key)
+    }
+  })
+
+  it('shows the Wishlist only the wanted platforms', async () => {
+    counts = [1]
+    pages.push([both()])
+    const result = await getListPage(
+      { ...owner, wishlistPublic: true },
+      'wishlist',
+      visitorOf(),
+      [],
+    )
+    expect(result.visibility).toBe('public')
+    expect(result.items[0]).toMatchObject({
+      ownedOn: [],
+      wantedOn: [130],
+      wanted: true,
+    })
+  })
+
+  it('gives only the values of the fields the visitor may see', async () => {
+    counts = [1]
+    const shown: FieldDefinition = { id: 'a', name: 'Notes', type: 'text' }
+    pages.push([
+      {
+        ...row(1),
+        item: { ...row(1).item, data: { a: 'hi', secret: 'x' } },
+      },
+    ])
+    const result = await getListPage(owner, 'owned', visitorOf(), [shown])
+    expect(result.fields).toEqual([shown])
+    expect(result.items[0]!.data).toEqual({ a: 'hi' })
+  })
+})
+
+describe('who can open a list', () => {
+  const user = { ownedPublic: true, wishlistPublic: false }
+
+  it('reads each list from its own setting', () => {
+    expect(listVisibility(user, 'owned')).toBe('public')
+    expect(listVisibility(user, 'wishlist')).toBe('private')
+  })
+
+  it('always lets the owner in, and a visitor only to a public list', () => {
+    expect(() => assertCanViewList(user, 'wishlist', true)).not.toThrow()
+    expect(() => assertCanViewList(user, 'owned', false)).not.toThrow()
+  })
+
+  it('answers a visitor of a private list with a 404, like a private collection', () => {
+    expect(() => assertCanViewList(user, 'wishlist', false)).toThrow(
+      expect.objectContaining({ statusCode: 404 }),
+    )
   })
 })

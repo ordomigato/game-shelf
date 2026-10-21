@@ -45,6 +45,10 @@ export async function fakeList(
     delay?: (request: number) => number
     /** Games in the whole library, owned and wishlisted. Defaults to this list's. */
     libraryCount?: number
+    /** Serve the list to a visitor: read-only, with no library count. */
+    visitor?: boolean
+    /** Who can open it. Defaults to private. */
+    visibility?: 'private' | 'public'
   } = {},
 ) {
   const fields = options.fields ?? []
@@ -55,6 +59,9 @@ export async function fakeList(
     hidden: [] as string[],
     /** What each save of the hidden columns sent. */
     columnSaves: [] as string[][],
+    visibility: options.visibility ?? 'private',
+    /** What each change of who can open the list sent. */
+    visibilitySaves: [] as string[],
     remove(id: string) {
       state.items = state.items.filter((item) => item.id !== id)
     },
@@ -103,6 +110,12 @@ export async function fakeList(
     state.columnSaves.push(body.hidden)
     state.hidden = body.hidden
     return route.fulfill({ json: body.hidden })
+  })
+  await page.route(`**/api/me/list-visibility/${list}`, (route) => {
+    const body = route.request().postDataJSON() as { visibility: string }
+    state.visibilitySaves.push(body.visibility)
+    state.visibility = body.visibility as 'private' | 'public'
+    return route.fulfill({ json: { list, visibility: body.visibility } })
   })
   await page.route(
     new RegExp(`/api/u/${username}/lists/${list}(\\?.*)?$`),
@@ -179,8 +192,12 @@ export async function fakeList(
       await route.fulfill({
         json: {
           list,
+          visibility: state.visibility,
+          isOwner: !options.visitor,
           itemCount: state.items.length,
-          libraryCount: options.libraryCount ?? state.items.length,
+          ...(!options.visitor && {
+            libraryCount: options.libraryCount ?? state.items.length,
+          }),
           total: rows.length,
           page: current,
           size,

@@ -9,6 +9,7 @@ import type {
   LibraryItem,
   ListDetail,
   ListName,
+  ListSummary,
   CollectionLink,
 } from '#shared/types/collection'
 import type { ListAction } from '#shared/utils/lists'
@@ -81,6 +82,12 @@ export function useCollections() {
     list: (username: string) =>
       viewerFetch<CollectionSummary[]>(userPath(username)),
 
+    /** The user's Owned and Wishlist the viewer can open, with sizes. */
+    lists: (username: string) =>
+      viewerFetch<ListSummary[]>(
+        `/api/u/${encodeURIComponent(username)}/lists`,
+      ),
+
     get: (username: string, slug: string) =>
       viewerFetch<CollectionDetail>(
         `${userPath(username)}/${encodeURIComponent(slug)}`,
@@ -88,8 +95,9 @@ export function useCollections() {
 
     /**
      * One page of Owned or the Wishlist, sorted, searched and filtered by
-     * the server. Only its owner can read them (404). `signal` cancels the
-     * request when a newer one replaces it.
+     * the server. Its owner can always read it, anyone else only when it's
+     * public (404 otherwise). `signal` cancels the request when a newer one
+     * replaces it.
      */
     getList: (
       username: string,
@@ -101,6 +109,13 @@ export function useCollections() {
         `/api/u/${encodeURIComponent(username)}/lists/${list}`,
         { query: viewToQuery(view, { withSize: true }), signal },
       ),
+
+    /** Makes the user's Owned or Wishlist private or public. */
+    setListVisibility: (list: ListName, visibility: CollectionVisibility) =>
+      auth.apiFetch(`/api/me/list-visibility/${list}`, {
+        method: 'PUT',
+        body: { visibility },
+      }),
 
     /** The whole of Owned or the Wishlist as a CSV file. */
     exportList: (list: ListName) =>

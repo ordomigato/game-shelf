@@ -9,7 +9,8 @@ import {
 } from '../../shared/utils/bulk-add'
 import type { ListState } from '../../shared/utils/lists'
 import type { PlanLimits } from '../../shared/utils/plans'
-import { collectionItems, libraryItems } from '../db/schema'
+import { normalizeBarcode } from '../../shared/utils/barcode'
+import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
 import { ensureCatalogGames } from './catalog'
 import { assertOwnsCollections, lastPositions } from './collections'
 
@@ -20,6 +21,38 @@ function noRoomFor(where: keyof typeof BULK_NO_ROOM, fit: number): never {
     statusMessage: 'Plan limit reached',
     data: { key: BULK_NO_ROOM[where].key, params: { fit: Math.max(0, fit) } },
   })
+}
+
+/**
+ * The barcodes the user matched themselves, for games that end up in the
+ * library (added, or already there). Skipped and unknown games leave no
+ * trace, and a ScanDex match is never kept here. The platform is kept only
+ * if the catalog lists it for the game, as the add does. For a barcode named
+ * twice in a batch, the last pick wins.
+ */
+function ownPicks(
+  entries: BulkAddEntry[],
+  present: Set<number>,
+  catalog: Map<number, { platformIds: number[] }>,
+) {
+  const byCode = new Map<
+    string,
+    { code: string; igdbId: number; platformId: number | null }
+  >()
+  for (const entry of entries) {
+    if (!entry.own || !entry.barcode || !present.has(entry.igdbId)) continue
+    const code = normalizeBarcode(entry.barcode)
+    if (!code) continue
+    const known =
+      entry.platformId !== null &&
+      catalog.get(entry.igdbId)?.platformIds.includes(entry.platformId)
+    byCode.set(code, {
+      code,
+      igdbId: entry.igdbId,
+      platformId: known ? entry.platformId : null,
+    })
+  }
+  return [...byCode.values()]
 }
 
 /**
@@ -147,6 +180,22 @@ export async function bulkAdd(
             sql`, `,
           )})
         on conflict do nothing`),
+    )
+  }
+  const picks = ownPicks(input.entries, new Set(plan.present), catalog)
+  if (picks.length) {
+    statements.push(
+      db
+        .insert(userBarcodes)
+        .values(picks.map((pick) => ({ ownerId, ...pick })))
+        .onConflictDoUpdate({
+          target: [userBarcodes.ownerId, userBarcodes.code],
+          set: {
+            igdbId: sql`excluded.igdb_id`,
+            platformId: sql`excluded.platform_id`,
+            updatedAt: new Date(),
+          },
+        }),
     )
   }
   if (statements.length) {

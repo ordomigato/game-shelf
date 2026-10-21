@@ -1,4 +1,8 @@
-import type { BarcodeResult, BulkAddResult } from '#shared/types/barcode'
+import type {
+  BarcodeMatch,
+  BarcodeResult,
+  BulkAddResult,
+} from '#shared/types/barcode'
 import type { ListName } from '#shared/types/collection'
 import { MAX_SCAN_BATCH, normalizeBarcode } from '#shared/utils/barcode'
 import { SCAN_STORAGE_KEY as STORAGE_KEY } from '~/utils/scan-storage'
@@ -7,6 +11,7 @@ import {
   defaultTicked,
   entriesToAdd,
   parseStoredRows,
+  pickGame,
   type ScanRow,
 } from '~/utils/scan-rows'
 
@@ -168,6 +173,7 @@ export function useBarcodeScanner() {
               match,
               ticked: defaultTicked(match, list.value),
               problem: undefined,
+              own: result.own === true,
             }
           : { status: 'none', ticked: false },
       )
@@ -215,6 +221,19 @@ export function useBarcodeScanner() {
     void lookup(code)
   }
 
+  /**
+   * Sets a row to a game the user chose with Find it or Change. Returns the
+   * code of the row that already held the same game when the two merged
+   * (this row is then gone), else null.
+   */
+  function pick(code: string, match: BarcodeMatch): string | null {
+    const result = pickGame(rows.value, code, match, list.value)
+    rows.value = result.rows
+    save()
+    if (result.merged) highlight(result.merged)
+    return result.merged
+  }
+
   function remove(code: string) {
     rows.value = rows.value.filter((row) => row.code !== code)
     save()
@@ -243,7 +262,9 @@ export function useBarcodeScanner() {
 
   /**
    * Adds the ticked games in one request, empties the list and refreshes
-   * what shows the user's games. Throws the server's refusal (the plan's
+   * what shows the user's games. Games the user matched themselves are sent
+   * with their barcode so the server can remember them for this user only.
+   * Throws the server's refusal (the plan's
    * limits, say) and keeps the list.
    */
   async function addTicked(): Promise<BulkAddResult> {
@@ -283,6 +304,7 @@ export function useBarcodeScanner() {
     start,
     scan,
     retry,
+    pick,
     remove,
     setTicked,
     setList,

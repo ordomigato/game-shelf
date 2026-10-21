@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BulkAddResult } from '#shared/types/barcode'
+import type { BarcodeMatch, BulkAddResult } from '#shared/types/barcode'
 import type { ListName } from '#shared/types/collection'
 import { MAX_SCAN_BATCH } from '#shared/utils/barcode'
 import { canTick, rowHold, type ScanRow } from '~/utils/scan-rows'
@@ -29,6 +29,18 @@ const typed = ref('')
 const typedProblem = ref<'invalid' | 'full' | null>(null)
 const adding = ref(false)
 const confirmingClose = ref(false)
+// The barcode whose game is being chosen. While set, the search step
+// replaces the scanner's list inside the same dialog.
+const finding = ref<string | null>(null)
+const findingRow = computed(() =>
+  finding.value ? rows.value.find((r) => r.code === finding.value) : undefined,
+)
+
+function onPick(match: BarcodeMatch) {
+  if (!finding.value) return
+  if (scanner.pick(finding.value, match)) toast.info(t('scan.sameGame'))
+  finding.value = null
+}
 
 const listName = computed(() => t(`shelf.${list.value}`))
 
@@ -47,6 +59,10 @@ function onCameraScan(value: string, format: string) {
 
 function onOpenChange(next: boolean) {
   if (next) return
+  if (finding.value) {
+    finding.value = null
+    return
+  }
   if (rows.value.length) confirmingClose.value = true
   else open.value = false
 }
@@ -75,6 +91,7 @@ function chooseList(value: unknown) {
 
 watch(open, (isOpen) => {
   if (isOpen) {
+    finding.value = null
     cameraProblem.value = null
     typedProblem.value = null
   }
@@ -147,213 +164,267 @@ async function add() {
       @open-auto-focus="focusField"
     >
       <DialogHeader>
-        <DialogTitle>{{ $t('scan.title') }}</DialogTitle>
-        <DialogDescription>{{ $t('scan.description') }}</DialogDescription>
+        <DialogTitle>{{
+          finding ? $t('scan.findTitle') : $t('scan.title')
+        }}</DialogTitle>
+        <DialogDescription>{{
+          finding ? $t('scan.findHint') : $t('scan.description')
+        }}</DialogDescription>
       </DialogHeader>
 
-      <BarcodeCamera
-        v-if="!cameraProblem"
-        :paused="confirmingClose"
-        @scan="onCameraScan"
-        @unavailable="cameraProblem = $event"
+      <BarcodeFindGame
+        v-if="finding"
+        :name="findingRow?.match?.name ?? null"
+        @pick="onPick"
+        @back="finding = null"
       />
-      <p
-        v-else
-        class="rounded-lg bg-muted p-3 text-sm text-muted-foreground"
-        data-testid="camera-problem"
-      >
-        {{
-          cameraProblem === 'denied'
-            ? $t('scan.cameraDenied')
-            : $t('scan.cameraNone')
-        }}
-      </p>
 
-      <form class="flex flex-col gap-1.5" @submit.prevent="submitTyped">
-        <Label for="scan-typed">{{ $t('scan.typeLabel') }}</Label>
-        <div class="flex gap-2">
-          <Input
-            id="scan-typed"
-            v-model="typed"
-            inputmode="numeric"
-            autocomplete="off"
-            :placeholder="$t('scan.typePlaceholder')"
-            :aria-invalid="typedProblem !== null"
-          />
-          <Button type="submit" variant="outline" :disabled="!typed.trim()">
-            {{ $t('scan.typeAdd') }}
-          </Button>
-        </div>
+      <div v-show="!finding" class="contents">
+        <BarcodeCamera
+          v-if="!cameraProblem"
+          :paused="confirmingClose || !!finding"
+          @scan="onCameraScan"
+          @unavailable="cameraProblem = $event"
+        />
         <p
-          v-if="typedProblem"
-          class="text-sm text-destructive"
-          role="alert"
-          data-testid="scan-problem"
+          v-else
+          class="rounded-lg bg-muted p-3 text-sm text-muted-foreground"
+          data-testid="camera-problem"
         >
           {{
-            typedProblem === 'invalid'
-              ? $t('scan.notABarcode')
-              : $t('scan.listFull', { max: MAX_SCAN_BATCH })
+            cameraProblem === 'denied'
+              ? $t('scan.cameraDenied')
+              : $t('scan.cameraNone')
           }}
         </p>
-      </form>
 
-      <p
-        v-if="isFull && typedProblem !== 'full'"
-        class="text-sm text-muted-foreground"
-        data-testid="scan-full"
-      >
-        {{ $t('scan.listFull', { max: MAX_SCAN_BATCH }) }}
-      </p>
-
-      <ul
-        v-if="rows.length"
-        class="-mx-2 flex min-h-24 flex-1 flex-col gap-1 overflow-y-auto px-2"
-        :aria-label="$t('scan.listTitle')"
-      >
-        <li
-          v-for="row in rows"
-          :key="row.code"
-          :data-code="row.code"
-          data-testid="scan-row"
-          class="flex items-center gap-3 rounded-lg border p-2 transition-colors"
-          :class="{ 'bg-accent': highlighted === row.code }"
-        >
-          <Checkbox
-            v-if="row.status === 'match'"
-            :model-value="row.ticked && canTick(row, list)"
-            :disabled="!canTick(row, list)"
-            :aria-label="$t('scan.tick', { name: row.match?.name ?? '' })"
-            @update:model-value="scanner.setTicked(row.code, $event === true)"
-          />
-          <span v-else class="size-4 shrink-0" aria-hidden="true" />
-
-          <template v-if="row.status === 'match' && row.match">
-            <GameCover
-              :name="row.match.name"
-              :cover-id="row.match.coverId"
-              size="thumb"
-              class="w-10 shrink-0"
+        <form class="flex flex-col gap-1.5" @submit.prevent="submitTyped">
+          <Label for="scan-typed">{{ $t('scan.typeLabel') }}</Label>
+          <div class="flex gap-2">
+            <Input
+              id="scan-typed"
+              v-model="typed"
+              inputmode="numeric"
+              autocomplete="off"
+              :placeholder="$t('scan.typePlaceholder')"
+              :aria-invalid="typedProblem !== null"
             />
-            <div class="min-w-0 flex-1">
-              <p class="truncate font-medium">{{ row.match.name }}</p>
-              <p class="truncate text-xs text-muted-foreground">
-                {{
-                  [row.match.platform?.name, year(row)]
-                    .filter(Boolean)
-                    .join(' · ')
-                }}
-              </p>
-              <p
-                v-if="hold(row) !== 'ready'"
-                class="text-xs font-medium text-muted-foreground"
-              >
-                {{
-                  hold(row) === 'ownedHere'
-                    ? $t('scan.alreadyOwned')
-                    : $t('scan.alreadyWishlisted')
-                }}
-              </p>
-            </div>
-          </template>
-          <p
-            v-else-if="row.status === 'loading'"
-            class="min-w-0 flex-1 truncate text-sm text-muted-foreground"
-          >
-            {{ $t('scan.lookingUp', { code: row.code }) }}
-          </p>
-          <p
-            v-else-if="row.status === 'none'"
-            class="min-w-0 flex-1 truncate text-sm"
-          >
-            {{ $t('scan.noMatch', { code: row.code }) }}
-          </p>
-          <div v-else class="min-w-0 flex-1 text-sm">
-            <p>
-              {{
-                row.problem === 'limit'
-                  ? $t('scan.dailyLimit')
-                  : $t('scan.failed')
-              }}
-            </p>
-            <Button
-              v-if="row.problem !== 'limit'"
-              type="button"
-              variant="link"
-              size="sm"
-              class="h-auto p-0"
-              @click="scanner.retry(row.code)"
-            >
-              {{ $t('scan.retry') }}
+            <Button type="submit" variant="outline" :disabled="!typed.trim()">
+              {{ $t('scan.typeAdd') }}
             </Button>
           </div>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            :aria-label="
-              row.match
-                ? $t('scan.remove', { name: row.match.name })
-                : $t('scan.removeCode', { code: row.code })
-            "
-            @click="scanner.remove(row.code)"
-          >
-            <Trash2 />
-          </Button>
-        </li>
-      </ul>
-      <p v-else class="text-sm text-muted-foreground">
-        {{ $t('scan.empty') }}
-      </p>
-
-      <DialogFooter class="flex-col gap-3 sm:flex-col sm:items-stretch">
-        <div class="flex flex-wrap items-center gap-3">
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            :model-value="list"
-            :aria-label="$t('scan.listChoice')"
-            @update:model-value="chooseList"
-          >
-            <ToggleGroupItem value="owned">{{
-              $t('shelf.owned')
-            }}</ToggleGroupItem>
-            <ToggleGroupItem value="wishlist">{{
-              $t('shelf.wishlist')
-            }}</ToggleGroupItem>
-          </ToggleGroup>
-          <div v-if="collection" class="flex items-center gap-2">
-            <Checkbox id="scan-collection" v-model="intoCollection" />
-            <Label for="scan-collection">{{
-              $t('scan.toCollection', { collection: collection.title })
-            }}</Label>
-          </div>
-        </div>
-        <div class="flex items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            :disabled="!rows.length || adding"
-            @click="scanner.clear()"
-          >
-            {{ $t('scan.clear') }}
-          </Button>
-          <Button
-            type="button"
-            :disabled="!toAdd.length || adding"
-            data-testid="scan-add"
-            @click="add"
+          <p
+            v-if="typedProblem"
+            class="text-sm text-destructive"
+            role="alert"
+            data-testid="scan-problem"
           >
             {{
-              adding
-                ? $t('scan.adding')
-                : $t('scan.add', { count: toAdd.length, list: listName })
+              typedProblem === 'invalid'
+                ? $t('scan.notABarcode')
+                : $t('scan.listFull', { max: MAX_SCAN_BATCH })
             }}
-          </Button>
-        </div>
-      </DialogFooter>
+          </p>
+        </form>
+
+        <p
+          v-if="isFull && typedProblem !== 'full'"
+          class="text-sm text-muted-foreground"
+          data-testid="scan-full"
+        >
+          {{ $t('scan.listFull', { max: MAX_SCAN_BATCH }) }}
+        </p>
+
+        <ul
+          v-if="rows.length"
+          class="-mx-2 flex min-h-24 flex-1 flex-col gap-1 overflow-y-auto px-2"
+          :aria-label="$t('scan.listTitle')"
+        >
+          <li
+            v-for="row in rows"
+            :key="row.code"
+            :data-code="row.code"
+            data-testid="scan-row"
+            class="flex items-center gap-3 rounded-lg border p-2 transition-colors"
+            :class="{ 'bg-accent': highlighted === row.code }"
+          >
+            <Checkbox
+              v-if="row.status === 'match'"
+              :model-value="row.ticked && canTick(row, list)"
+              :disabled="!canTick(row, list)"
+              :aria-label="$t('scan.tick', { name: row.match?.name ?? '' })"
+              @update:model-value="scanner.setTicked(row.code, $event === true)"
+            />
+            <span v-else class="size-4 shrink-0" aria-hidden="true" />
+
+            <template v-if="row.status === 'match' && row.match">
+              <GameCover
+                :name="row.match.name"
+                :cover-id="row.match.coverId"
+                size="thumb"
+                class="w-10 shrink-0"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-medium">{{ row.match.name }}</p>
+                <p class="truncate text-xs text-muted-foreground">
+                  {{
+                    [row.match.platform?.name, year(row)]
+                      .filter(Boolean)
+                      .join(' · ')
+                  }}
+                </p>
+                <p
+                  v-if="hold(row) !== 'ready'"
+                  class="text-xs font-medium text-muted-foreground"
+                >
+                  {{
+                    hold(row) === 'ownedHere'
+                      ? $t('scan.alreadyOwned')
+                      : $t('scan.alreadyWishlisted')
+                  }}
+                </p>
+                <p v-if="row.own" class="text-xs text-muted-foreground">
+                  {{ $t('scan.yourMatch') }}
+                </p>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  class="h-auto p-0 text-xs"
+                  :aria-label="$t('scan.changeFor', { name: row.match.name })"
+                  @click="finding = row.code"
+                >
+                  {{ $t('scan.change') }}
+                </Button>
+              </div>
+            </template>
+            <p
+              v-else-if="row.status === 'loading'"
+              class="min-w-0 flex-1 truncate text-sm text-muted-foreground"
+            >
+              {{ $t('scan.lookingUp', { code: row.code }) }}
+            </p>
+            <div
+              v-else-if="row.status === 'none'"
+              class="min-w-0 flex-1 text-sm"
+            >
+              <p class="truncate">
+                {{ $t('scan.noMatch', { code: row.code }) }}
+              </p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                class="h-auto p-0"
+                :aria-label="$t('scan.findFor', { code: row.code })"
+                @click="finding = row.code"
+              >
+                {{ $t('scan.findIt') }}
+              </Button>
+            </div>
+            <div v-else class="min-w-0 flex-1 text-sm">
+              <p>
+                {{
+                  row.problem === 'limit'
+                    ? $t('scan.dailyLimit')
+                    : $t('scan.failed')
+                }}
+              </p>
+              <Button
+                v-if="row.problem !== 'limit'"
+                type="button"
+                variant="link"
+                size="sm"
+                class="h-auto p-0"
+                @click="scanner.retry(row.code)"
+              >
+                {{ $t('scan.retry') }}
+              </Button>
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              :aria-label="
+                row.match
+                  ? $t('scan.remove', { name: row.match.name })
+                  : $t('scan.removeCode', { code: row.code })
+              "
+              @click="scanner.remove(row.code)"
+            >
+              <Trash2 />
+            </Button>
+          </li>
+        </ul>
+        <p v-else class="text-sm text-muted-foreground">
+          {{ $t('scan.empty') }}
+        </p>
+        <i18n-t
+          scope="global"
+          keypath="scan.credit"
+          tag="p"
+          class="text-xs text-muted-foreground"
+        >
+          <template #scandex>
+            <a
+              href="https://scandex.gamery.app"
+              class="underline underline-offset-4 hover:text-foreground"
+              target="_blank"
+              rel="noopener"
+              >ScanDex</a
+            >
+          </template>
+        </i18n-t>
+
+        <DialogFooter class="flex-col gap-3 sm:flex-col sm:items-stretch">
+          <div class="flex flex-wrap items-center gap-3">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              :model-value="list"
+              :aria-label="$t('scan.listChoice')"
+              @update:model-value="chooseList"
+            >
+              <ToggleGroupItem value="owned">{{
+                $t('shelf.owned')
+              }}</ToggleGroupItem>
+              <ToggleGroupItem value="wishlist">{{
+                $t('shelf.wishlist')
+              }}</ToggleGroupItem>
+            </ToggleGroup>
+            <div v-if="collection" class="flex items-center gap-2">
+              <Checkbox id="scan-collection" v-model="intoCollection" />
+              <Label for="scan-collection">{{
+                $t('scan.toCollection', { collection: collection.title })
+              }}</Label>
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              :disabled="!rows.length || adding"
+              @click="scanner.clear()"
+            >
+              {{ $t('scan.clear') }}
+            </Button>
+            <Button
+              type="button"
+              :disabled="!toAdd.length || adding"
+              data-testid="scan-add"
+              @click="add"
+            >
+              {{
+                adding
+                  ? $t('scan.adding')
+                  : $t('scan.add', { count: toAdd.length, list: listName })
+              }}
+            </Button>
+          </div>
+        </DialogFooter>
+      </div>
     </DialogContent>
   </Dialog>
 

@@ -176,6 +176,13 @@
       "when": 1792615626860,
       "tag": "0024_barcode_lookups",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792620488206,
+      "tag": "0025_user_barcodes",
+      "breakpoints": true
     }
   ]
 }

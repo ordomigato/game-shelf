@@ -11,6 +11,8 @@ const bodySchema = z.object({
       z.object({
         igdbId: z.number().int().positive(),
         platformId: z.number().int().positive().nullable().default(null),
+        barcode: z.string().max(20).optional(),
+        own: z.boolean().optional(),
       }),
     )
     .min(1)

@@ -15,12 +15,18 @@ export interface BarcodeMatch {
 /** The answer to a barcode lookup. `match` is null when no game has it. */
 export interface BarcodeResult {
   match: BarcodeMatch | null
+  /** True when the user matched this barcode themselves, which beats ScanDex. */
+  own?: boolean
 }
 
 /** One game to add in bulk. */
 export interface BulkAddEntry {
   igdbId: number
   platformId: number | null
+  /** With `own`, the barcode the user matched to this game themselves. */
+  barcode?: string
+  /** The user picked this game for `barcode` (Find it or Change). */
+  own?: boolean
 }
 
 /** Why a game in a bulk add was left alone. */

@@ -5,8 +5,11 @@ vi.mock('./scandex', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./scandex')>()),
   askScanDex,
 }))
-vi.mock('./catalog', () => ({ ensureCatalogGames: vi.fn() }))
-vi.mock('./collections', () => ({ platformNames: vi.fn() }))
+const ensureCatalogGames = vi.fn()
+vi.mock('./catalog', () => ({ ensureCatalogGames }))
+vi.mock('./collections', () => ({
+  platformNames: async () => new Map<number, string>(),
+}))
 
 // Nitro auto-imports these in the server.
 vi.stubGlobal(
@@ -18,10 +21,21 @@ vi.stubGlobal(
 const DAY = 24 * 60 * 60 * 1000
 let failSave = false
 let cached: Record<string, unknown> | undefined
+// Rows of user_barcodes, as the table holds them.
+let ownRows: Record<string, unknown>[] = []
 const saved: Record<string, unknown>[] = []
 vi.stubGlobal('useDb', () => ({
   select: () => ({
-    from: () => ({ where: async () => (cached ? [cached] : []) }),
+    from: (table: unknown) => ({
+      where: async (condition: unknown) =>
+        table === userBarcodes
+          ? ownRows.filter((row) => matches(condition, row))
+          : table === barcodeLookups
+            ? cached
+              ? [cached]
+              : []
+            : [],
+    }),
   }),
   insert: () => ({
     values: (values: Record<string, unknown>) => ({
@@ -33,7 +47,27 @@ vi.stubGlobal('useDb', () => ({
   }),
 }))
 
-const { lookupBarcode } = await import('./barcodes')
+// Reads the owner and code a `findOwnPick` query was scoped to.
+function matches(condition: unknown, row: Record<string, unknown>): boolean {
+  const values: unknown[] = []
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') return
+    const chunk = node as { queryChunks?: unknown[]; value?: unknown }
+    if (chunk.queryChunks) chunk.queryChunks.forEach(walk)
+    else if (
+      'encoder' in chunk &&
+      'value' in chunk &&
+      typeof chunk.value === 'string'
+    )
+      values.push(chunk.value)
+  }
+  walk(condition)
+  return values.includes(row.ownerId) && values.includes(row.code)
+}
+
+const { userBarcodes, barcodeLookups } = await import('../db/schema')
+const { lookupBarcode, findOwnPick, resolveBarcode } =
+  await import('./barcodes')
 const { ScanDexError } = await import('./scandex')
 
 const match = {
@@ -45,8 +79,18 @@ const match = {
 
 beforeEach(() => {
   cached = undefined
+  ownRows = []
   saved.length = 0
   askScanDex.mockReset()
+  ensureCatalogGames.mockReset()
+  ensureCatalogGames.mockImplementation(async (ids: number[]) =>
+    ids.map((igdbId) => ({
+      igdbId,
+      name: `Game ${igdbId}`,
+      coverId: null,
+      releaseDate: null,
+    })),
+  )
 })
 
 describe('lookupBarcode', () => {
@@ -141,5 +185,92 @@ describe('lookupBarcode', () => {
     }
     askScanDex.mockRejectedValue(new ScanDexError('down'))
     expect(await lookupBarcode('0045496590048')).toEqual(match)
+  })
+})
+
+describe('findOwnPick', () => {
+  const pick = {
+    ownerId: 'user-a',
+    code: '0045496590048',
+    igdbId: 7,
+    platformId: 130,
+  }
+
+  it('gives the user their own pick, without asking ScanDex', async () => {
+    ownRows = [pick]
+    expect(await findOwnPick('user-a', '0045496590048')).toEqual({
+      kind: 'match',
+      igdbId: 7,
+      platformId: 130,
+      platformName: null,
+    })
+    expect(askScanDex).not.toHaveBeenCalled()
+  })
+
+  it('never gives one user another user’s pick', async () => {
+    ownRows = [pick]
+    expect(await findOwnPick('user-b', '0045496590048')).toBeNull()
+  })
+
+  it('has nothing for a barcode the user never matched', async () => {
+    ownRows = [pick]
+    expect(await findOwnPick('user-a', '0045496590055')).toBeNull()
+  })
+})
+
+describe('resolveBarcode', () => {
+  const barcode = { code: '0045496590048', scanned: '0045496590048' }
+  const cap = vi.fn(async () => {})
+  beforeEach(() => cap.mockClear())
+
+  it('prefers the user’s own pick to the shared cache and ScanDex', async () => {
+    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+    cached = { igdbId: 26758, fetchedAt: new Date() }
+    const result = await resolveBarcode('user-a', barcode, cap)
+    expect(result.own).toBe(true)
+    expect(result.match?.igdbId).toBe(7)
+    expect(askScanDex).not.toHaveBeenCalled()
+    expect(cap).not.toHaveBeenCalled()
+  })
+
+  it('overrides a ScanDex match for that user only', async () => {
+    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+    cached = { igdbId: 26758, fetchedAt: new Date() }
+    const other = await resolveBarcode('user-b', barcode, cap)
+    expect(other.own).toBeUndefined()
+    expect(other.match?.igdbId).toBe(26758)
+  })
+
+  it('uses the shared cache when the user has no pick', async () => {
+    cached = { igdbId: 26758, fetchedAt: new Date() }
+    const result = await resolveBarcode('user-a', barcode, cap)
+    expect(result.match?.igdbId).toBe(26758)
+    expect(askScanDex).not.toHaveBeenCalled()
+  })
+
+  it('asks ScanDex last, through the cap', async () => {
+    askScanDex.mockResolvedValue(match)
+    const result = await resolveBarcode('user-a', barcode, cap)
+    expect(result.match?.igdbId).toBe(26758)
+    expect(cap).toHaveBeenCalledOnce()
+    expect(askScanDex).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to ScanDex when IGDB no longer knows the picked game', async () => {
+    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+    ensureCatalogGames.mockImplementation(async (ids: number[]) =>
+      ids
+        .filter((id) => id !== 7)
+        .map((igdbId) => ({
+          igdbId,
+          name: 'G',
+          coverId: null,
+          releaseDate: null,
+        })),
+    )
+    askScanDex.mockResolvedValue(match)
+    const result = await resolveBarcode('user-a', barcode, cap)
+    expect(result.own).toBeUndefined()
+    expect(result.match?.igdbId).toBe(26758)
   })
 })

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { limitsFor } from '../../shared/utils/plans'
-import { collectionItems, libraryItems } from '../db/schema'
+import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
 
 const ensureCatalogGames = vi.fn()
 const assertOwnsCollections = vi.fn()
@@ -36,9 +36,9 @@ vi.stubGlobal('useDb', () => ({
       },
     }),
   }),
-  insert: () => ({
+  insert: (table: unknown) => ({
     values: (values: unknown) => ({
-      onConflictDoUpdate: () => ({ kind: 'upsert', values }),
+      onConflictDoUpdate: () => ({ kind: 'upsert', table, values }),
     }),
   }),
   execute: () => ({ kind: 'collection insert' }),
@@ -205,5 +205,106 @@ describe('bulkAdd', () => {
     })
     expect(result.added).toBe(1)
     expect(result.skipped).toEqual([{ igdbId: 2, reason: 'notFound' }])
+  })
+
+  describe('barcodes the user matched themselves', () => {
+    const picks = () =>
+      (
+        batches[0] as { table: unknown; values: Record<string, unknown>[] }[]
+      ).find((statement) => statement.table === userBarcodes)
+
+    it('are saved in the same batch as the add, for that user', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: '0045496590048',
+            own: true,
+          },
+          { igdbId: 2, platformId: SWITCH },
+        ],
+      })
+      expect(batches).toHaveLength(1)
+      expect(picks()?.values).toEqual([
+        {
+          ownerId: 'u1',
+          code: '0045496590048',
+          igdbId: 1,
+          platformId: SWITCH,
+        },
+      ])
+    })
+
+    it('never keep a plain ScanDex match, even with its barcode sent', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: '0045496590048' }],
+      })
+      expect(picks()).toBeUndefined()
+    })
+
+    it('are not saved for a game IGDB does not know, or a bad barcode', async () => {
+      ensureCatalogGames.mockImplementation(async (ids: number[]) =>
+        ids.filter((id) => id !== 9).map(game),
+      )
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          { igdbId: 9, platformId: null, barcode: '0045496590048', own: true },
+          { igdbId: 1, platformId: null, barcode: '123', own: true },
+          { igdbId: 2, platformId: null },
+        ],
+      })
+      expect(picks()).toBeUndefined()
+    })
+
+    it('are saved for a game already in the library, and drop an unlisted platform', async () => {
+      fake.existing = [
+        {
+          id: 'i1',
+          igdbId: 1,
+          owned: true,
+          wishlisted: false,
+          ownedOn: [SWITCH],
+          wantedOn: [],
+        },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: '0045496590048',
+            own: true,
+          },
+          { igdbId: 2, platformId: 999, barcode: '0045496590055', own: true },
+        ],
+      })
+      expect(picks()?.values).toEqual([
+        { ownerId: 'u1', code: '0045496590048', igdbId: 1, platformId: SWITCH },
+        { ownerId: 'u1', code: '0045496590055', igdbId: 2, platformId: null },
+      ])
+    })
+
+    it('are not saved when the add is refused', async () => {
+      fake.libraryCount = free.games
+      await expect(
+        bulkAdd('u1', free, {
+          list: 'owned',
+          entries: [
+            {
+              igdbId: 1,
+              platformId: SWITCH,
+              barcode: '0045496590048',
+              own: true,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ statusCode: 403 })
+      expect(batches).toEqual([])
+    })
   })
 })

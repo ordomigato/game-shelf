@@ -34,15 +34,10 @@ export default defineEventHandler(async (event): Promise<BarcodeResult> => {
     paramsSchema.parse,
   )
   const user = await findOrCreateUser(sub)
-  const answer = await lookupBarcode(
-    parsed.code,
-    () =>
-      rateLimit(event, `barcode:${user.id}`, {
-        limit: DAILY_LOOKUPS,
-        windowSeconds: 24 * 60 * 60,
-      }),
-    parsed.scanned,
+  return resolveBarcode(user.id, parsed, () =>
+    rateLimit(event, `barcode:${user.id}`, {
+      limit: DAILY_LOOKUPS,
+      windowSeconds: 24 * 60 * 60,
+    }),
   )
-  if (answer.kind === 'none') return { match: null }
-  return { match: await describeMatch(user.id, answer) }
 })

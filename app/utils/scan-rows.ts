@@ -12,6 +12,8 @@ export interface ScanRow {
   problem?: 'limit' | 'failed'
   match?: BarcodeMatch
   ticked: boolean
+  /** The user matched this barcode themselves (Find it, Change, or an earlier pick). */
+  own?: boolean
 }
 
 /** Where a matched game stands on the chosen list, on the box's platform. */
@@ -45,20 +47,69 @@ export function defaultTicked(match: BarcodeMatch, list: ListName): boolean {
 
 /** The games the ticked rows add, each game and platform once. */
 export function entriesToAdd(rows: ScanRow[], list: ListName): BulkAddEntry[] {
-  const seen = new Set<string>()
+  const seen = new Map<string, BulkAddEntry>()
   const entries: BulkAddEntry[] = []
   for (const row of rows) {
     if (!row.ticked || !row.match || !canTick(row, list)) continue
-    const entry = {
+    const entry: BulkAddEntry = {
       igdbId: row.match.igdbId,
       platformId: row.match.platform?.id ?? null,
     }
+    // Only the user's own matches carry their barcode, so the server can
+    // remember them for this user. A ScanDex match never does.
+    if (row.own) {
+      entry.barcode = row.code
+      entry.own = true
+    }
     const key = `${entry.igdbId}:${entry.platformId ?? ''}`
-    if (seen.has(key)) continue
-    seen.add(key)
+    const first = seen.get(key)
+    if (first) {
+      // The same game twice adds once, and a barcode the user matched is
+      // still remembered.
+      if (entry.own && !first.own) Object.assign(first, entry)
+      continue
+    }
+    seen.set(key, entry)
     entries.push(entry)
   }
   return entries
+}
+
+/**
+ * Sets a row to a game the user chose. If another row already holds the same
+ * game and platform the two merge: this row goes and the other is named in
+ * `merged`.
+ */
+export function pickGame(
+  rows: ScanRow[],
+  code: string,
+  match: BarcodeMatch,
+  list: ListName,
+): { rows: ScanRow[]; merged: string | null } {
+  const platform = match.platform?.id ?? null
+  const twin = rows.find(
+    (row) =>
+      row.code !== code &&
+      row.match?.igdbId === match.igdbId &&
+      (row.match.platform?.id ?? null) === platform,
+  )
+  if (twin) {
+    return { rows: rows.filter((row) => row.code !== code), merged: twin.code }
+  }
+  return {
+    rows: rows.map((row) =>
+      row.code === code
+        ? {
+            code,
+            status: 'match',
+            match,
+            ticked: defaultTicked(match, list),
+            own: true,
+          }
+        : row,
+    ),
+    merged: null,
+  }
 }
 
 const isNumbers = (value: unknown): value is number[] =>
@@ -98,6 +149,7 @@ export function parseStoredRows(raw: unknown): ScanRow[] {
           status: 'match',
           match: row.match,
           ticked: row.ticked === true,
+          ...(row.own === true && { own: true }),
         },
       ]
     }

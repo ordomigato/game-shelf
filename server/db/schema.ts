@@ -309,3 +309,28 @@ export const barcodeLookups = pgTable(
     ),
   ],
 )
+
+/**
+ * A game a user matched to a barcode themselves (Find it or Change in the
+ * scanner), kept for that user only so scanning the box again is instant.
+ * It is never shared, never copied into `barcode_lookups` and never sent to
+ * ScanDex. A row is written only in the batch that adds the game, so the
+ * game is then in the user's library and the library's cap on games bounds
+ * how many a person can keep. Every query is scoped by `owner_id`. Keys are
+ * normalised like `barcode_lookups.code`.
+ */
+export const userBarcodes = pgTable(
+  'user_barcodes',
+  {
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    igdbId: integer('igdb_id').notNull(),
+    platformId: integer('platform_id'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.ownerId, table.code] })],
+)

@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "{page} · ThisPlayShelf"
+    "title": "{page} - ThisPlayShelf"
   },
   "header": {
     "signIn": "Sign in",
@@ -706,13 +706,35 @@
     "makePublicConfirm": "Make public and share"
   },
   "preview": {
-    "collectionTitle": "{collection} · {owner}'s collections",
+    "collectionTitle": "{collection} - {owner}'s collections",
     "text": "{text}",
     "gameCount": "An empty collection on ThisPlayShelf | 1 game on ThisPlayShelf | {count} games on ThisPlayShelf",
     "shelfTitle": "{owner}'s collections",
     "collectionCount": "No public collections on ThisPlayShelf yet | 1 public collection on ThisPlayShelf | {count} public collections on ThisPlayShelf",
-    "site": "Search games, track your collection and share your collections.",
+    "site": "Search games, track your collection and share your shelf.",
     "imageAlt": "The ThisPlayShelf logo, an S-shaped glass shelf, with the words “Your collection, on display.”"
+  },
+  "seo": {
+    "homeTitle": "ThisPlayShelf - Your game collection, on display",
+    "descriptions": {
+      "home": "Search games, track your collection and share your shelf.",
+      "explore": "Browse public game collections made by people on ThisPlayShelf, with the most recently updated ones first.",
+      "about": "ThisPlayShelf is a free, ad-free place to keep track of the games you collect and share your shelf. One developer makes it.",
+      "pricing": "ThisPlayShelf is free, and the free plan is meant to be enough for most collections. See what each plan includes.",
+      "privacy": "ThisPlayShelf keeps only what it needs to run your account, sells nothing, and lets you export or delete everything.",
+      "contact": "Found a bug, have an idea or want to say hi? Email the developer of ThisPlayShelf. Replies can take a few days."
+    },
+    "game": {
+      "year": "{name} ({year}).",
+      "noYear": "{name}.",
+      "yearGenres": "{name} ({year}): {genres}.",
+      "noYearGenres": "{name}: {genres}.",
+      "platforms": "Released on {platforms}.",
+      "platformsComing": "Coming to {platforms}.",
+      "platformsOn": "On {platforms}.",
+      "track": "Track it in your ThisPlayShelf collection.",
+      "more": "Search, track and share games."
+    }
   },
   "explore": {
     "title": "Explore",

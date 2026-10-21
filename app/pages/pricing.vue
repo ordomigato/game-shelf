@@ -9,9 +9,9 @@ import { PLAN_LIMITS, PRO_PRICE_PER_YEAR } from '#shared/utils/plans'
 const { t, locale } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('pricing.title') }) }))
 useSeoMeta({
-  description: () => t('pricing.intro'),
+  description: () => t('seo.descriptions.pricing'),
   ogTitle: () => t('app.title', { page: t('pricing.title') }),
-  ogDescription: () => t('pricing.intro'),
+  ogDescription: () => t('seo.descriptions.pricing'),
 })
 
 const { signedIn } = useViewer()

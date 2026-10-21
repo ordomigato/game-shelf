@@ -6,9 +6,9 @@ import { toast } from 'vue-sonner'
 const { t } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('contact.title') }) }))
 useSeoMeta({
-  description: () => t('contact.intro'),
+  description: () => t('seo.descriptions.contact'),
   ogTitle: () => t('app.title', { page: t('contact.title') }),
-  ogDescription: () => t('contact.intro'),
+  ogDescription: () => t('seo.descriptions.contact'),
 })
 
 const copied = ref(false)

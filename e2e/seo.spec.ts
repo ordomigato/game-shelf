@@ -6,7 +6,7 @@ test('pages tell search engines and link previews what the site is', async ({
 }) => {
   const html = await (await request.get('/')).text()
   expect(html).toContain(
-    '<meta name="description" content="Search games, track your collection and share your collections.">',
+    '<meta name="description" content="Search games, track your collection and share your shelf.">',
   )
   expect(html).toContain(`<link rel="canonical" href="${baseURL}/">`)
   expect(html).toContain(

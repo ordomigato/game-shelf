@@ -192,6 +192,7 @@ export function toGameSummary(game: IgdbGame): GameSummary {
 export interface IgdbGameDetails extends IgdbGame {
   summary?: string
   url?: string
+  release_dates?: { date?: number; date_format?: number }[]
   genres?: { name: string }[]
   involved_companies?: {
     company: { name: string }
@@ -209,7 +210,8 @@ export function buildGameQuery(id: number): string {
     'fields name, summary, url, first_release_date, cover.image_id,',
     'platforms.name, genres.name, screenshots.image_id,',
     'involved_companies.company.name, involved_companies.developer,',
-    'involved_companies.publisher;',
+    'involved_companies.publisher,',
+    'release_dates.date, release_dates.date_format;',
     `where id = ${id};`,
     'limit 1;',
   ].join(' ')
@@ -227,6 +229,7 @@ export function toGameDetails(game: IgdbGameDetails): GameDetails {
     releaseDate: game.first_release_date
       ? new Date(game.first_release_date * 1000).toISOString().slice(0, 10)
       : null,
+    releasePrecision: releasePrecisionOf(game),
     summary: game.summary?.trim() || null,
     platforms: [...new Set((game.platforms ?? []).map((p) => p.name))],
     genres: (game.genres ?? []).map((genre) => genre.name),

@@ -61,7 +61,7 @@ test('a search result opens the game page', async ({ page }) => {
   ).toHaveText(['Puzzle', 'Adventure'])
   await expect(page.getByText('Venture back to Hyrule.')).toBeVisible()
   await expect(page.getByRole('img', { name: /^Screenshot/ })).toHaveCount(2)
-  await expect(page).toHaveTitle(`${linkToThePast.name} · ThisPlayShelf`)
+  await expect(page).toHaveTitle(`${linkToThePast.name} - ThisPlayShelf`)
 })
 
 test('the game page says its data comes from IGDB', async ({ page }) => {

@@ -39,7 +39,7 @@ test('About introduces the developer and says it is free', async ({ page }) => {
       .getByRole('main')
       .getByRole('link', { name: 'support@thisplayshelf.com' }),
   ).toBeVisible()
-  await expect(page).toHaveTitle('About · ThisPlayShelf')
+  await expect(page).toHaveTitle('About - ThisPlayShelf')
 })
 
 test('Privacy explains what is stored and links to Settings', async ({

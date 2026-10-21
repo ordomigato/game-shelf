@@ -237,6 +237,18 @@ describe('toGameDetails', () => {
     ).toBe('1991-11-21')
   })
 
+  it('says how exact the release date is', () => {
+    expect(buildGameQuery(1)).toContain('release_dates.date_format')
+    expect(
+      toGameDetails({
+        id: 1,
+        name: 'x',
+        first_release_date: 1_293_840_000,
+        release_dates: [{ date: 1_293_840_000, date_format: 2 }],
+      }).releasePrecision,
+    ).toBe('year')
+  })
+
   it(`keeps at most ${MAX_SCREENSHOTS} screenshots`, () => {
     const screenshots = Array.from({ length: 7 }, (_, i) => ({
       image_id: `s${i}`,
@@ -252,6 +264,7 @@ describe('toGameDetails', () => {
       name: 'Bare',
       coverId: null,
       releaseDate: null,
+      releasePrecision: null,
       summary: null,
       platforms: [],
       genres: [],

@@ -12,6 +12,8 @@ export const REQUEST_LIMITS = {
   igdb: { perClient: 30, perInstance: 150 },
   /** The browser's performance beacon. Over the limit it is dropped. */
   vitals: { perClient: 30, perInstance: 300 },
+  /** The sitemap, rebuilt from the database whenever CloudFront misses. */
+  sitemap: { perClient: 10, perInstance: 60 },
   /** Pages and API routes anyone can read, like shared shelves and Explore. */
   public: { perClient: 120, perInstance: 1200 },
   /** Changes (POST, PUT, PATCH, DELETE) before sign-in is known. */
@@ -28,6 +30,7 @@ export const USER_WRITE_LIMIT = 60
 /** Build files and the site icon, which CloudFront serves without the Lambda. */
 const SKIPPED = /^\/(_nuxt|__nuxt|_ipx)(\/|$)|^\/favicon\.(ico|svg|png)$/
 const IGDB_ROUTES = /^\/api\/(games|library-items\/igdb|import\/match)(\/|$)/
+const SITEMAP_ROUTES = /^\/sitemaps?(\/|\.xml$|$)/
 const PUBLIC_ROUTES = /^\/(api\/)?(u|explore)(\/|$|\.)/
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const JWT_BEARER = /^Bearer [\w-]+\.[\w-]+\.[\w-]+$/i
@@ -68,6 +71,7 @@ export function limitGroupFor(
   if (SKIPPED.test(path)) return null
   if (path === '/api/vitals') return 'vitals'
   if (IGDB_ROUTES.test(path)) return 'igdb'
+  if (SITEMAP_ROUTES.test(path)) return 'sitemap'
   if (isWrite(method, path)) return hasToken ? 'other' : 'write'
   if (PUBLIC_ROUTES.test(path)) return 'public'
   return 'other'

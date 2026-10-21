@@ -123,6 +123,18 @@ GitHub's OIDC provider. The user created both by hand in the IAM console,
 outside `sst.config.ts`. The role only trusts jobs in this repo's GitHub
 `production` environment, which only `v*.*.*` tags can use.
 
+## Request limits and the viewer's IP
+
+App-level rate limits (`server/middleware/rate-limit.ts`, counted in each
+Lambda instance's memory, never Postgres) need the viewer's IP. The Lambda
+only sees CloudFront's address, so the `edge.viewerRequest.injection` in
+`sst.config.ts` copies `event.viewer.ip` into an `x-viewer-ip` request
+header, overwriting anything the browser sent. No origin request policy
+change is needed (SST's forwards all viewer headers except Host). The
+Lambda URL is public, so a direct call can forge the header. The
+per-instance ceilings in `server/utils/request-limits.ts` bound that. To
+turn the limits off, set `NUXT_RATE_LIMIT_ENABLED=false`.
+
 ## Domain
 
 Production answers on `thisplayshelf.com`. `www` is an alias on the same

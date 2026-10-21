@@ -381,7 +381,8 @@
     }
   },
   "common": {
-    "genericError": "Something went wrong. Try again."
+    "genericError": "Something went wrong. Try again.",
+    "rateLimited": "Too many requests. Wait a moment and try again."
   },
   "authErrors": {
     "UsernameExistsException": "An account with that email already exists. Try signing in.",

@@ -209,6 +209,15 @@ export default $config({
           NUXT_PUBLIC_SITE_URL: 'https://thisplayshelf.com',
         }),
       },
+      // CloudFront's address is all the Lambda sees as the caller, so the
+      // viewer's IP is copied into a header the server's request limits
+      // read (server/utils/request-limits.ts). Set here, it replaces any
+      // x-viewer-ip the browser sends.
+      edge: {
+        viewerRequest: {
+          injection: `event.request.headers["x-viewer-ip"] = { value: event.viewer.ip };`,
+        },
+      },
       server: {
         runtime: 'nodejs24.x',
         architecture: 'arm64',

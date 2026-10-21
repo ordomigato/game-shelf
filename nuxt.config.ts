@@ -72,6 +72,9 @@ export default defineNuxtConfig({
     '/u/**': { ssr: false },
   },
   runtimeConfig: {
+    // Per-client request limits (server/middleware/rate-limit.ts). The e2e
+    // server turns them off with NUXT_RATE_LIMIT_ENABLED=false.
+    rateLimitEnabled: true,
     public: {
       // The real domain, for canonical links and link previews. Set in
       // production with NUXT_PUBLIC_SITE_URL.

@@ -41,6 +41,11 @@ All lines go through `log()` in `server/utils/log.ts`.
   (`runtimeConfig.public.vitalsSampleRate`, 25% by default, set with
   `NUXT_PUBLIC_VITALS_SAMPLE_RATE`). To test, set localStorage
   `gameshelf:vitals` to `always`.
+- **`http.rate_limited`**, one per request the in-memory limiter refused
+  (`server/middleware/rate-limit.ts`): `group` only (`igdb`, `vitals`,
+  `public`, `write`, `other`, or `user-write`), never an IP or user id.
+  Watch it to see whether the limits fire: `filter event = "http.rate_limited"
+| stats count() by group`. Limits are in `server/utils/request-limits.ts`.
 - **Existing events:** `igdb.slow`, `igdb.rate_limited`, `twitch.*`,
   `server.error` (unexpected errors only), `preview.failed`.
 
@@ -52,8 +57,8 @@ All lines go through `log()` in `server/utils/log.ts`.
 - No user ids in request or vitals lines. They're for performance, not for
   following people.
 - `/api/vitals` takes no sign-in. Its body is capped (10 metrics, values up
-  to 120 s) so it can't be used to write arbitrary text into the logs. If it's
-  ever abused, rate-limit it at CloudFront rather than in the app.
+  to 120 s) so it can't be used to write arbitrary text into the logs. It is also
+  limited to 30 requests a minute per viewer, dropped silently with 204.
 
 ## Reading it
 

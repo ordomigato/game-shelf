@@ -159,21 +159,26 @@ export const maskDigits = (text: string) => text.replace(/\d/g, '#')
 export async function submitToScanDex(
   suggestion: ScanDexSuggestion,
 ): Promise<ScanDexSubmitResult> {
+  // ScanDex reads fields the way its lookup does, not from a JSON body (a
+  // JSON post answered "The parameter 'value' is required"). They go both in
+  // the address and as a form body. The barcode goes as text, keeping its
+  // leading zeros.
+  const fields = new URLSearchParams({
+    igdb_id: String(suggestion.igdbId),
+    platform_id: String(suggestion.platformId),
+    platform: suggestion.platform,
+    name: suggestion.name,
+    value: suggestion.code,
+  })
   try {
-    const response = await fetch(CREATE_URL, {
+    const response = await fetch(`${CREATE_URL}?${fields}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${Resource.ScanDexToken.value}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
       },
-      body: JSON.stringify({
-        igdb_id: suggestion.igdbId,
-        platform_id: suggestion.platformId,
-        platform: suggestion.platform,
-        name: suggestion.name,
-        value: Number(suggestion.code),
-      }),
+      body: fields,
       signal: AbortSignal.timeout(CREATE_TIMEOUT_MS),
     })
     if (response.status >= 200 && response.status <= 299) return { ok: true }

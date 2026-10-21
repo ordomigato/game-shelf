@@ -20,25 +20,31 @@ afterEach(() => {
 })
 
 describe('submitToScanDex', () => {
-  it('posts the five fields as JSON with the bearer token', async () => {
+  it('posts the five fields in the address and as a form, with the bearer token', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(null, { status: 201 }))
     vi.stubGlobal('fetch', fetchMock)
     expect(await submitToScanDex(suggestion)).toEqual({ ok: true })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('https://scandex.gamery.app/api/v2/create')
-    expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>).Authorization).toBe(
-      'Bearer secret',
-    )
-    expect(JSON.parse(init.body as string)).toEqual({
-      igdb_id: 26758,
-      platform_id: 130,
+    const fields = {
+      igdb_id: '26758',
+      platform_id: '130',
       platform: 'Nintendo Switch',
       name: 'Super Mario Odyssey',
-      value: 45496590048,
-    })
+      value: suggestion.code,
+    }
+    const sent = new URL(url)
+    expect(sent.origin + sent.pathname).toBe(
+      'https://scandex.gamery.app/api/v2/create',
+    )
+    expect(Object.fromEntries(sent.searchParams)).toEqual(fields)
+    expect(init.method).toBe('POST')
+    const headers = init.headers as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer secret')
+    expect(headers['Content-Type']).toBe('application/x-www-form-urlencoded')
+    expect(Object.fromEntries(init.body as URLSearchParams)).toEqual(fields)
+    expect(suggestion.code.startsWith('0')).toBe(true)
   })
 
   it('returns the status and ScanDex’s message for a non-2xx, and logs the message with every digit masked', async () => {

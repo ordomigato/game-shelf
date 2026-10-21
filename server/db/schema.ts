@@ -66,6 +66,12 @@ export const users = pgTable(
       .$type<Partial<Record<'owned' | 'wishlist', string[]>>>()
       .notNull()
       .default({}),
+    /**
+     * Whether anyone with the link can open Owned, or the Wishlist. Both
+     * start private, like a new collection.
+     */
+    ownedPublic: boolean('owned_public').notNull().default(false),
+    wishlistPublic: boolean('wishlist_public').notNull().default(false),
     ...timestamps,
   },
   (table) => [

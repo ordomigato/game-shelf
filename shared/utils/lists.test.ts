@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyListAction,
+  importedListState,
   listStateValid,
   newListState,
   type ListAction,
@@ -41,6 +42,81 @@ describe('newListState', () => {
 
   it('starts a wanted game wishlisted only', () => {
     expect(newListState('wishlist', [])).toEqual(wantedOnly)
+  })
+})
+
+describe('importedListState', () => {
+  it('follows the platforms when the file names no list', () => {
+    expect(importedListState(undefined, [], [])).toMatchObject({
+      owned: true,
+      wishlisted: false,
+    })
+    expect(importedListState(undefined, [], [PS4])).toMatchObject({
+      owned: false,
+      wishlisted: true,
+    })
+    expect(importedListState(undefined, [XBOX_360], [PS4])).toMatchObject({
+      owned: true,
+      wishlisted: true,
+    })
+  })
+
+  it('puts a game on the list the file names', () => {
+    expect(importedListState('wishlist', [], [])).toEqual({
+      owned: false,
+      wishlisted: true,
+      conflict: false,
+    })
+    expect(importedListState('owned', [], [])).toEqual({
+      owned: true,
+      wishlisted: false,
+      conflict: false,
+    })
+  })
+
+  it('keeps both lists only when a wishlist platform is named', () => {
+    expect(importedListState('both', [XBOX_360], [PS4])).toEqual({
+      owned: true,
+      wishlisted: true,
+      conflict: false,
+    })
+    // Without one the game is owned only, and the file's request is reported.
+    expect(importedListState('both', [XBOX_360], [])).toEqual({
+      owned: true,
+      wishlisted: false,
+      conflict: true,
+    })
+    expect(importedListState('wishlist', [XBOX_360], [])).toMatchObject({
+      owned: true,
+      wishlisted: false,
+      conflict: true,
+    })
+  })
+
+  it('lets a wishlist platform put an owned game on the Wishlist too', () => {
+    expect(importedListState('owned', [], [PS4])).toMatchObject({
+      owned: true,
+      wishlisted: true,
+      conflict: false,
+    })
+  })
+
+  it('always gives a state the database accepts', () => {
+    const lists = [undefined, 'owned', 'wishlist', 'both'] as const
+    for (const list of lists) {
+      for (const ownedOn of [[], [XBOX_360]]) {
+        for (const wantedOn of [[], [PS4]]) {
+          const { owned, wishlisted } = importedListState(
+            list,
+            ownedOn,
+            wantedOn,
+          )
+          expect(listStateValid({ owned, wishlisted, ownedOn, wantedOn })).toBe(
+            true,
+          )
+        }
+      }
+    }
   })
 })
 

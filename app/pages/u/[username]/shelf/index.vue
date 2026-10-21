@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { CollectionSummary } from '#shared/types/collection'
+import type { CollectionSummary, ListSummary } from '#shared/types/collection'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -14,6 +14,26 @@ const { data, status, error, refresh } = useAsyncData(
   () => `shelf-${username.value}`,
   () => collections.list(username.value),
   { watch: [username] },
+)
+
+// Owned and the Wishlist: both for the owner, the public ones for visitors.
+const { data: lists } = useAsyncData(
+  () => `shelf-lists-${username.value}`,
+  () => collections.lists(username.value),
+  { watch: [username] },
+)
+/** A list shown like a collection, with its page's address as its slug. */
+const listCards = computed<CollectionSummary[]>(() =>
+  (lists.value ?? []).map((summary: ListSummary) => ({
+    id: summary.list,
+    title: summary.list === 'owned' ? t('shelf.owned') : t('shelf.wishlist'),
+    slug: summary.list,
+    description: null,
+    color: null,
+    visibility: summary.visibility,
+    itemCount: summary.itemCount,
+    updatedAt: '',
+  })),
 )
 
 const { data: profile } = useAsyncData(
@@ -141,7 +161,7 @@ async function onCreated(collection: CollectionSummary) {
       </div>
 
       <p
-        v-else-if="data && !data.length"
+        v-else-if="data && !data.length && !listCards.length"
         class="py-12 text-center text-muted-foreground"
       >
         {{
@@ -152,6 +172,13 @@ async function onCreated(collection: CollectionSummary) {
       </p>
 
       <ul v-else-if="data" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <li v-for="card in listCards" :key="card.id">
+          <CollectionCard
+            :collection="card"
+            :username="username"
+            :show-visibility="isMine"
+          />
+        </li>
         <li v-for="collection in data" :key="collection.id">
           <CollectionCard
             :collection="collection"

@@ -17,7 +17,9 @@ import type {
  * game's platforms, "Owned on" and "Wishlisted on" let the user say which
  * version they have or want. The collections come from the sidebar's list
  * and the game's state is remembered, so opening the menu again doesn't
- * ask the server again.
+ * ask the server again. A game the library doesn't have yet needs room in
+ * it, so when the library is full every tick is disabled and says Full
+ * until the game is there.
  */
 const props = withDefaults(
   defineProps<{
@@ -37,6 +39,7 @@ const { limits } = usePlan()
 const collections = useCollections()
 const myCollections = useMyCollections()
 const leaving = useUnownConfirm()
+const { full: libraryFull } = useLibraryRoom()
 
 const open = ref(false)
 const loading = ref(false)
@@ -52,6 +55,9 @@ const creating = ref(false)
 const collectionsBusy = computed(() =>
   customCollections.value.some((collection) => saving.value.has(collection.id)),
 )
+
+// Adding a new game, to any list or collection, takes room in the library.
+const noRoom = computed(() => libraryFull.value && item.value === null)
 
 const label = computed(() =>
   tracked.value
@@ -77,8 +83,9 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [, membership] = await Promise.all([
+    const [, , membership] = await Promise.all([
       myCollections.load(),
+      myCollections.loadCounts(),
       collections.membership(props.game.igdbId),
     ])
     platforms.value = membership.platforms ?? []
@@ -179,6 +186,7 @@ function toggleCollection(collection: CollectionSummary, checked: boolean) {
 
 /** A full collection can't take this game, though it can keep it. */
 const isFull = (collection: CollectionSummary) =>
+  noRoom.value ||
   collectionFullFor(
     collection,
     limits.value.gamesPerCollection,
@@ -191,7 +199,8 @@ function startCreating() {
 }
 
 async function onCreated(collection: CollectionSummary) {
-  await toggleCollection(collection, true)
+  // A new collection is made either way, but a game with no room stays out.
+  if (!noRoom.value) await toggleCollection(collection, true)
 }
 </script>
 
@@ -217,31 +226,44 @@ async function onCreated(collection: CollectionSummary) {
       <template v-else>
         <DropdownMenuCheckboxItem
           :model-value="item?.owned === true"
-          :disabled="saving.has('owned')"
+          :disabled="saving.has('owned') || noRoom"
           @update:model-value="toggleList('owned', $event === true)"
           @select.prevent
         >
           {{ $t('shelf.owned') }}
+          <span
+            v-if="noRoom"
+            class="ml-auto pl-2 text-xs text-muted-foreground"
+            >{{ $t('addToCollection.full') }}</span
+          >
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           :model-value="item?.wishlisted === true"
-          :disabled="saving.has('wishlist')"
+          :disabled="saving.has('wishlist') || noRoom"
           @update:model-value="toggleList('wishlist', $event === true)"
           @select.prevent
         >
           {{ $t('shelf.wishlist') }}
+          <span
+            v-if="noRoom"
+            class="ml-auto pl-2 text-xs text-muted-foreground"
+            >{{ $t('addToCollection.full') }}</span
+          >
         </DropdownMenuCheckboxItem>
         <template v-if="platforms.length">
           <DropdownMenuSub
             v-for="list in ['owned', 'wishlist'] as const"
             :key="list"
           >
-            <DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger :disabled="noRoom">
               {{
                 list === 'owned'
                   ? $t('addToCollection.ownedOn')
                   : $t('addToCollection.wantedOn')
               }}
+              <span v-if="noRoom" class="text-xs text-muted-foreground">{{
+                $t('addToCollection.full')
+              }}</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent class="max-h-72 w-56 overflow-y-auto">
               <DropdownMenuCheckboxItem

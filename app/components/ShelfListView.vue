@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Download,
   Ellipsis,
-  Lock,
   Pencil,
   PenLine,
   Plus,
@@ -21,17 +20,18 @@ import {
 import type {
   CollectionEntry,
   CollectionLink,
+  CollectionVisibility,
   FieldValue,
   ListDetail,
-  OwnerEntry,
   LibraryItem,
   ListName,
 } from '#shared/types/collection'
 
 /**
  * Owned or the Wishlist at `/u/<username>/shelf/<list>`: the owner's games
- * on that list, as a table with the shared columns only. Only the owner can
- * open it. Everyone else gets the not found page.
+ * on that list, as a table. The owner always sees it, with everything they
+ * can change. Anyone else sees it read-only when the owner made it public,
+ * and gets the not found page when they didn't.
  */
 const props = defineProps<{ list: ListName }>()
 
@@ -88,6 +88,7 @@ const { data, status, error, refresh } = useAsyncData(
   { server: false, watch: [username, () => props.list, viewKey] },
 )
 const notFound = computed(() => error.value?.statusCode === 404)
+const isOwner = computed(() => data.value?.isOwner === true)
 
 async function fetchPage(signal: AbortSignal): Promise<ListDetail> {
   const requested = view.value
@@ -193,12 +194,16 @@ const usageKey = {
 }
 const total = computed(() => data.value?.libraryCount ?? 0)
 const overLimit = computed(() => total.value > limits.value.games)
+// A full library can't take new games, so adding is switched off.
+const libraryFull = computed(
+  () => isOwner.value && total.value >= limits.value.games,
+)
 
 useHead(() => ({ title: t('app.title', { page: title.value }) }))
 
 // The loaded page is held shallowly, so changes replace it rather than
 // editing it in place.
-function setItems(items: OwnerEntry[]) {
+function setItems(items: CollectionEntry[]) {
   if (!data.value) return
   data.value = { ...data.value, items }
 }
@@ -231,7 +236,15 @@ const moves = useListMoves(shelfPath)
 const sidebar = useMyCollections()
 const mine = computed(() => sidebar.list.value ?? [])
 onMounted(() => {
-  onNuxtReady(() => void sidebar.load().catch(() => {}))
+  onNuxtReady(() => {
+    watch(
+      isOwner,
+      (owner) => {
+        if (owner) void sidebar.load().catch(() => {})
+      },
+      { immediate: true },
+    )
+  })
 })
 const gotItItem = ref<CollectionEntry | null>(null)
 const offeringCollections = ref(false)
@@ -350,6 +363,29 @@ async function saveValue(
   void refetchQuietly()
 }
 
+const changingVisibility = ref(false)
+
+/** Makes the list private or public. Resolves whether it worked. */
+async function setVisibility(visibility: CollectionVisibility) {
+  if (!data.value) return false
+  changingVisibility.value = true
+  try {
+    await collections.setListVisibility(props.list, visibility)
+    data.value = { ...data.value, visibility }
+    toast.success(
+      visibility === 'public'
+        ? t('lists.nowPublic', { list: title.value })
+        : t('lists.nowPrivate', { list: title.value }),
+    )
+    return true
+  } catch {
+    toast.error(t('visibility.failed'))
+    return false
+  } finally {
+    changingVisibility.value = false
+  }
+}
+
 const exporting = ref(false)
 
 /** Downloads the whole list as CSV, whatever the search and filters. */
@@ -374,9 +410,18 @@ async function exportCsv() {
  */
 async function removeItem(itemId: string) {
   const item = data.value?.items.find((entry) => entry.id === itemId)
-  if (!item) return
+  // Only the owner's rows carry the flags, and only the owner removes.
+  if (!item || item.owned === undefined || item.wishlisted === undefined) return
   try {
-    const saved = await leaving.leave(item, props.list)
+    const saved = await leaving.leave(
+      {
+        id: item.id,
+        name: item.name,
+        owned: item.owned,
+        wishlisted: item.wishlisted,
+      },
+      props.list,
+    )
     if (!saved) return
     if (!saved.item || !onList(saved.item)) leaveView(itemId)
   } catch {
@@ -442,7 +487,11 @@ function onRenamed(saved: LibraryItem) {
           <div
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
           >
+            <span v-if="!data.isOwner" data-testid="list-usage">{{
+              $t('shelf.gameCount', data.itemCount)
+            }}</span>
             <i18n-t
+              v-else
               scope="global"
               :keypath="usageKey[list].key"
               tag="span"
@@ -463,7 +512,17 @@ function onRenamed(saved: LibraryItem) {
               <template #count>{{ n(data.itemCount) }}</template>
             </i18n-t>
           </div>
-          <p class="max-w-prose text-sm text-muted-foreground">
+          <p
+            v-if="libraryFull"
+            class="text-sm font-medium text-destructive"
+            data-testid="library-full"
+          >
+            {{ $t('limits.libraryFull') }}
+          </p>
+          <p
+            v-if="data.isOwner"
+            class="max-w-prose text-sm text-muted-foreground"
+          >
             {{
               list === 'owned'
                 ? $t('lists.ownedHint')
@@ -472,19 +531,33 @@ function onRenamed(saved: LibraryItem) {
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <Badge variant="outline" class="gap-1 text-muted-foreground">
-            <Lock class="size-3" aria-hidden="true" />
-            {{ $t('lists.onlyYou') }}
-          </Badge>
-          <Button as-child>
+          <VisibilityMenu
+            v-if="data.isOwner"
+            :visibility="data.visibility"
+            :disabled="changingVisibility"
+            @change="setVisibility"
+          />
+          <ShareButton
+            v-if="data.isOwner || data.visibility === 'public'"
+            :path="`${shelfPath}/${list}`"
+            :title="title"
+            :is-public="data.visibility === 'public'"
+            :make-public="() => setVisibility('public')"
+          />
+          <Button v-if="data.isOwner && !libraryFull" as-child>
             <NuxtLink :to="{ path: '/', query: { to: list } }">
               <Plus />
               {{ $t('collection.addGames') }}
             </NuxtLink>
           </Button>
+          <Button v-else-if="data.isOwner" disabled>
+            <Plus />
+            {{ $t('collection.addGames') }}
+          </Button>
           <Button
-            v-if="ADD_BY_HAND"
+            v-if="data.isOwner && ADD_BY_HAND"
             variant="outline"
+            :disabled="libraryFull"
             @click="addingByHand = true"
           >
             <PenLine />
@@ -495,7 +568,7 @@ function onRenamed(saved: LibraryItem) {
               $t('collection.addByHand')
             }}</span>
           </Button>
-          <DropdownMenu>
+          <DropdownMenu v-if="data.isOwner">
             <DropdownMenuTrigger as-child>
               <Button
                 variant="outline"
@@ -522,20 +595,25 @@ function onRenamed(saved: LibraryItem) {
         class="rounded-lg border border-dashed py-12 text-center"
       >
         <p class="font-medium">{{ $t('collection.empty') }}</p>
-        <p class="mt-1 text-sm text-muted-foreground">
-          {{
-            list === 'owned'
-              ? $t('lists.ownedEmptyHint')
-              : $t('lists.wishlistEmptyHint')
-          }}
-        </p>
-        <div class="mt-4 flex flex-wrap justify-center gap-2">
-          <Button as-child>
-            <NuxtLink :to="{ path: '/', query: { to: list } }">{{
-              $t('collection.searchGames')
-            }}</NuxtLink>
-          </Button>
-        </div>
+        <template v-if="data.isOwner">
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{
+              list === 'owned'
+                ? $t('lists.ownedEmptyHint')
+                : $t('lists.wishlistEmptyHint')
+            }}
+          </p>
+          <div
+            v-if="!libraryFull"
+            class="mt-4 flex flex-wrap justify-center gap-2"
+          >
+            <Button as-child>
+              <NuxtLink :to="{ path: '/', query: { to: list } }">{{
+                $t('collection.searchGames')
+              }}</NuxtLink>
+            </Button>
+          </div>
+        </template>
       </div>
 
       <CollectionTable
@@ -543,9 +621,9 @@ function onRenamed(saved: LibraryItem) {
         :fields="data.fields"
         :items="data.items"
         :mode="list"
-        :add-targets="mine"
+        :add-targets="data.isOwner ? mine : undefined"
         :server="tableServer"
-        editable
+        :editable="data.isOwner"
         :hidden-columns="data.hiddenColumns"
         :shelf-path="shelfPath"
         @view="onView"
@@ -561,18 +639,20 @@ function onRenamed(saved: LibraryItem) {
       />
 
       <FieldsEditorDialog
+        v-if="data.isOwner"
         v-model:open="editingFields"
         :fields="data.fields"
         @saved="refresh()"
       />
       <AddByHandDialog
-        v-if="ADD_BY_HAND"
+        v-if="ADD_BY_HAND && data.isOwner"
         v-model:open="addingByHand"
         :title="title"
         :target="{ list }"
         @added="refresh()"
       />
       <GotItDialog
+        v-if="data.isOwner"
         v-model:open="offeringCollections"
         :item-id="gotItItem?.id ?? null"
         :item-name="gotItItem?.name ?? ''"
@@ -581,6 +661,7 @@ function onRenamed(saved: LibraryItem) {
         @missing="refresh()"
       />
       <RenameItemDialog
+        v-if="data.isOwner"
         v-model:open="renaming"
         :item="renamingItem"
         @saved="onRenamed"

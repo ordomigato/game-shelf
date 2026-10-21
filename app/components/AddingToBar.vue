@@ -12,6 +12,8 @@ const props = defineProps<{
   username: string
   /** How many more games it can take, or null when unlimited or unknown. */
   room?: number | null
+  /** Whether the library has no room for a game it doesn't have yet. */
+  libraryFull?: boolean
 }>()
 const emit = defineEmits<{ change: [slug: string] }>()
 
@@ -45,6 +47,9 @@ function choose(slug: unknown) {
           ? $t('addToCollection.collectionFull')
           : $t('addToCollection.roomLeft', { count: room }, room)
       }}
+    </p>
+    <p v-if="libraryFull" class="w-full text-sm font-medium text-destructive">
+      {{ $t('addToCollection.libraryFull') }}
     </p>
     <div class="flex items-center gap-2">
       <DropdownMenu v-if="targets.length > 1">

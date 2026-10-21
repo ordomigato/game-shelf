@@ -64,8 +64,13 @@ values are matched by id.
   Wishlist, tick, untick, set the platforms), which
   `changeItemLists` in `server/utils/lists.ts` applies. A game left on
   neither list is deleted with its values and collection links.
-  `getList` reads a list (owner only, 404 for anyone else) with the custom
-  collections each game is in. A new game is owned unless it's added to
+  `getListPage` reads a page of a list. The owner always can, with the
+  custom collections each game is in. Anyone else can only when the owner
+  made it public (`users.owned_public`, `wishlist_public`, both private by
+  default), and gets a 404 otherwise, like a private collection. A visitor
+  gets the same rules as a public collection: no hidden fields, only
+  fields some game on the list has a value for, and only that list's own
+  platforms, never the owner's collections. A new game is owned unless it's added to
   the Wishlist, and adding a game to a custom collection never touches its
   flags. Custom collections hold owned and Wishlist games alike.
 - `collection_items`: the junction table (composite primary key), with

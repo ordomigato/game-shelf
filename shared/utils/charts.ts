@@ -10,8 +10,8 @@ import { platformsOf } from './platforms'
 
 /**
  * A game as charts see it: its values, and when it joined the collection.
- * The rest is the catalog's facts and the owner's platforms, which a game
- * added by hand doesn't have (and a visitor doesn't get, for the platforms).
+ * The rest is the catalog's facts and the platforms, which a game added by
+ * hand doesn't have.
  */
 export interface ChartItem
   extends

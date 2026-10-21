@@ -140,6 +140,7 @@
     "gamesMeter": "Games: {total} of {limit} ({owned} owned, {wishlisted} wishlisted)",
     "overGamesHelp": "You can keep and remove games, but you can't add more until it's down to {limit}.",
     "overLibraryHelp": "You can keep and remove games, but you can't add more until you're down to {limit}.",
+    "libraryFull": "Your library is full. Remove a game to add another.",
     "collections": "Collections",
     "games": "Games",
     "fields": "Extra fields per game",
@@ -500,7 +501,8 @@
     "wantedOn": "Wishlisted on",
     "full": "Full",
     "roomLeft": "Room for {count} more game | Room for {count} more games",
-    "collectionFull": "This one is full. Remove a game to add another."
+    "collectionFull": "This one is full. Remove a game to add another.",
+    "libraryFull": "Your library is full. Only games you already have can be added."
   },
   "itemCollections": {
     "title": "Collections for {name}",
@@ -682,7 +684,7 @@
   "visibility": {
     "label": "Who can see this: {current}",
     "privateHint": "Only you can see it.",
-    "publicHint": "Anyone with the link can see it, and it's listed on your collections page.",
+    "publicHint": "Anyone with the link can see it, and it's listed on your collections page. Visitors see which platforms you own or want each game on.",
     "nowPublic": "Collection is now public",
     "nowPrivate": "Collection is now private",
     "failed": "Couldn't change who can see it. Try again."
@@ -692,7 +694,7 @@
     "copied": "Link copied",
     "copyFailed": "Couldn't copy the link. Here it is: {url}",
     "makePublicTitle": "Make it public to share?",
-    "makePublicBody": "Anyone with the link will be able to see this collection, and it will be listed on your collections page. You can make it private again at any time.",
+    "makePublicBody": "Anyone with the link will be able to see this, and it will be listed on your collections page. Visitors see which platforms you own or want each game on. You can make it private again at any time.",
     "makePublicConfirm": "Make public and share"
   },
   "preview": {
@@ -814,7 +816,8 @@
       "released": "Released",
       "genre": "Genre",
       "platforms": "Platforms",
-      "wishlistPlatforms": "Wishlist platforms"
+      "wishlistPlatforms": "Wishlist platforms",
+      "list": "List"
     }
   },
   "import": {
@@ -826,6 +829,7 @@
     "empty": "That file has no rows to import. The first row should name the columns.",
     "unreadable": "Couldn't read that file. Make sure it's a CSV.",
     "mapHint": "{file}: {count} rows. Choose where each column goes.",
+    "listNote": "Games already in your library keep their lists (Owned or Wishlist). The List column only applies to new games.",
     "accountFields": "New fields are added to your account, so every game and collection gets them. You can have up to {limit} fields.",
     "room": "Room for {count} more game in this collection. | Room for {count} more games in this collection.",
     "noRoom": "This import adds {count} new game. This collection has room for {room}. | This import adds {count} new games. This collection has room for {room}.",
@@ -844,6 +848,7 @@
       "new": "New field",
       "platforms": "Owned platforms",
       "wishlistPlatforms": "Wishlist platforms",
+      "list": "List (Owned or Wishlist)",
       "skip": "Don't import"
     },
     "needsName": "Choose which column holds the game's name.",
@@ -864,6 +869,7 @@
       "doesNotFit": "Doesn't fit the field"
     },
     "platformProblemsTitle": "{count} platform wasn't added | {count} platforms weren't added",
+    "listConflicts": "{count} game was added as Owned only. The file put it on both lists without a Wishlist platform. Row: {rows}. | {count} games were added as Owned only. The file put them on both lists without a Wishlist platform. Rows: {rows}.",
     "moreProblems": "and {count} more | and {count} more",
     "platformProblems": {
       "unknownPlatform": "IGDB doesn't list this game on that platform",
@@ -908,7 +914,8 @@
     "exportFailed": "Couldn't prepare your download. Try again.",
     "actions": "List actions",
     "exportAll": "Export {count} game | Export all {count} games",
-    "onlyYou": "Private",
+    "nowPublic": "{list} is now public",
+    "nowPrivate": "{list} is now private",
     "ownedHint": "Every game you own. Collections can hold games you only want too.",
     "wishlistHint": "Games you want. They can also be in your collections, so you can see what's missing.",
     "ownedEmptyHint": "Search for a game and add it to Owned.",

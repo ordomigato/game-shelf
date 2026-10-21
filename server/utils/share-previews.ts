@@ -1,5 +1,6 @@
-import { and, asc, count, eq, isNotNull } from 'drizzle-orm'
+import { and, asc, count, desc, eq, isNotNull } from 'drizzle-orm'
 import en from '../../i18n/locales/en.json'
+import type { ListName } from '../../shared/types/collection'
 import type { Message } from '../../shared/types/message'
 import { igdbImageUrl } from '../../shared/utils/igdb-images'
 import {
@@ -9,6 +10,7 @@ import {
   type SharePreview,
 } from '../../shared/utils/share-preview'
 import { collectionItems, collections, games, libraryItems } from '../db/schema'
+import type { users } from '../db/schema'
 import { catalogJoin, itemCoverId } from './collections'
 
 /**
@@ -76,6 +78,42 @@ export function previewTags(
 }
 
 /**
+ * The preview for a public Owned or Wishlist page, built like a
+ * collection's. A private list falls back to the generic page.
+ */
+async function listPreview(
+  owner: typeof users.$inferSelect,
+  list: ListName,
+  ownerName: string,
+): Promise<SharePreview | null> {
+  if (listVisibility(owner, list) !== 'public') return null
+  const db = useDb()
+  const flag = list === 'owned' ? libraryItems.owned : libraryItems.wishlisted
+  const onList = and(eq(libraryItems.ownerId, owner.id), eq(flag, true))
+  const [[{ value: itemCount } = { value: 0 }], [cover]] = await Promise.all([
+    db.select({ value: count() }).from(libraryItems).where(onList),
+    db
+      .select({ coverId: itemCoverId })
+      .from(libraryItems)
+      .leftJoin(games, catalogJoin)
+      .where(and(onList, isNotNull(itemCoverId)))
+      .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
+      .limit(1),
+  ])
+  return collectionPreview({
+    collection: translate({
+      key: list === 'owned' ? 'shelf.owned' : 'shelf.wishlist',
+    }),
+    owner: ownerName,
+    description: null,
+    itemCount,
+    image: cover?.coverId
+      ? igdbImageUrl(cover.coverId, 'cover_big')
+      : undefined,
+  })
+}
+
+/**
  * The preview for a shared shelf or collection page, or null when the path
  * isn't one, or names something missing or private. Private things fall
  * back to the generic page, so a preview never reveals them.
@@ -101,6 +139,10 @@ export async function findSharePreview(
         ),
       )
     return shelfPreview({ owner: ownerName, collectionCount: value })
+  }
+
+  if (target.slug === 'owned' || target.slug === 'wishlist') {
+    return listPreview(owner, target.slug, ownerName)
   }
 
   const [collection] = await db

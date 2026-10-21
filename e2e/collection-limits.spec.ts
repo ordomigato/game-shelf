@@ -277,6 +277,7 @@ test('a refusal partway says how many rows were already imported', async ({
           linked: 0,
           handAdded: 250,
           platformProblems: [],
+          listConflicts: [],
         },
       })
     }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldDefinition, FieldType } from '../types/collection'
-import { autoMap, guessType, parseCell, planImport } from './csv-import'
+import {
+  autoMap,
+  guessType,
+  parseCell,
+  parseListCell,
+  planImport,
+} from './csv-import'
 
 const field = (type: FieldType, extra: Partial<FieldDefinition> = {}) =>
   ({ id: 'f', name: 'Field', type, ...extra }) as FieldDefinition
@@ -138,6 +144,25 @@ describe('autoMap', () => {
     ])
   })
 
+  it('reads the List column, unless the user has a field of that name', () => {
+    const rows = [['Zelda', 'Wishlist']]
+    expect(autoMap(['Name', 'List'], rows, [])).toEqual([
+      { kind: 'name' },
+      { kind: 'list' },
+    ])
+    const own: FieldDefinition = { id: 'l', name: 'List', type: 'text' }
+    expect(autoMap(['Name', 'List'], rows, [own])).toEqual([
+      { kind: 'name' },
+      { kind: 'field', fieldId: 'l' },
+    ])
+    // Our exports repeat the header when a field has the same name.
+    expect(autoMap(['Name', 'List', 'List'], rows, [own])).toEqual([
+      { kind: 'name' },
+      { kind: 'list' },
+      { kind: 'field', fieldId: 'l' },
+    ])
+  })
+
   it('lets a later column of the same name be a field, as in our exports', () => {
     const genre: FieldDefinition = { id: 'g', name: 'Genre', type: 'text' }
     const headers = ['Name', 'Genre', 'Platforms', 'Genre', 'Platforms']
@@ -177,6 +202,42 @@ describe('planImport platforms', () => {
         row: 2,
       },
       { name: 'Homebrew', igdbId: null, values: {} },
+    ])
+    expect(plan.problems).toEqual([])
+  })
+})
+
+describe('parseListCell', () => {
+  it('reads what our exports write, in any case', () => {
+    expect(parseListCell('Owned')).toBe('owned')
+    expect(parseListCell('wishlist')).toBe('wishlist')
+    expect(parseListCell('Owned; Wishlist')).toBe('both')
+    expect(parseListCell(' OWNED , wish list ')).toBe('both')
+    expect(parseListCell('Both')).toBe('both')
+  })
+
+  it('leaves words it does not know alone', () => {
+    expect(parseListCell('')).toBeUndefined()
+    expect(parseListCell('Backlog')).toBeUndefined()
+  })
+})
+
+describe('planImport list', () => {
+  it('sends the list of each row, with its row in the file', () => {
+    const plan = planImport(
+      ['Name', 'List'],
+      [
+        ['Zelda', 'Wishlist'],
+        ['Homebrew', ''],
+        ['Metroid', 'Backlog'],
+      ],
+      [{ kind: 'name' }, { kind: 'list' }],
+      [],
+    )
+    expect(plan.rows).toEqual([
+      { name: 'Zelda', igdbId: null, values: {}, list: 'wishlist', row: 2 },
+      { name: 'Homebrew', igdbId: null, values: {} },
+      { name: 'Metroid', igdbId: null, values: {} },
     ])
     expect(plan.problems).toEqual([])
   })

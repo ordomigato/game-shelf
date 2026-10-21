@@ -55,6 +55,8 @@ const importError = ref('')
 const result = ref({ added: 0, updated: 0, linked: 0, handAdded: 0 })
 /** Platform cells the server couldn't use, found while importing. */
 const platformProblems = ref<PlatformProblem[]>([])
+/** Rows of new games the file put on both lists with no Wishlist platform. */
+const listConflicts = ref<number[]>([])
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
@@ -112,6 +114,7 @@ function setTarget(index: number, value: unknown) {
     value === 'igdbId' ||
     value === 'platforms' ||
     value === 'wishlistPlatforms' ||
+    value === 'list' ||
     value === 'skip'
       ? { kind: value }
       : value.startsWith('field:')
@@ -121,14 +124,16 @@ function setTarget(index: number, value: unknown) {
             name: header.slice(0, 60) || t('import.newField'),
             type: 'text',
           }
-  // One column holds the name, one the IGDB id, and one each the platforms.
+  // One column holds the name, one the IGDB id, and one each the platforms
+  // and the list.
   targets.value = targets.value.map((target, i) =>
     i === index
       ? next
       : (next.kind === 'name' ||
             next.kind === 'igdbId' ||
             next.kind === 'platforms' ||
-            next.kind === 'wishlistPlatforms') &&
+            next.kind === 'wishlistPlatforms' ||
+            next.kind === 'list') &&
           target.kind === next.kind
         ? { kind: 'skip' }
         : target,
@@ -378,12 +383,16 @@ async function runImport() {
   importError.value = ''
   const totals = { added: 0, updated: 0, linked: 0, handAdded: 0 }
   platformProblems.value = []
+  listConflicts.value = []
   const fieldsChanged =
     current.newFields.length > 0 || Object.keys(current.addedOptions).length > 0
   try {
     for (let start = 0; start < rows.length; start += IMPORT_CHUNK_SIZE) {
       const chunk = await auth.apiFetch<
-        typeof totals & { platformProblems: PlatformProblem[] }
+        typeof totals & {
+          platformProblems: PlatformProblem[]
+          listConflicts: number[]
+        }
       >(`/api/collections/${props.collectionId}/import`, {
         method: 'POST',
         body: {
@@ -396,6 +405,7 @@ async function runImport() {
       totals.linked += chunk.linked
       totals.handAdded += chunk.handAdded
       platformProblems.value.push(...chunk.platformProblems)
+      listConflicts.value.push(...chunk.listConflicts)
       progress.value = Math.min(start + IMPORT_CHUNK_SIZE, rows.length)
     }
     result.value = totals
@@ -458,6 +468,9 @@ async function runImport() {
         <p class="text-sm text-muted-foreground">
           {{ $t('import.mapHint', { file: fileName, count: rows.length }) }}
         </p>
+        <p class="text-sm text-muted-foreground">
+          {{ $t('import.listNote') }}
+        </p>
         <p
           class="rounded-md border border-primary/40 bg-accent px-3 py-2 text-sm"
         >
@@ -502,6 +515,9 @@ async function runImport() {
                 }}</SelectItem>
                 <SelectItem value="wishlistPlatforms">{{
                   $t('import.targets.wishlistPlatforms')
+                }}</SelectItem>
+                <SelectItem value="list">{{
+                  $t('import.targets.list')
                 }}</SelectItem>
                 <SelectItem
                   v-for="field in fields"
@@ -786,6 +802,22 @@ async function runImport() {
             }}
           </li>
         </ul>
+        <p
+          v-if="listConflicts.length"
+          class="text-sm text-muted-foreground"
+          data-testid="list-conflicts"
+        >
+          {{
+            $t(
+              'import.listConflicts',
+              {
+                count: listConflicts.length,
+                rows: listConflicts.slice(0, SHOWN_PROBLEMS).join(', '),
+              },
+              listConflicts.length,
+            )
+          }}
+        </p>
         <div v-if="platformProblems.length" class="flex flex-col gap-2">
           <p class="text-sm font-medium">
             {{

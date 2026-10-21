@@ -10,6 +10,7 @@ import {
   OPTION_MAX_LENGTH,
 } from './field-changes'
 import { normalizeFieldValue } from './field-values'
+import type { ImportList } from './lists'
 
 /** The most rows one import takes. */
 export const MAX_IMPORT_ROWS = 5000
@@ -27,6 +28,8 @@ export type ColumnTarget =
   | { kind: 'platforms' }
   /** The platforms the game is wanted on, matched on the server. */
   | { kind: 'wishlistPlatforms' }
+  /** Which list a new game goes on: Owned, Wishlist or both. */
+  | { kind: 'list' }
   | { kind: 'skip' }
   | { kind: 'field'; fieldId: string }
   | { kind: 'new'; name: string; type: FieldType }
@@ -40,6 +43,11 @@ export interface ImportRow {
   platforms?: string[]
   /** Platform names from the file, to tick as wanted on the Wishlist. */
   wishlistPlatforms?: string[]
+  /**
+   * The list a new game goes on. A game already in the library keeps its
+   * lists.
+   */
+  list?: ImportList
   /** The row in the file (see `ImportProblem.row`), for platform problems. */
   row?: number
 }
@@ -95,13 +103,14 @@ const SKIPPED_HEADERS = ['added', 'date added', 'added at']
 /**
  * The core columns of our exports, by the headers that name them. Released
  * and Genre come from IGDB, so a file's values are never used. The platform
- * columns are read.
+ * and List columns are read.
  */
 const CORE_HEADERS: Record<string, string[]> = {
   released: ['released', 'release date'],
   genre: ['genre', 'genres'],
   platforms: ['platforms', 'platform'],
   wishlistPlatforms: ['wishlist platforms', 'wishlist platform'],
+  list: ['list'],
 }
 const coreOf = (key: string) =>
   Object.keys(CORE_HEADERS).find((core) => CORE_HEADERS[core]!.includes(key))
@@ -245,6 +254,17 @@ export function guessType(values: string[]): {
   return { type: 'text' }
 }
 
+/** The list a List cell names: Owned, Wishlist or both, else undefined. */
+export function parseListCell(raw: string): ImportList | undefined {
+  const words = splitChoices(unguard(raw.trim())).map(normalize)
+  const owned = words.includes('owned')
+  const wishlist = words.some((word) =>
+    ['wishlist', 'wishlisted', 'wish list', 'wanted'].includes(word),
+  )
+  if ((owned && wishlist) || words.includes('both')) return 'both'
+  return owned ? 'owned' : wishlist ? 'wishlist' : undefined
+}
+
 /**
  * Where each column goes, guessed from its header: the game's name, its
  * IGDB id, the platforms it's owned on, a field with the same name, or a
@@ -283,7 +303,9 @@ export function autoMap(
       )
       if (!ownField || keys.filter((other) => other === key).length > 1) {
         seenCore.add(core)
-        return core === 'platforms' || core === 'wishlistPlatforms'
+        return core === 'platforms' ||
+          core === 'wishlistPlatforms' ||
+          core === 'list'
           ? { kind: core }
           : { kind: 'skip' }
       }
@@ -373,6 +395,7 @@ export function planImport(
   const wishlistColumn = targets.findIndex(
     (target) => target.kind === 'wishlistPlatforms',
   )
+  const listColumn = targets.findIndex((target) => target.kind === 'list')
   const platformNames = (column: number, row: string[]) =>
     column >= 0
       ? splitChoices(unguard((row[column] ?? '').trim()))
@@ -425,13 +448,16 @@ export function planImport(
     }
     const platforms = platformNames(platformsColumn, row)
     const wishlistPlatforms = platformNames(wishlistColumn, row)
+    const list =
+      listColumn >= 0 ? parseListCell(row[listColumn] ?? '') : undefined
     planned.push({
       name,
       igdbId,
       values,
       ...(platforms.length && { platforms }),
       ...(wishlistPlatforms.length && { wishlistPlatforms }),
-      ...((platforms.length || wishlistPlatforms.length) && {
+      ...(list && { list }),
+      ...((platforms.length || wishlistPlatforms.length || list) && {
         row: spreadsheetRow,
       }),
     })

@@ -111,8 +111,7 @@ function widgetFieldIds(widget: ChartWidget): string[] {
 
 /**
  * The charts a visitor may see: the owner gets all of them, and a visitor
- * gets none that read a hidden field or the owner's platforms (which
- * visitors aren't sent, so the chart would be empty).
+ * gets none that read a hidden field.
  */
 export function chartsFor(
   viewerIsOwner: boolean,
@@ -122,9 +121,7 @@ export function chartsFor(
   if (viewerIsOwner) return dashboard
   const hidden = hiddenIds(fields)
   return dashboard.filter(
-    (widget) =>
-      widget.groupBy !== 'platforms' &&
-      !widgetFieldIds(widget).some((id) => hidden.has(id)),
+    (widget) => !widgetFieldIds(widget).some((id) => hidden.has(id)),
   )
 }
 
@@ -145,10 +142,21 @@ export function dataFor(
 }
 
 /**
+ * The fields a visitor may see, given the ids that have a value somewhere
+ * in what they're viewing: a field the owner keeps for other games isn't
+ * listed. Hidden fields are never listed.
+ */
+export function visitorFields(
+  fields: FieldDefinition[],
+  usedIds: ReadonlySet<string>,
+): FieldDefinition[] {
+  return fields.filter((field) => !field.hidden && usedIds.has(field.id))
+}
+
+/**
  * The fields to show someone viewing a collection. The owner sees all of
  * them. A visitor sees only the fields that some game in the collection has
- * a value for, or that one of its charts uses, so a field the owner keeps
- * for other games isn't listed. Hidden fields are never listed.
+ * a value for, or that one of its charts uses (see `visitorFields`).
  */
 export function fieldsFor(
   viewerIsOwner: boolean,
@@ -164,5 +172,5 @@ export function fieldsFor(
   for (const widget of dashboard) {
     for (const id of widgetFieldIds(widget)) used.add(id)
   }
-  return fields.filter((field) => !field.hidden && used.has(field.id))
+  return visitorFields(fields, used)
 }

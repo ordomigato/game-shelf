@@ -82,17 +82,19 @@ const homebrew = {
   catalogPlatforms: [],
 }
 
-/** What a visitor is sent: no lists, no platforms. */
+/**
+ * What a visitor is sent: the platforms a game is owned and wanted on, with
+ * their names, but not which lists it is on.
+ */
 const forVisitor = (item: typeof chrono) => {
-  const {
-    owned: _owned,
-    wishlisted: _wishlisted,
-    ownedOn: _ownedOn,
-    wantedOn: _wantedOn,
-    catalogPlatforms: _catalogPlatforms,
-    ...rest
-  } = item
-  return rest
+  const { owned: _owned, wishlisted: _wishlisted, ...rest } = item
+  const shown = [...item.ownedOn, ...item.wantedOn]
+  return {
+    ...rest,
+    catalogPlatforms: item.catalogPlatforms.filter(({ id }) =>
+      shown.includes(id),
+    ),
+  }
 }
 
 async function open(page: Page, owner: boolean) {
@@ -248,15 +250,23 @@ test.describe('a collection', () => {
     ).toHaveCount(0)
   })
 
-  test('shows a visitor the release date and genres but never platforms', async ({
+  test('shows a visitor the release date, genres and platforms, read-only', async ({
     page,
   }) => {
     await open(page, false)
     await expect(header(page, 'Released')).toBeVisible()
     await expect(header(page, 'Genre')).toBeVisible()
-    await expect(header(page, 'Platforms')).toHaveCount(0)
+    await expect(header(page, 'Platforms')).toBeVisible()
     await expect(rowOf(page, 'Zelda')).toContainText('Q4 1991')
-    await expect(page.getByText('SNES', { exact: true })).toHaveCount(0)
+    // Owned on SNES for Chrono Trigger, wanted on SNES for Zelda. The
+    // Switch, which neither is on a list for, is not named.
+    await expect(
+      rowOf(page, 'Chrono Trigger').getByText('SNES', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      rowOf(page, 'Zelda').getByTitle('SNES (Wishlist)'),
+    ).toBeVisible()
+    await expect(page.getByText('Switch', { exact: true })).toHaveCount(0)
     await expect(
       page.getByRole('button', { name: /Choose platforms/ }),
     ).toHaveCount(0)

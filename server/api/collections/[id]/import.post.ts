@@ -24,6 +24,7 @@ const bodySchema = z.object({
           .array(z.string().trim().min(1).max(PLATFORM_NAME_MAX))
           .max(MAX_ROW_PLATFORMS)
           .optional(),
+        list: z.enum(['owned', 'wishlist', 'both']).optional(),
         row: z.number().int().positive().optional(),
       }),
     )

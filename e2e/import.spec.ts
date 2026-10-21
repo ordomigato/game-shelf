@@ -25,6 +25,7 @@ async function openCollection(
   page: Page,
   matches: unknown[] = [],
   platformProblems: unknown[] = [],
+  listConflicts: number[] = [],
 ) {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/import/match', (route) => {
@@ -73,6 +74,7 @@ async function openCollection(
         handAdded: body.rows.length - 1,
         rejectedValues: 0,
         platformProblems,
+        listConflicts,
       },
     })
   })
@@ -191,12 +193,13 @@ test('ignores Released and Genre, and reports platforms the server could not tic
         reason: 'handAddedPlatforms',
       },
     ],
+    [2],
   )
   await chooseFile(
     page,
-    'Name,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms\r\n' +
-      'The Legend of Zelda,1022,2026-01-01,1986-02,Adventure,NES; Atari 2600,SNES\r\n' +
-      'Micro Mages,,2026-02-01,,,,NES\r\n',
+    'Name,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms,List\r\n' +
+      'The Legend of Zelda,1022,2026-01-01,1986-02,Adventure,NES; Atari 2600,SNES,Owned; Wishlist\r\n' +
+      'Micro Mages,,2026-02-01,,,,NES,Wishlist\r\n',
   )
   const dialog = page.getByRole('dialog', { name: 'Import from a CSV file' })
   for (const column of ['Released', 'Genre']) {
@@ -210,6 +213,9 @@ test('ignores Released and Genre, and reports platforms the server could not tic
   await expect(
     dialog.getByRole('combobox', { name: 'Where Wishlist platforms goes' }),
   ).toHaveText('Wishlist platforms')
+  await expect(
+    dialog.getByRole('combobox', { name: 'Where List goes' }),
+  ).toHaveText('List (Owned or Wishlist)')
   await dialog.getByRole('button', { name: 'Review' }).click()
   await dialog.getByRole('button', { name: 'Review' }).click()
   await expect(dialog.getByText('New fields')).toHaveCount(0)
@@ -224,6 +230,7 @@ test('ignores Released and Genre, and reports platforms the server could not tic
       values: {},
       platforms: ['NES', 'Atari 2600'],
       wishlistPlatforms: ['SNES'],
+      list: 'both',
       row: 2,
     },
     {
@@ -231,10 +238,14 @@ test('ignores Released and Genre, and reports platforms the server could not tic
       igdbId: null,
       values: {},
       wishlistPlatforms: ['NES'],
+      list: 'wishlist',
       row: 3,
     },
   ])
   await expect(dialog.getByText("2 platforms weren't added")).toBeVisible()
+  await expect(dialog.getByTestId('list-conflicts')).toHaveText(
+    '1 game was added as Owned only. The file put it on both lists without a Wishlist platform. Row: 2.',
+  )
   await expect(dialog.getByRole('row', { name: /Atari 2600/ })).toContainText(
     "IGDB doesn't list this game on that platform",
   )

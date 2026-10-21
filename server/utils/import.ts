@@ -4,6 +4,7 @@ import type { FieldDefinition, ItemData } from '../../shared/types/collection'
 import type { ImportRow, PlatformProblem } from '../../shared/utils/csv-import'
 import { cleanFields, fieldsProblem } from '../../shared/utils/field-changes'
 import { normalizeFieldValue } from '../../shared/utils/field-values'
+import { importedListState } from '../../shared/utils/lists'
 import { planPlatforms } from './import-platforms'
 import {
   collectionItems,
@@ -27,6 +28,11 @@ export interface ImportResult {
   rejectedValues: number
   /** Platform cells it couldn't use, for the person to see. */
   platformProblems: PlatformProblem[]
+  /**
+   * Rows of new games the file put on both lists without a Wishlist
+   * platform. They were added as owned only.
+   */
+  listConflicts: number[]
 }
 
 /** An integer[] value in SQL. */
@@ -83,7 +89,9 @@ function validValues(fields: FieldDefinition[], values: ItemData) {
  * platforms the catalog knows the game on, and ticked as owned (Platforms)
  * or wanted (Wishlist platforms), merging with what the game has. Wanted
  * platforms put the game on the Wishlist. A new game with only wanted
- * platforms is wishlisted and not owned. Names that don't match, platforms
+ * platforms is wishlisted and not owned. A new game follows its List cell
+ * too, within the rules of the lists (see `importedListState`), while a game
+ * already in the library keeps its lists. Names that don't match, platforms
  * on a game that has none, and ones that would clash with the other list
  * come back as `platformProblems` (see `planPlatforms`).
  */
@@ -180,6 +188,7 @@ export async function importIntoCollection(
   )
 
   let rejectedValues = 0
+  const listConflicts: number[] = []
   const toInsert: (typeof libraryItems.$inferInsert)[] = []
   const toUpdate: {
     id: string
@@ -233,7 +242,9 @@ export async function importIntoCollection(
       const wantedOn = sorted(
         [...addWanted].filter((id) => !ownedOn.includes(id)),
       )
-      // A game with only wishlist platforms is on the Wishlist, not Owned.
+      // The List cell and the platforms decide where a new game goes.
+      const lists = importedListState(row.list, ownedOn, wantedOn)
+      if (lists.conflict) listConflicts.push(row.row ?? 0)
       toInsert.push({
         ownerId,
         igdbId: known(row) ? row.igdbId : null,
@@ -242,8 +253,8 @@ export async function importIntoCollection(
         data: valid,
         ownedOn,
         wantedOn,
-        wishlisted: wantedOn.length > 0,
-        owned: ownedOn.length > 0 || wantedOn.length === 0,
+        wishlisted: lists.wishlisted,
+        owned: lists.owned,
       })
     }
   }
@@ -329,5 +340,6 @@ export async function importIntoCollection(
     handAdded: rows.filter((row) => !known(row)).length,
     rejectedValues,
     platformProblems,
+    listConflicts,
   }
 }

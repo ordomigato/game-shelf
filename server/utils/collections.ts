@@ -148,11 +148,14 @@ export function catalogPlatformsOf(
 }
 
 /**
- * A game in a collection as the viewer may see it. Only the owner gets the
- * flags and platforms, the catalog's and their own. Visitors get `wanted`,
- * so a public collection can mark the games its owner is missing without
- * saying more. The release date and genres are public catalog facts for
- * everyone.
+ * A game in a collection or on a list as the viewer may see it. Only the
+ * owner gets the flags, and every catalog platform to pick from. A visitor
+ * gets the platforms the game is owned and wanted on, with their names, so
+ * a public collection shows them as its owner sees them. On a public list
+ * (`onlyList`) the visitor gets only that list's platforms, so Owned never
+ * shows what the Wishlist holds, nor the other way round. They also get
+ * `wanted`, to mark the games the owner is missing. The release date and
+ * genres are public catalog facts for everyone.
  */
 export function toCollectionEntry(
   row: ItemRow,
@@ -160,22 +163,36 @@ export function toCollectionEntry(
   addedAt: Date,
   viewerIsOwner: boolean,
   names: Map<number, string> = new Map(),
+  onlyList?: ListName,
 ): CollectionEntry {
   const { owned, wishlisted, ownedOn, wantedOn, ...item } = toLibraryItem(
     row,
     game,
   )
-  return {
-    ...item,
-    addedAt: addedAt.toISOString(),
-    wanted: wishlisted,
-    ...(viewerIsOwner && {
+  if (viewerIsOwner) {
+    return {
+      ...item,
+      addedAt: addedAt.toISOString(),
+      wanted: wishlisted,
       owned,
       wishlisted,
       ownedOn,
       wantedOn,
       catalogPlatforms: catalogPlatformsOf(game, names),
-    }),
+    }
+  }
+  const shownOwned = onlyList === 'wishlist' ? [] : ownedOn
+  const shownWanted = onlyList === 'owned' ? [] : wantedOn
+  const shown = new Set([...shownOwned, ...shownWanted])
+  return {
+    ...item,
+    addedAt: addedAt.toISOString(),
+    wanted: onlyList ? onlyList === 'wishlist' : wishlisted,
+    ownedOn: shownOwned,
+    wantedOn: shownWanted,
+    catalogPlatforms: catalogPlatformsOf(game, names).filter(({ id }) =>
+      shown.has(id),
+    ),
   }
 }
 
@@ -285,15 +302,13 @@ export async function getCollectionBySlug(
         entries.map((entry) => entry.item.id),
       )
     : null
-  const names = viewerIsOwner
-    ? await platformNames(
-        entries.flatMap((entry) => [
-          ...(entry.game?.platformIds ?? []),
-          ...entry.item.ownedOn,
-          ...entry.item.wantedOn,
-        ]),
-      )
-    : undefined
+  const names = await platformNames(
+    entries.flatMap((entry) => [
+      ...(viewerIsOwner ? (entry.game?.platformIds ?? []) : []),
+      ...entry.item.ownedOn,
+      ...entry.item.wantedOn,
+    ]),
+  )
   const dashboard = chartsFor(
     viewerIsOwner,
     found.fields,

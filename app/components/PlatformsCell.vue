@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Plus, Star } from '@lucide/vue'
+import { Plus } from '@lucide/vue'
 import type {
   CollectionEntry,
   LibraryItem,
@@ -10,8 +10,9 @@ import { platformsOf } from '#shared/utils/platforms'
 /**
  * The platforms column, the same on every page: the platforms the game is
  * owned on as plain chips, and the ones it's on the Wishlist for as outline
- * chips with a star. The owner clicks the cell to pick from the platforms
- * the catalog knows the game on. Each tick saves at once and shows
+ * chips with a star (see `PlatformChips`). A visitor only reads them. The
+ * owner clicks the cell to pick from the platforms the catalog knows the
+ * game on. Each tick saves at once and shows
  * straight away, and is undone with a message if saving fails. A game
  * added by hand has no catalog platforms, so its cell is empty and can't
  * be clicked.
@@ -58,28 +59,7 @@ async function tick(list: ListName, platformId: number, on: boolean) {
         class="-mx-1.5 flex max-w-64 flex-wrap items-center gap-1 rounded-md px-1.5 py-1 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="$t('table.editPlatforms', { name: item.name })"
       >
-        <Badge
-          v-for="platform in shown.owned"
-          :key="`owned-${platform.id}`"
-          as="span"
-          variant="secondary"
-          class="text-[11px]"
-          :title="platform.name"
-        >
-          {{ platform.name }}
-        </Badge>
-        <Badge
-          v-for="platform in shown.wanted"
-          :key="`wanted-${platform.id}`"
-          as="span"
-          variant="outline"
-          class="gap-1 text-[11px] text-muted-foreground"
-          :title="`${platform.name} (${$t('table.wishlist')})`"
-        >
-          <Star class="size-3" aria-hidden="true" />
-          {{ platform.name }}
-          <span class="sr-only">{{ $t('table.wishlist') }}</span>
-        </Badge>
+        <PlatformChips :owned="shown.owned" :wanted="shown.wanted" />
         <Plus
           v-if="!shown.owned.length && !shown.wanted.length"
           class="size-4 text-muted-foreground"
@@ -118,4 +98,7 @@ async function tick(list: ListName, platformId: number, on: boolean) {
       </div>
     </PopoverContent>
   </Popover>
+  <div v-else class="flex max-w-64 flex-wrap items-center gap-1">
+    <PlatformChips :owned="shown.owned" :wanted="shown.wanted" />
+  </div>
 </template>

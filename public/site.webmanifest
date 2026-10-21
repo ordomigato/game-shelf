@@ -1,0 +1,13 @@
+{
+  "name": "ThisPlayShelf",
+  "short_name": "ThisPlayShelf",
+  "description": "Search games, track your collection and share your collections.",
+  "start_url": "/",
+  "display": "browser",
+  "theme_color": "#041429",
+  "background_color": "#041429",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

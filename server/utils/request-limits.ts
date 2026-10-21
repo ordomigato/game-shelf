@@ -10,6 +10,11 @@ export const LIMIT_WINDOW_MS = 60_000
 export const REQUEST_LIMITS = {
   /** Routes that call IGDB, which allows about 4 requests a second. */
   igdb: { perClient: 30, perInstance: 150 },
+  /**
+   * Barcode lookups, which can reach ScanDex. A shelf is scanned at about a
+   * box a second, so this is looser than IGDB's.
+   */
+  barcodes: { perClient: 60, perInstance: 300 },
   /** The browser's performance beacon. Over the limit it is dropped. */
   vitals: { perClient: 30, perInstance: 300 },
   /** The sitemap, rebuilt from the database whenever CloudFront misses. */
@@ -30,6 +35,7 @@ export const USER_WRITE_LIMIT = 60
 /** Build files and the site icon, which CloudFront serves without the Lambda. */
 const SKIPPED = /^\/(_nuxt|__nuxt|_ipx)(\/|$)|^\/favicon\.(ico|svg|png)$/
 const IGDB_ROUTES = /^\/api\/(games|library-items\/igdb|import\/match)(\/|$)/
+const BARCODE_ROUTES = /^\/api\/barcodes(\/|$)/
 const SITEMAP_ROUTES = /^\/sitemaps?(\/|\.xml$|$)/
 const PUBLIC_ROUTES = /^\/(api\/)?(u|explore)(\/|$|\.)/
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
@@ -71,6 +77,7 @@ export function limitGroupFor(
   if (SKIPPED.test(path)) return null
   if (path === '/api/vitals') return 'vitals'
   if (IGDB_ROUTES.test(path)) return 'igdb'
+  if (BARCODE_ROUTES.test(path)) return 'barcodes'
   if (SITEMAP_ROUTES.test(path)) return 'sitemap'
   if (isWrite(method, path)) return hasToken ? 'other' : 'write'
   if (PUBLIC_ROUTES.test(path)) return 'public'

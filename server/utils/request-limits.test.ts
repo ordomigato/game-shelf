@@ -24,6 +24,10 @@ describe('limitGroupFor', () => {
     expect(limitGroupFor('POST', '/api/import/match')).toBe('igdb')
   })
 
+  it('puts barcode lookups in their own group', () => {
+    expect(limitGroupFor('GET', '/api/barcodes/0045496590048')).toBe('barcodes')
+  })
+
   it('treats the vitals beacon on its own', () => {
     expect(limitGroupFor('POST', '/api/vitals')).toBe('vitals')
   })

@@ -18,6 +18,10 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "ScanDexToken": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "Site": {
       "type": "sst.aws.Nuxt"
       "url": string

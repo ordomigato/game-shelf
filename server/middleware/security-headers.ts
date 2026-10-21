@@ -21,7 +21,7 @@ export default defineEventHandler((event) => {
   ].join(' ')
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://images.igdb.com",
     "font-src 'self' data:",
@@ -39,7 +39,7 @@ export default defineEventHandler((event) => {
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy':
-      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
+      'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
     'Cross-Origin-Opener-Policy': 'same-origin',
   })
 })

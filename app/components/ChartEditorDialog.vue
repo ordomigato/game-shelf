@@ -11,9 +11,12 @@ import type { FieldDefinition } from '#shared/types/collection'
 import type { Message } from '#shared/types/message'
 import {
   checkboxFields,
+  CORE_GROUPS,
+  coreLabel,
   dateFields,
   groupableFields,
   numericFields,
+  RELEASED_SOURCE,
   type ChartItem,
 } from '#shared/utils/charts'
 
@@ -31,6 +34,8 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [widget: ChartWidget] }>()
 const open = defineModel<boolean>('open', { default: false })
 
+const { t } = useI18n()
+
 type MeasureOp = ChartMeasure['op']
 
 const kind = ref<ChartKind>('number')
@@ -45,7 +50,11 @@ const cumulative = ref(false)
 
 const numeric = computed(() => numericFields(props.fields))
 const checkboxes = computed(() => checkboxFields(props.fields))
-const groupable = computed(() => groupableFields(props.fields))
+// The fields, then the core columns, which every collection has.
+const groupable = computed(() => [
+  ...groupableFields(props.fields).map(({ id, name }) => ({ id, name })),
+  ...CORE_GROUPS.map((id) => ({ id, name: t(coreLabel(id).key) })),
+])
 const dates = computed(() => dateFields(props.fields))
 
 watch(open, (isOpen) => {
@@ -250,7 +259,7 @@ function save() {
             class="flex flex-col gap-2"
           >
             <Label for="chart-group">{{ $t('charts.editor.groupBy') }}</Label>
-            <Select v-if="groupable.length" v-model="groupBy">
+            <Select v-model="groupBy">
               <SelectTrigger id="chart-group">
                 <SelectValue />
               </SelectTrigger>
@@ -264,9 +273,6 @@ function save() {
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p v-else class="text-sm text-muted-foreground">
-              {{ $t('charts.editor.noGroupable') }}
-            </p>
           </div>
 
           <template v-if="kind === 'line'">
@@ -280,6 +286,9 @@ function save() {
                   <SelectContent>
                     <SelectItem value="addedAt">
                       {{ $t('charts.editor.whenAdded') }}
+                    </SelectItem>
+                    <SelectItem :value="RELEASED_SOURCE">
+                      {{ $t('charts.core.released') }}
                     </SelectItem>
                     <SelectItem
                       v-for="field in dates"

@@ -29,7 +29,11 @@ const items = [
 
 async function openCharts(
   page: Page,
-  { owner = true, dashboard = [] as unknown[] } = {},
+  {
+    owner = true,
+    dashboard = [] as unknown[],
+    games = items as unknown[],
+  } = {},
 ) {
   if (owner) await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/collections', (route) => route.fulfill({ json: [] }))
@@ -42,11 +46,11 @@ async function openCharts(
         slug: 'nes-games',
         description: null,
         visibility: 'public',
-        itemCount: items.length,
+        itemCount: games.length,
         updatedAt: '2026-01-01T00:00:00.000Z',
         isOwner: owner,
         fields,
-        items,
+        items: games,
         dashboard: current,
       },
     }),
@@ -240,4 +244,81 @@ test('offers the rest as suggestions once there are charts', async ({
       groupBy: 'status',
     },
   ])
+})
+
+// The catalog's facts and the owner's platforms. The last game was added by
+// hand, so it has none.
+const catalogGame = (n: number, extra: Record<string, unknown>) => ({
+  ...item(n, {}, '2026-01-10T00:00:00.000Z'),
+  releaseDate: null,
+  releasePrecision: null,
+  genres: [],
+  ownedOn: [],
+  ...extra,
+})
+const catalogItems = [
+  catalogGame(1, {
+    releaseDate: '1995-03-11',
+    releasePrecision: 'day',
+    genres: ['RPG', 'Puzzle'],
+    ownedOn: [19],
+    catalogPlatforms: [
+      { id: 19, name: 'SNES' },
+      { id: 130, name: 'Switch' },
+    ],
+  }),
+  catalogGame(2, {
+    releaseDate: '1995-01-01',
+    releasePrecision: 'year',
+    genres: ['RPG'],
+  }),
+  catalogGame(3, {}),
+]
+
+test('splits games by the core columns, with hand-added games not set', async ({
+  page,
+}) => {
+  const saves = await openCharts(page, { games: catalogItems })
+  await page.getByRole('button', { name: 'Add your first chart' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add a chart' })
+  await dialog.getByRole('button', { name: 'Bar' }).click()
+  const caption = (name: string) =>
+    dialog.getByRole('region', { name }).locator('figcaption')
+
+  await dialog.getByLabel('Split by').click()
+  await page.getByRole('option', { name: 'Genre' }).click()
+  await expect(caption('Games by Genre')).toHaveText(
+    'RPG: 2, Puzzle: 1, Not set: 1',
+  )
+  await dialog.getByLabel('Split by').click()
+  await page.getByRole('option', { name: 'Platforms' }).click()
+  await expect(caption('Games by Platforms')).toHaveText('SNES: 1, Not set: 2')
+  await dialog.getByLabel('Split by').click()
+  await page.getByRole('option', { name: 'Release year' }).click()
+  await expect(caption('Games by Release year')).toHaveText(
+    '1995: 2, Not set: 1',
+  )
+  await dialog.getByRole('button', { name: 'Add chart' }).click()
+  expect(saves[0]).toEqual([
+    expect.objectContaining({ kind: 'bar', groupBy: 'releaseYear' }),
+  ])
+})
+
+test('draws a line chart over release dates', async ({ page }) => {
+  await openCharts(page, {
+    games: catalogItems,
+    dashboard: [
+      {
+        id: 'w3',
+        kind: 'line',
+        title: 'Releases',
+        size: 'large',
+        measure: { op: 'count' },
+        timeline: { source: 'released', bucket: 'year', cumulative: false },
+      },
+    ],
+  })
+  await expect(
+    page.getByRole('region', { name: 'Releases' }).locator('figcaption'),
+  ).toHaveText('1995: 2')
 })

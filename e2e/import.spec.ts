@@ -21,7 +21,11 @@ const summary = (id: number, name: string, year: number) => ({
   platforms: ['NES'],
 })
 
-async function openCollection(page: Page, matches: unknown[] = []) {
+async function openCollection(
+  page: Page,
+  matches: unknown[] = [],
+  platformProblems: unknown[] = [],
+) {
   await signInAs(page, { username: 'retro_fan' })
   await page.route('**/api/import/match', (route) => {
     const { names } = route.request().postDataJSON() as { names: string[] }
@@ -68,6 +72,7 @@ async function openCollection(page: Page, matches: unknown[] = []) {
         linked: 1,
         handAdded: body.rows.length - 1,
         rejectedValues: 0,
+        platformProblems,
       },
     })
   })
@@ -164,6 +169,78 @@ test('imports a file, matching columns and reporting what does not fit', async (
       values: { status: 'Playing', [priceId]: 5 },
     },
   ])
+})
+
+test('ignores Released and Genre, and reports platforms the server could not tick', async ({
+  page,
+}) => {
+  const sent = await openCollection(
+    page,
+    [],
+    [
+      {
+        row: 2,
+        list: 'owned',
+        value: 'Atari 2600',
+        reason: 'unknownPlatform',
+      },
+      {
+        row: 3,
+        list: 'wanted',
+        value: 'NES',
+        reason: 'handAddedPlatforms',
+      },
+    ],
+  )
+  await chooseFile(
+    page,
+    'Name,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms\r\n' +
+      'The Legend of Zelda,1022,2026-01-01,1986-02,Adventure,NES; Atari 2600,SNES\r\n' +
+      'Micro Mages,,2026-02-01,,,,NES\r\n',
+  )
+  const dialog = page.getByRole('dialog', { name: 'Import from a CSV file' })
+  for (const column of ['Released', 'Genre']) {
+    await expect(
+      dialog.getByRole('combobox', { name: `Where ${column} goes` }),
+    ).toHaveText("Don't import")
+  }
+  await expect(
+    dialog.getByRole('combobox', { name: 'Where Platforms goes' }),
+  ).toHaveText('Owned platforms')
+  await expect(
+    dialog.getByRole('combobox', { name: 'Where Wishlist platforms goes' }),
+  ).toHaveText('Wishlist platforms')
+  await dialog.getByRole('button', { name: 'Review' }).click()
+  await dialog.getByRole('button', { name: 'Review' }).click()
+  await expect(dialog.getByText('New fields')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Import 2 games' }).click()
+
+  // The names go to the server, which knows the game's platforms.
+  await expect(dialog.getByText('Import finished')).toBeVisible()
+  expect(sent[0]!.rows).toEqual([
+    {
+      name: 'The Legend of Zelda',
+      igdbId: 1022,
+      values: {},
+      platforms: ['NES', 'Atari 2600'],
+      wishlistPlatforms: ['SNES'],
+      row: 2,
+    },
+    {
+      name: 'Micro Mages',
+      igdbId: null,
+      values: {},
+      wishlistPlatforms: ['NES'],
+      row: 3,
+    },
+  ])
+  await expect(dialog.getByText("2 platforms weren't added")).toBeVisible()
+  await expect(dialog.getByRole('row', { name: /Atari 2600/ })).toContainText(
+    "IGDB doesn't list this game on that platform",
+  )
+  await expect(
+    dialog.getByRole('row', { name: /3 Wishlist platforms/ }),
+  ).toContainText('Games added by hand have no platforms')
 })
 
 test('asks which column holds the name when it cannot tell', async ({

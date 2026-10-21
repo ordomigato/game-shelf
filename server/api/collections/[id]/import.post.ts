@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { IMPORT_CHUNK_SIZE } from '../../../../shared/utils/csv-import'
+import {
+  IMPORT_CHUNK_SIZE,
+  MAX_ROW_PLATFORMS,
+  PLATFORM_NAME_MAX,
+} from '../../../../shared/utils/csv-import'
 import type { ImportResult } from '../../../utils/import'
 
 const paramsSchema = z.object({ id: z.uuid() })
@@ -12,6 +16,15 @@ const bodySchema = z.object({
         name: z.string().trim().min(1).max(200),
         igdbId: z.number().int().positive().nullable(),
         values: z.record(z.string().max(64), z.unknown()),
+        platforms: z
+          .array(z.string().trim().min(1).max(PLATFORM_NAME_MAX))
+          .max(MAX_ROW_PLATFORMS)
+          .optional(),
+        wishlistPlatforms: z
+          .array(z.string().trim().min(1).max(PLATFORM_NAME_MAX))
+          .max(MAX_ROW_PLATFORMS)
+          .optional(),
+        row: z.number().int().positive().optional(),
       }),
     )
     .min(1)

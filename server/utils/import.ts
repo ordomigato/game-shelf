@@ -1,10 +1,17 @@
 import { and, eq, inArray, max, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
-import type { ImportRow } from '../../shared/utils/csv-import'
+import type { ImportRow, PlatformProblem } from '../../shared/utils/csv-import'
 import { cleanFields, fieldsProblem } from '../../shared/utils/field-changes'
 import { normalizeFieldValue } from '../../shared/utils/field-values'
-import { collectionItems, collections, libraryItems, users } from '../db/schema'
+import { planPlatforms } from './import-platforms'
+import {
+  collectionItems,
+  collections,
+  libraryItems,
+  platforms,
+  users,
+} from '../db/schema'
 import type { PlanLimits } from '../../shared/utils/plans'
 
 export interface ImportResult {
@@ -18,7 +25,18 @@ export interface ImportResult {
   handAdded: number
   /** Values the server refused (the browser checks first, so rarely any). */
   rejectedValues: number
+  /** Platform cells it couldn't use, for the person to see. */
+  platformProblems: PlatformProblem[]
 }
+
+/** An integer[] value in SQL. */
+const intArray = (ids: number[]) =>
+  ids.length
+    ? sql`ARRAY[${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::integer[]`
+    : sql`'{}'::integer[]`
 
 /**
  * The fields after import must keep every current field, with the same
@@ -60,6 +78,14 @@ function validValues(fields: FieldDefinition[], values: ItemData) {
  * Games with an IGDB id the user already has are updated, not duplicated,
  * and only with the values the file has: empty cells never erase anything.
  * Every game ends up in the collection, at the end, in file order.
+ *
+ * Platform names in the file are matched, by name or short name, to the
+ * platforms the catalog knows the game on, and ticked as owned (Platforms)
+ * or wanted (Wishlist platforms), merging with what the game has. Wanted
+ * platforms put the game on the Wishlist. A new game with only wanted
+ * platforms is wishlisted and not owned. Names that don't match, platforms
+ * on a game that has none, and ones that would clash with the other list
+ * come back as `platformProblems` (see `planPlatforms`).
  */
 export async function importIntoCollection(
   ownerId: string,
@@ -110,6 +136,10 @@ export async function importIntoCollection(
           id: libraryItems.id,
           igdbId: libraryItems.igdbId,
           data: libraryItems.data,
+          owned: libraryItems.owned,
+          wishlisted: libraryItems.wishlisted,
+          ownedOn: libraryItems.ownedOn,
+          wantedOn: libraryItems.wantedOn,
         })
         .from(libraryItems)
         .where(
@@ -121,29 +151,99 @@ export async function importIntoCollection(
     : []
   const existingByIgdb = new Map(existing.map((item) => [item.igdbId!, item]))
 
+  // The platforms the file names, matched to each game's catalog platforms.
+  const asked = input.rows.some(
+    (row) => row.platforms?.length || row.wishlistPlatforms?.length,
+  )
+  const catalogPlatforms = asked
+    ? await db
+        .select()
+        .from(platforms)
+        .where(
+          inArray(platforms.igdbId, [
+            ...new Set(catalog.flatMap((game) => game.platformIds)),
+          ]),
+        )
+    : []
+  const {
+    problems: platformProblems,
+    owned: ownedOnAdd,
+    wanted: wantedOnAdd,
+  } = planPlatforms(
+    input.rows,
+    (row) =>
+      known(row)
+        ? catalog.find((candidate) => candidate.igdbId === row.igdbId)
+        : undefined,
+    catalogPlatforms,
+    (igdbId) => existingByIgdb.get(igdbId),
+  )
+
   let rejectedValues = 0
   const toInsert: (typeof libraryItems.$inferInsert)[] = []
-  const toUpdate: { id: string; data: ItemData }[] = []
+  const toUpdate: {
+    id: string
+    data: ItemData
+    ownedOn: number[]
+    wantedOn: number[]
+    wishlisted: boolean
+  }[] = []
   // The library item each row ends up as, filled in below, in file order.
   const order: (string | { pending: number })[] = []
+  const sorted = (ids: Iterable<number>) => [...ids].sort((a, b) => a - b)
 
   for (const row of rows) {
     const { valid, rejected } = validValues(fields, row.values)
     rejectedValues += rejected
     const have = known(row) ? existingByIgdb.get(row.igdbId!) : undefined
+    const gameId = known(row) ? row.igdbId! : null
+    const addOwned = (gameId && ownedOnAdd.get(gameId)) || new Set<number>()
+    const addWanted = (gameId && wantedOnAdd.get(gameId)) || new Set<number>()
     if (have) {
-      if (Object.keys(valid).length) {
-        toUpdate.push({ id: have.id, data: { ...have.data, ...valid } })
+      const ownedOn = sorted(new Set([...have.ownedOn, ...addOwned]))
+      // Duplicate rows can name a platform on both lists: owned wins.
+      const wantedOn = sorted(
+        new Set(
+          [...have.wantedOn, ...addWanted].filter(
+            (id) => !ownedOn.includes(id),
+          ),
+        ),
+      )
+      // Wanted platforms need the Wishlist. A game that's owned as well
+      // is fine, because they name another version.
+      const wishlisted = have.wishlisted || wantedOn.length > 0
+      if (
+        Object.keys(valid).length ||
+        ownedOn.length !== have.ownedOn.length ||
+        wantedOn.length !== have.wantedOn.length ||
+        wishlisted !== have.wishlisted
+      ) {
+        toUpdate.push({
+          id: have.id,
+          data: { ...have.data, ...valid },
+          ownedOn,
+          wantedOn,
+          wishlisted,
+        })
       }
       order.push(have.id)
     } else {
       order.push({ pending: toInsert.length })
+      const ownedOn = sorted(addOwned)
+      const wantedOn = sorted(
+        [...addWanted].filter((id) => !ownedOn.includes(id)),
+      )
+      // A game with only wishlist platforms is on the Wishlist, not Owned.
       toInsert.push({
         ownerId,
         igdbId: known(row) ? row.igdbId : null,
         name: row.name,
         coverId: known(row) ? (covers.get(row.igdbId!) ?? null) : null,
         data: valid,
+        ownedOn,
+        wantedOn,
+        wishlisted: wantedOn.length > 0,
+        owned: ownedOn.length > 0 || wantedOn.length === 0,
       })
     }
   }
@@ -180,14 +280,15 @@ export async function importIntoCollection(
   if (toUpdate.length) {
     await db.execute(sql`
       update library_items as item
-      set data = changed.data
+      set data = changed.data, owned_on = changed.owned_on,
+        wanted_on = changed.wanted_on, wishlisted = changed.wishlisted
       from (values ${sql.join(
         toUpdate.map(
           (update) =>
-            sql`(${update.id}::uuid, ${JSON.stringify(update.data)}::jsonb)`,
+            sql`(${update.id}::uuid, ${JSON.stringify(update.data)}::jsonb, ${intArray(update.ownedOn)}, ${intArray(update.wantedOn)}, ${update.wishlisted}::boolean)`,
         ),
         sql`, `,
-      )}) as changed(id, data)
+      )}) as changed(id, data, owned_on, wanted_on, wishlisted)
       where item.id = changed.id and item.owner_id = ${ownerId}
     `)
   }
@@ -227,5 +328,6 @@ export async function importIntoCollection(
     linked: rows.filter(known).length,
     handAdded: rows.filter((row) => !known(row)).length,
     rejectedValues,
+    platformProblems,
   }
 }

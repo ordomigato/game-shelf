@@ -97,6 +97,89 @@ describe('autoMap', () => {
       { kind: 'skip' },
     ])
   })
+
+  it('ignores Released and Genre, and reads Platforms', () => {
+    const headers = ['Name', 'Released', 'Genre', 'Platforms', 'Condition']
+    const rows = [['Zelda', '1991', 'Adventure', 'SNES', 'Loose']]
+    expect(autoMap(headers, rows, fields)).toEqual([
+      { kind: 'name' },
+      { kind: 'skip' },
+      { kind: 'skip' },
+      { kind: 'platforms' },
+      { kind: 'field', fieldId: 'cond' },
+    ])
+  })
+
+  it("gives a file's only Genre or Platform column to the field of that name", () => {
+    const own: FieldDefinition[] = [
+      { id: 'g', name: 'Genre', type: 'text' },
+      { id: 'p', name: 'Platform', type: 'text' },
+    ]
+    expect(
+      autoMap(['Name', 'Genre', 'Platform'], [['Zelda', 'RPG', 'SNES']], own),
+    ).toEqual([
+      { kind: 'name' },
+      { kind: 'field', fieldId: 'g' },
+      { kind: 'field', fieldId: 'p' },
+    ])
+  })
+
+  it('reads Wishlist platforms too', () => {
+    expect(
+      autoMap(
+        ['Name', 'Platforms', 'Wishlist platforms'],
+        [['Zelda', 'SNES', 'Switch']],
+        [],
+      ),
+    ).toEqual([
+      { kind: 'name' },
+      { kind: 'platforms' },
+      { kind: 'wishlistPlatforms' },
+    ])
+  })
+
+  it('lets a later column of the same name be a field, as in our exports', () => {
+    const genre: FieldDefinition = { id: 'g', name: 'Genre', type: 'text' }
+    const headers = ['Name', 'Genre', 'Platforms', 'Genre', 'Platforms']
+    const rows = [['Zelda', 'Adventure', 'SNES', 'Mine', 'Shelf 2']]
+    const platform: FieldDefinition = {
+      id: 'p',
+      name: 'Platforms',
+      type: 'text',
+    }
+    expect(autoMap(headers, rows, [genre, platform])).toEqual([
+      { kind: 'name' },
+      { kind: 'skip' },
+      { kind: 'platforms' },
+      { kind: 'field', fieldId: 'g' },
+      { kind: 'field', fieldId: 'p' },
+    ])
+  })
+})
+
+describe('planImport platforms', () => {
+  it('sends the platform names of each row, with its row in the file', () => {
+    const plan = planImport(
+      ['Name', 'Platforms'],
+      [
+        ['Zelda', 'SNES; Switch'],
+        ['Homebrew', ''],
+      ],
+      [{ kind: 'name' }, { kind: 'platforms' }],
+      [],
+    )
+    expect(plan.rows).toEqual([
+      {
+        name: 'Zelda',
+        igdbId: null,
+        values: {},
+        platforms: ['SNES', 'Switch'],
+        row: 2,
+      },
+      { name: 'Homebrew', igdbId: null, values: {} },
+    ])
+    expect(plan.problems).toEqual([])
+  })
 })
 
 describe('planImport', () => {

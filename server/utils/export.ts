@@ -3,17 +3,18 @@ import { strToU8, zipSync } from 'fflate'
 import { collectionCsv, FIXED_COLUMNS } from '../../shared/utils/csv'
 import { collectionItems, collections, games, libraryItems } from '../db/schema'
 import { catalogJoin, getUserFields, itemName } from './collections'
-import { listForExport } from './lists'
+import { exportItemsOf, listForExport } from './lists'
 
-/** The first three column names of an export, in English. */
+/** The first seven column names of an export, in English. */
 export const exportColumns = () =>
-  FIXED_COLUMNS.map((column) => translate(column)) as [string, string, string]
+  FIXED_COLUMNS.map((column) => translate(column))
 
 /**
  * Everything the user has as CSV files in one zip: every collection, built
  * the same way as a single collection's export in the browser, plus
- * `owned.csv` and `wishlist.csv`. Every file has the name, IGDB id and date
- * added, then a column per field the user keeps.
+ * `owned.csv` and `wishlist.csv`. Every file has the name, IGDB id, date
+ * added, release date, genres and owned platforms, then a column per field
+ * the user keeps.
  */
 export async function exportEverything(ownerId: string): Promise<Buffer> {
   const db = useDb()
@@ -34,6 +35,7 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
     const entries = await db
       .select({
         item: libraryItems,
+        game: games,
         name: itemName,
         addedAt: collectionItems.addedAt,
       })
@@ -44,12 +46,17 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
       .orderBy(asc(collectionItems.position), asc(collectionItems.addedAt))
     const csv = collectionCsv(
       fields,
-      entries.map(({ item, name, addedAt }) => ({
-        name,
-        igdbId: item.igdbId,
-        addedAt: addedAt.toISOString(),
-        data: item.data,
-      })),
+      await exportItemsOf(
+        entries.map(({ item, game, name, addedAt }) => ({
+          name,
+          igdbId: item.igdbId,
+          addedAt: addedAt.toISOString(),
+          data: item.data,
+          ownedOn: item.ownedOn,
+          wantedOn: item.wantedOn,
+          game,
+        })),
+      ),
       columns,
     )
     files[`${collection.slug}.csv`] = strToU8(csv)

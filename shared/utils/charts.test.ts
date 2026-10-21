@@ -80,6 +80,107 @@ describe('measureValue', () => {
   })
 })
 
+describe('core columns', () => {
+  const platforms = [
+    { id: 19, name: 'SNES' },
+    { id: 130, name: 'Switch' },
+  ]
+  const game = (extra: Partial<ChartItem>): ChartItem => ({
+    data: {},
+    addedAt: '2026-01-15T00:00:00Z',
+    ...extra,
+  })
+  const games = [
+    game({
+      releaseDate: '1995-03-11',
+      releasePrecision: 'day',
+      genres: ['RPG', 'Puzzle'],
+      catalogPlatforms: platforms,
+      ownedOn: [19, 130],
+    }),
+    game({
+      releaseDate: '1995-01-01',
+      releasePrecision: 'year',
+      genres: ['RPG'],
+      catalogPlatforms: platforms,
+      ownedOn: [19],
+      // Wishlisted platforms are not owned ones.
+    }),
+    game({
+      releaseDate: '2001-06-01',
+      releasePrecision: 'month',
+      genres: ['Action'],
+    }),
+    game({ releasePrecision: 'tbd', releaseDate: '2030-01-01' }),
+    // Added by hand: no catalog facts.
+    game({}),
+  ]
+  const labels = (groups: ReturnType<typeof groupValues>) =>
+    groups.map((group) =>
+      group.label.kind === 'value' ? group.label.text : `(${group.label.kind})`,
+    )
+  const split = (groupBy: string) =>
+    groupValues(games, [], widget({ kind: 'bar', groupBy }))
+
+  it('splits by genre, a game in each of its genres, largest first', () => {
+    const groups = split('genre')
+    expect(labels(groups)).toEqual(['RPG', 'Puzzle', 'Action', '(none)'])
+    expect(groups.map((group) => group.value)).toEqual([2, 1, 1, 2])
+  })
+
+  it('splits by the platforms a game is owned on', () => {
+    const groups = split('platforms')
+    expect(labels(groups)).toEqual(['SNES', 'Switch', '(none)'])
+    expect(groups.map((group) => group.value)).toEqual([2, 1, 3])
+  })
+
+  it('splits by release year, oldest first, games without a date last', () => {
+    const groups = split('releaseYear')
+    expect(labels(groups)).toEqual(['1995', '2001', '(none)'])
+    expect(groups.map((group) => group.value)).toEqual([2, 1, 2])
+  })
+
+  it('keeps every release year, oldest first', () => {
+    const years = Array.from({ length: 15 }, (_, i) =>
+      game({ releaseDate: `${1990 + i}-05-05`, releasePrecision: 'day' }),
+    )
+    const groups = groupValues(
+      [...years, game({})],
+      [],
+      widget({ kind: 'bar', groupBy: 'releaseYear' }),
+    )
+    expect(labels(groups)).toEqual([
+      ...years.map((_, i) => String(1990 + i)),
+      '(none)',
+    ])
+  })
+
+  it('draws charts split by a core column, and not by a made-up one', () => {
+    for (const id of ['genre', 'platforms', 'releaseYear']) {
+      expect(chartProblem(widget({ kind: 'pie', groupBy: id }), [])).toBeNull()
+    }
+    expect(chartProblem(widget({ kind: 'pie', groupBy: 'size' }), [])).toEqual({
+      key: 'charts.problems.fieldGone',
+    })
+  })
+
+  it('spreads games over time by release date', () => {
+    const line = (bucket: 'month' | 'year') =>
+      widget({
+        kind: 'line',
+        timeline: { source: 'released', bucket, cumulative: false },
+      })
+    expect(chartProblem(line('year'), [])).toBeNull()
+    expect(timeSeries(games, line('year')).slice(0, 1)).toEqual([
+      { bucket: '1995', value: 2 },
+    ])
+    // A game known only to its year has no month, and TBD has no date.
+    const months = timeSeries(games, line('month'))
+    expect(months[0]).toEqual({ bucket: '1995-03', value: 1 })
+    expect(months.reduce((total, point) => total + point.value, 0)).toBe(2)
+  })
+})
+
 describe('groupValues', () => {
   const labels = (groups: ReturnType<typeof groupValues>) =>
     groups.map((group) =>
@@ -241,6 +342,7 @@ describe('suggestCharts', () => {
       ['pie', 'count', 'status'],
       ['pie', 'count', 'genres'],
       ['line', 'count', 'addedAt'],
+      ['bar', 'count', 'genre'],
     ])
   })
 
@@ -265,10 +367,24 @@ describe('suggestCharts', () => {
     ).toBe(false)
   })
 
-  it('always offers the game count and growth, even with no fields', () => {
+  it('always offers the game count, genres and growth, even with no fields', () => {
     expect(suggestCharts([], [], newId).map((w) => w.kind)).toEqual([
       'number',
       'line',
+      'bar',
     ])
+  })
+
+  it('offers games by genre once, then leaves it out', () => {
+    const genre = suggestCharts([], [], newId).find(
+      (w) => w.groupBy === 'genre',
+    )!
+    expect(defaultTitle(genre, [], (core) => `the ${core}`)).toEqual({
+      key: 'charts.titles.countBy',
+      params: { field: '', group: 'the genre' },
+    })
+    expect(
+      suggestCharts([], [genre], newId).some((w) => w.groupBy === 'genre'),
+    ).toBe(false)
   })
 })

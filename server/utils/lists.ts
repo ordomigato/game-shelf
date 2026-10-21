@@ -208,6 +208,34 @@ export async function setListColumns(
   return hidden
 }
 
+/**
+ * Games as an export needs them: with the catalog game's release date and
+ * genres, and the short names of the platforms they're owned on.
+ */
+export async function exportItemsOf(
+  rows: (Pick<ExportItem, 'name' | 'igdbId' | 'addedAt' | 'data'> & {
+    ownedOn: number[]
+    wantedOn: number[]
+    game: typeof catalogGames.$inferSelect | null
+  })[],
+): Promise<ExportItem[]> {
+  const names = await platformNames(
+    rows.flatMap((row) => [...row.ownedOn, ...row.wantedOn]),
+  )
+  return rows.map(({ game, ...row }) => ({
+    ...row,
+    releaseDate: game?.releaseDate ?? null,
+    releasePrecision: game?.releasePrecision ?? null,
+    genres: game?.genres ?? [],
+    catalogPlatforms: [...row.ownedOn, ...row.wantedOn]
+      .flatMap((id) => {
+        const name = names.get(id)
+        return name === undefined ? [] : [{ id, name }]
+      })
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }))
+}
+
 /** Every game on a list, newest first, with what an export needs. */
 export async function listForExport(
   ownerId: string,
@@ -219,6 +247,9 @@ export async function listForExport(
       name: itemName,
       addedAt: libraryItems.createdAt,
       data: libraryItems.data,
+      ownedOn: libraryItems.ownedOn,
+      wantedOn: libraryItems.wantedOn,
+      game: catalogGames,
     })
     .from(libraryItems)
     .leftJoin(catalogGames, catalogJoin)
@@ -232,7 +263,9 @@ export async function listForExport(
       ),
     )
     .orderBy(desc(libraryItems.createdAt), desc(libraryItems.id))
-  return rows.map((row) => ({ ...row, addedAt: row.addedAt.toISOString() }))
+  return exportItemsOf(
+    rows.map((row) => ({ ...row, addedAt: row.addedAt.toISOString() })),
+  )
 }
 
 /** How many games are on each list, for the sidebar. */

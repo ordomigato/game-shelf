@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldDefinition, FieldType } from '../types/collection'
-import { collectionCsv, exportValue, safeText, toCsv } from './csv'
+import {
+  collectionCsv,
+  exportValue,
+  releasedText,
+  safeText,
+  toCsv,
+} from './csv'
 
 const field = (type: FieldType): FieldDefinition => ({
   id: 'f',
@@ -71,6 +77,15 @@ describe('collectionCsv', () => {
           igdbId: 1022,
           addedAt: '2026-01-15T10:00:00.000Z',
           data: { c: 'Loose', p: 40 },
+          releaseDate: '2017-03-03',
+          releasePrecision: 'day',
+          genres: ['Adventure', 'Puzzle'],
+          ownedOn: [130],
+          wantedOn: [19],
+          catalogPlatforms: [
+            { id: 19, name: 'SNES' },
+            { id: 130, name: 'Switch' },
+          ],
         },
         {
           name: 'Homebrew',
@@ -79,12 +94,36 @@ describe('collectionCsv', () => {
           data: {},
         },
       ],
-      ['Name', 'IGDB ID', 'Added'],
+      [
+        'Name',
+        'IGDB ID',
+        'Added',
+        'Released',
+        'Genre',
+        'Platforms',
+        'Wishlist platforms',
+      ],
     )
     expect(csv).toBe(
-      '\uFEFFName,IGDB ID,Added,Condition,Price\r\n' +
-        '"Zelda, The",1022,2026-01-15,Loose,40.00\r\n' +
-        'Homebrew,,2026-02-01,,\r\n',
+      '\uFEFFName,IGDB ID,Added,Released,Genre,Platforms,Wishlist platforms,Condition,Price\r\n' +
+        '"Zelda, The",1022,2026-01-15,2017-03-03,Adventure; Puzzle,Switch,SNES,Loose,40.00\r\n' +
+        'Homebrew,,2026-02-01,,,,,,\r\n',
     )
+  })
+})
+
+describe('releasedText', () => {
+  it('writes a date at the precision IGDB knows', () => {
+    expect(releasedText('2017-03-03', 'day')).toBe('2017-03-03')
+    expect(releasedText('2017-03-01', 'month')).toBe('2017-03')
+    expect(releasedText('2017-01-01', 'year')).toBe('2017')
+    expect(releasedText('2017-07-01', 'quarter')).toBe('2017-Q3')
+    expect(releasedText('2017-03-03', null)).toBe('2017-03-03')
+    expect(releasedText('2030-01-01', 'tbd')).toBe('TBD')
+  })
+
+  it('is empty without a date', () => {
+    expect(releasedText(null, null)).toBe('')
+    expect(releasedText(undefined, 'day')).toBe('')
   })
 })

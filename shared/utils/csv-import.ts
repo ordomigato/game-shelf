@@ -13,6 +13,9 @@ import { normalizeFieldValue } from './field-values'
 
 /** The most rows one import takes. */
 export const MAX_IMPORT_ROWS = 5000
+/** The most platforms taken from one row, and the longest name of one. */
+export const MAX_ROW_PLATFORMS = 50
+export const PLATFORM_NAME_MAX = 100
 /** Rows sent to the server per request while importing. */
 export const IMPORT_CHUNK_SIZE = 250
 
@@ -20,6 +23,10 @@ export const IMPORT_CHUNK_SIZE = 250
 export type ColumnTarget =
   | { kind: 'name' }
   | { kind: 'igdbId' }
+  /** The platforms the game is owned on, matched on the server. */
+  | { kind: 'platforms' }
+  /** The platforms the game is wanted on, matched on the server. */
+  | { kind: 'wishlistPlatforms' }
   | { kind: 'skip' }
   | { kind: 'field'; fieldId: string }
   | { kind: 'new'; name: string; type: FieldType }
@@ -29,6 +36,30 @@ export interface ImportRow {
   name: string
   igdbId: number | null
   values: ItemData
+  /** Platform names from the file, to tick as owned. The server matches them. */
+  platforms?: string[]
+  /** Platform names from the file, to tick as wanted on the Wishlist. */
+  wishlistPlatforms?: string[]
+  /** The row in the file (see `ImportProblem.row`), for platform problems. */
+  row?: number
+}
+
+/**
+ * A platform cell the server couldn't use, for the person to see with the
+ * other problems. Found while importing, because the platforms a game can
+ * be on come from the catalog.
+ */
+export interface PlatformProblem {
+  row: number
+  /** Which column it came from. */
+  list: 'owned' | 'wanted'
+  value: string
+  reason:
+    | 'unknownPlatform'
+    | 'handAddedPlatforms'
+    | 'notOwnedPlatforms'
+    | 'wantedPlatforms'
+    | 'ownedPlatforms'
 }
 
 /** A cell that couldn't be imported, for the person to see. */
@@ -61,6 +92,19 @@ const NAME_HEADERS = ['name', 'title', 'game', 'game name', 'game title']
 const IGDB_HEADERS = ['igdb id', 'igdb', 'igdbid']
 /** ThisPlayShelf sets the date a game joins a collection itself. */
 const SKIPPED_HEADERS = ['added', 'date added', 'added at']
+/**
+ * The core columns of our exports, by the headers that name them. Released
+ * and Genre come from IGDB, so a file's values are never used. The platform
+ * columns are read.
+ */
+const CORE_HEADERS: Record<string, string[]> = {
+  released: ['released', 'release date'],
+  genre: ['genre', 'genres'],
+  platforms: ['platforms', 'platform'],
+  wishlistPlatforms: ['wishlist platforms', 'wishlist platform'],
+}
+const coreOf = (key: string) =>
+  Object.keys(CORE_HEADERS).find((core) => CORE_HEADERS[core]!.includes(key))
 
 const YES = new Set(['yes', 'y', 'true', '1', 'x', '✓', '✔'])
 const NO = new Set(['no', 'n', 'false', '0'])
@@ -203,8 +247,11 @@ export function guessType(values: string[]): {
 
 /**
  * Where each column goes, guessed from its header: the game's name, its
- * IGDB id, a field with the same name, or a new field with a guessed type.
- * A date-added column is skipped: ThisPlayShelf sets that itself.
+ * IGDB id, the platforms it's owned on, a field with the same name, or a
+ * new field with a guessed type. A date-added column is skipped:
+ * ThisPlayShelf sets that itself. So are the first Released and Genre
+ * columns, which come from IGDB. Our own exports put these core columns
+ * first, so a field of the same name later in the file still gets its values.
  */
 export function autoMap(
   headers: string[],
@@ -213,8 +260,10 @@ export function autoMap(
 ): ColumnTarget[] {
   let hasName = false
   let hasIgdb = false
+  const seenCore = new Set<string>()
+  const keys = headers.map(normalize)
   return headers.map((header, index): ColumnTarget => {
-    const key = normalize(header)
+    const key = keys[index]!
     if (!hasName && NAME_HEADERS.includes(key)) {
       hasName = true
       return { kind: 'name' }
@@ -224,6 +273,21 @@ export function autoMap(
       return { kind: 'igdbId' }
     }
     if (SKIPPED_HEADERS.includes(key)) return { kind: 'skip' }
+    const core = coreOf(key)
+    if (core && !seenCore.has(core)) {
+      // The user's own field of that name gets a file's only such column.
+      // Our exports repeat the header when a field has the same name, with
+      // the core column first.
+      const ownField = fields.some(
+        (candidate) => normalize(candidate.name) === key,
+      )
+      if (!ownField || keys.filter((other) => other === key).length > 1) {
+        seenCore.add(core)
+        return core === 'platforms' || core === 'wishlistPlatforms'
+          ? { kind: core }
+          : { kind: 'skip' }
+      }
+    }
     const field = fields.find((candidate) => normalize(candidate.name) === key)
     if (field) return { kind: 'field', fieldId: field.id }
     if (!header.trim()) return { kind: 'skip' }
@@ -303,6 +367,18 @@ export function planImport(
 
   const nameColumn = targets.findIndex((target) => target.kind === 'name')
   const igdbColumn = targets.findIndex((target) => target.kind === 'igdbId')
+  const platformsColumn = targets.findIndex(
+    (target) => target.kind === 'platforms',
+  )
+  const wishlistColumn = targets.findIndex(
+    (target) => target.kind === 'wishlistPlatforms',
+  )
+  const platformNames = (column: number, row: string[]) =>
+    column >= 0
+      ? splitChoices(unguard((row[column] ?? '').trim()))
+          .slice(0, MAX_ROW_PLATFORMS)
+          .map((platform) => platform.slice(0, PLATFORM_NAME_MAX))
+      : []
   const problems: ImportProblem[] = []
   const planned: ImportRow[] = []
   rows.slice(0, MAX_IMPORT_ROWS).forEach((row, rowIndex) => {
@@ -347,7 +423,18 @@ export function planImport(
         values[field.id] = value
       }
     }
-    planned.push({ name, igdbId, values })
+    const platforms = platformNames(platformsColumn, row)
+    const wishlistPlatforms = platformNames(wishlistColumn, row)
+    planned.push({
+      name,
+      igdbId,
+      values,
+      ...(platforms.length && { platforms }),
+      ...(wishlistPlatforms.length && { wishlistPlatforms }),
+      ...((platforms.length || wishlistPlatforms.length) && {
+        row: spreadsheetRow,
+      }),
+    })
   })
 
   return { fields, newFields, addedOptions, rows: planned, problems }

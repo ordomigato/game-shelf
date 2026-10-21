@@ -3,7 +3,7 @@ import { ChartColumn, ChartLine, ChartPie, Hash, Plus } from '@lucide/vue'
 import type { Component } from 'vue'
 import type { ChartKind, ChartWidget } from '#shared/types/charts'
 import type { FieldDefinition } from '#shared/types/collection'
-import { defaultTitle } from '#shared/utils/charts'
+import { coreLabel, defaultTitle } from '#shared/utils/charts'
 
 /** Suggested charts to add in one click, one at a time or all together. */
 const props = defineProps<{
@@ -22,7 +22,9 @@ const icons: Record<ChartKind, Component> = {
 }
 
 function titleOf(widget: ChartWidget) {
-  const message = defaultTitle(widget, props.fields)
+  const message = defaultTitle(widget, props.fields, (core) =>
+    t(coreLabel(core).key),
+  )
   return t(message.key, message.params ?? {})
 }
 </script>

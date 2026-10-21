@@ -3,7 +3,7 @@ import type { BulkAddResult } from '../../../shared/types/barcode'
 import { MAX_SCAN_BATCH } from '../../../shared/utils/barcode'
 
 /** Up to a batch of games to add, plus barcodes to remember for them. */
-const MAX_BATCH_ITEMS = MAX_SCAN_BATCH * 3
+const MAX_BATCH_ITEMS = MAX_SCAN_BATCH * 2
 
 const bodySchema = z.object({
   list: z.enum(['owned', 'wishlist']),
@@ -23,7 +23,8 @@ const bodySchema = z.object({
     .max(MAX_BATCH_ITEMS)
     .refine(
       (items) =>
-        items.filter((item) => !item.rememberOnly).length <= MAX_SCAN_BATCH,
+        items.filter((item) => !item.rememberOnly).length <= MAX_SCAN_BATCH &&
+        items.filter((item) => item.rememberOnly).length <= MAX_SCAN_BATCH,
       { message: 'Too many games to add' },
     ),
 })

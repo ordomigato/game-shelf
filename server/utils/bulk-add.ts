@@ -113,22 +113,27 @@ export async function bulkAdd(
       ...input.entries.map((entry) => entry.igdbId),
     ]),
   ]
+  const addIds = new Set(entries.map((entry) => entry.igdbId))
   if (input.collectionId) {
     await assertOwnsCollections(ownerId, [input.collectionId])
   }
 
-  const [catalogRows, existingRows] = await Promise.all([
-    ensureCatalogGames(igdbIds),
-    db
-      .select()
-      .from(libraryItems)
-      .where(
-        and(
-          eq(libraryItems.ownerId, ownerId),
-          inArray(libraryItems.igdbId, igdbIds),
-        ),
+  const existingRows = await db
+    .select()
+    .from(libraryItems)
+    .where(
+      and(
+        eq(libraryItems.ownerId, ownerId),
+        inArray(libraryItems.igdbId, igdbIds),
       ),
-  ])
+    )
+  // The catalog (and so IGDB) is asked about the games being added, and about
+  // remember-only games only if they are already in the library. A request
+  // can't make us fetch arbitrary games just to remember a barcode.
+  const inLibraryNow = new Set(existingRows.map((row) => row.igdbId!))
+  const catalogRows = await ensureCatalogGames(
+    igdbIds.filter((id) => addIds.has(id) || inLibraryNow.has(id)),
+  )
   const catalog = new Map(catalogRows.map((game) => [game.igdbId, game]))
   const existing = new Map<number, ListState>(
     existingRows.map((row) => [row.igdbId!, row]),

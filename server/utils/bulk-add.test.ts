@@ -415,6 +415,41 @@ describe('bulkAdd', () => {
       expect(pickStatement()).toBeUndefined()
     })
 
+    it('reads only the added games and library games from IGDB, never a remember-only stranger', async () => {
+      fake.existing = [
+        {
+          id: 'i1',
+          igdbId: 1,
+          owned: true,
+          wishlisted: false,
+          ownedOn: [SWITCH],
+          wantedOn: [],
+        },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [
+          { igdbId: 2, platformId: null },
+          {
+            igdbId: 1,
+            platformId: SWITCH,
+            barcode: code,
+            own: true,
+            rememberOnly: true,
+          },
+          {
+            igdbId: 999,
+            platformId: SWITCH,
+            barcode: '0045496590055',
+            own: true,
+            rememberOnly: true,
+          },
+        ],
+      })
+      expect(ensureCatalogGames).toHaveBeenCalledOnce()
+      expect(ensureCatalogGames.mock.calls[0]![0].sort()).toEqual([1, 2])
+    })
+
     it('stops saving new barcodes at the plan’s game limit, but updates existing ones and still adds', async () => {
       fake.stored = Array.from({ length: free.games - 1 }, (_, i) => `s${i}`)
       fake.stored.push('0045496590055')

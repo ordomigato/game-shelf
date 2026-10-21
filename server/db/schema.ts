@@ -40,11 +40,11 @@ export const users = pgTable(
     /** Chosen after the first sign-in. Null until then. */
     username: text('username').unique(),
     displayName: text('display_name'),
-    /** What the account may store (shared/utils/plans.ts). */
     /** May suggest games to ScanDex. Set by hand, off for everyone else. */
     contributesBarcodes: boolean('contributes_barcodes')
       .notNull()
       .default(false),
+    /** What the account may store (shared/utils/plans.ts). */
     plan: text('plan')
       .$type<'free' | 'pro' | 'max'>()
       .notNull()

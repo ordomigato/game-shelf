@@ -1,7 +1,11 @@
 import { Resource } from 'sst'
+import { log } from './log'
 
 const LOOKUP_URL = 'https://scandex.gamery.app/api/v2/lookup'
+const CREATE_URL = 'https://scandex.gamery.app/api/v2/create'
 const TIMEOUT_MS = 5000
+/** Suggesting a game is never worth making anyone wait long. */
+const CREATE_TIMEOUT_MS = 3000
 
 /** What ScanDex knows about a barcode. */
 export type ScanDexAnswer =
@@ -98,5 +102,53 @@ export async function askScanDex(
   } catch (error) {
     if (error instanceof ScanDexError) return first
     throw error
+  }
+}
+
+/** What ScanDex is told about a box it didn't know. */
+export interface ScanDexSuggestion {
+  igdbId: number
+  platformId: number
+  /** The IGDB platform's name. */
+  platform: string
+  /** The IGDB game's name. */
+  name: string
+  /** The barcode, as digits. */
+  value: number
+}
+
+/**
+ * Suggests a game for a barcode to ScanDex. Any 2xx is success. Anything
+ * else, or no answer within a few seconds, is a failure that is only logged
+ * (the status, never the barcode or the game). Never throws.
+ */
+export async function submitToScanDex(
+  suggestion: ScanDexSuggestion,
+): Promise<boolean> {
+  try {
+    const response = await fetch(CREATE_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${Resource.ScanDexToken.value}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        igdb_id: suggestion.igdbId,
+        platform_id: suggestion.platformId,
+        platform: suggestion.platform,
+        name: suggestion.name,
+        value: suggestion.value,
+      }),
+      signal: AbortSignal.timeout(CREATE_TIMEOUT_MS),
+    })
+    if (response.status < 200 || response.status > 299) {
+      log('warn', 'barcode.suggest_failed', { status: response.status })
+      return false
+    }
+    return true
+  } catch {
+    log('warn', 'barcode.suggest_failed', { status: 0 })
+    return false
   }
 }

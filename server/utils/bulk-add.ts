@@ -11,6 +11,7 @@ import type { ListState } from '../../shared/utils/lists'
 import type { PlanLimits } from '../../shared/utils/plans'
 import { normalizeBarcode } from '../../shared/utils/barcode'
 import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
+import { contributePicks } from './barcode-contribute'
 import { ensureCatalogGames } from './catalog'
 import { assertOwnsCollections, lastPositions } from './collections'
 
@@ -93,7 +94,13 @@ async function withRoomForPicks<T extends { code: string }>(
 export async function bulkAdd(
   ownerId: string,
   limits: PlanLimits,
-  input: { list: ListName; collectionId?: string; entries: BulkAddEntry[] },
+  input: {
+    list: ListName
+    collectionId?: string
+    entries: BulkAddEntry[]
+    /** The account may suggest games to ScanDex. */
+    contributes?: boolean
+  },
 ): Promise<BulkAddResult> {
   const db = useDb()
   // `rememberOnly` entries only carry a barcode and are never added.
@@ -241,6 +248,16 @@ export async function bulkAdd(
   }
   if (statements.length) {
     await db.batch(statements as [(typeof statements)[0]])
+  }
+
+  // After the add has gone through. Awaited, because the server may freeze
+  // once the response is sent. It never throws and is capped at a few seconds.
+  if (input.contributes && picks.length) {
+    await contributePicks(
+      ownerId,
+      picks,
+      new Map([...catalog].map(([id, game]) => [id, game.name])),
+    ).catch(() => {})
   }
 
   return {

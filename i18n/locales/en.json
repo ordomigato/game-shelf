@@ -146,7 +146,7 @@
     "othersTitle": "Other services",
     "others": "Cover images load straight from IGDB, so IGDB sees your browser's address when you view them, as any website would.",
     "scanningTitle": "Scanning barcodes",
-    "scanning": "The camera picture never leaves your device. Only the barcode number is sent to us, and we look it up through ScanDex. When you match a barcode to a game yourself, we remember it for your account only, so scanning that box again is instant.",
+    "scanning": "The camera picture never leaves your device. Only the barcode number is sent to us, and we look it up through ScanDex. When you match a barcode to a game yourself, we remember it for your account only, so scanning that box again is instant. If ScanDex didn't know the box, we may also send ScanDex the barcode and the game you chose to help grow their database. Nothing about you is sent.",
     "controlTitle": "Take it with you, or delete it",
     "control": "In {settings} you can export everything as spreadsheet files, or delete your account. Deleting removes your account and everything you've added. The database host keeps a few hours of history for recovery, after which it's gone for good.",
     "settingsLink": "Settings",

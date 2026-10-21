@@ -3,6 +3,8 @@ import { limitsFor } from '../../shared/utils/plans'
 import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
 
 const ensureCatalogGames = vi.fn()
+const contributePicks = vi.fn()
+vi.mock('./barcode-contribute', () => ({ contributePicks }))
 const assertOwnsCollections = vi.fn()
 vi.mock('./catalog', () => ({ ensureCatalogGames }))
 vi.mock('./collections', () => ({
@@ -79,6 +81,8 @@ beforeEach(() => {
   }
   batches.length = 0
   reads.length = 0
+  contributePicks.mockReset()
+  contributePicks.mockResolvedValue(undefined)
   ensureCatalogGames.mockReset()
   ensureCatalogGames.mockImplementation(async (ids: number[]) => ids.map(game))
   assertOwnsCollections.mockReset()
@@ -437,6 +441,72 @@ describe('bulkAdd', () => {
       expect(pickStatement()?.values.map((v) => v.code)).toEqual([
         '0045496590055',
       ])
+    })
+  })
+
+  describe('suggesting to ScanDex', () => {
+    const entry = {
+      igdbId: 1,
+      platformId: SWITCH,
+      barcode: '0045496590048',
+      own: true,
+    }
+
+    it('is left to an allowed account, after the batch, with the saved picks and catalog names', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [entry],
+        contributes: true,
+      })
+      expect(batches).toHaveLength(1)
+      expect(contributePicks).toHaveBeenCalledWith(
+        'u1',
+        [
+          expect.objectContaining({
+            code: '0045496590048',
+            igdbId: 1,
+            platformId: SWITCH,
+          }),
+        ],
+        new Map([[1, 'Game 1']]),
+      )
+    })
+
+    it('is never started for other accounts', async () => {
+      await bulkAdd('u1', free, { list: 'owned', entries: [entry] })
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [entry],
+        contributes: false,
+      })
+      expect(contributePicks).not.toHaveBeenCalled()
+    })
+
+    it('is not started when the add is refused', async () => {
+      fake.libraryCount = free.games
+      await expect(
+        bulkAdd('u1', free, {
+          list: 'owned',
+          entries: [entry],
+          contributes: true,
+        }),
+      ).rejects.toMatchObject({ statusCode: 403 })
+      expect(contributePicks).not.toHaveBeenCalled()
+    })
+
+    it('does not change the add’s answer when it fails', async () => {
+      contributePicks.mockRejectedValue(new Error('ScanDex down'))
+      const result = await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [entry],
+        contributes: true,
+      })
+      expect(result).toEqual({
+        added: 1,
+        withoutPlatform: 0,
+        skipped: [],
+        inCollection: 0,
+      })
     })
   })
 })

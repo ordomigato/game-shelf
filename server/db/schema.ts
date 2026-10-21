@@ -41,6 +41,10 @@ export const users = pgTable(
     username: text('username').unique(),
     displayName: text('display_name'),
     /** What the account may store (shared/utils/plans.ts). */
+    /** May suggest games to ScanDex. Set by hand, off for everyone else. */
+    contributesBarcodes: boolean('contributes_barcodes')
+      .notNull()
+      .default(false),
     plan: text('plan')
       .$type<'free' | 'pro' | 'max'>()
       .notNull()
@@ -332,6 +336,8 @@ export const userBarcodes = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** When the pick was suggested to ScanDex. Null if it never was. */
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.ownerId, table.code] })],
 )

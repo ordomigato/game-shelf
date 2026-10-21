@@ -1,5 +1,5 @@
 {
-  "id": "6a51b4cd-7bd3-43f1-b329-d803152324df",
+  "id": "68bc5cb0-72e7-4f4c-b304-5bda832e31a6",
   "prevId": "19566543-e53f-4a58-8671-fb1e3ee7e2ee",
   "version": "7",
   "dialect": "postgresql",
@@ -721,6 +721,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -781,6 +787,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "contributes_barcodes": {
+          "name": "contributes_barcodes",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "plan": {
           "name": "plan",

@@ -14,11 +14,13 @@ useSeoMeta({
   ogDescription: () => t('explore.description'),
 })
 
-// Nuxt's $fetch, which also works while rendering on the server (a plain
-// fetch can't resolve "/api/…" there). Typed by hand: inferring the route's
-// type here is too deep for TypeScript.
+// The request's own fetch, which also works while rendering on the server (a
+// plain fetch can't resolve "/api/…" there) and passes the visitor's headers
+// on, so the server's call to itself counts as theirs for the request limits.
+// Typed by hand: inferring the route's type here is too deep for TypeScript.
+const requestFetch = useRequestFetch()
 const fetchPage = (page: number) =>
-  $fetch<ExplorePage>('/api/explore' as string, { query: { page } })
+  requestFetch<ExplorePage>('/api/explore' as string, { query: { page } })
 
 const { data, status, error, refresh } = useAsyncData('explore', () =>
   fetchPage(1),

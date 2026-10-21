@@ -57,7 +57,7 @@ jobs:
       - name: Smoke test
         run: |
           base=https://thisplayshelf.com
-          for path in / /explore '/api/games/search?q=zelda'; do
+          for path in / /explore '/?q=zelda' '/api/games/search?q=zelda'; do
             status=$(curl -s -o /dev/null -w '%{http_code}' --retry 3 --retry-all-errors "$base$path")
             echo "$status $path"
             if [ "$status" != 200 ]; then

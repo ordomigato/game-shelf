@@ -11,10 +11,17 @@ const { data: game, error } = await useFetch<GameDetails>(
 )
 
 if (error.value) {
-  const notFound = [400, 404].includes(error.value.statusCode ?? 0)
+  const status = error.value.statusCode ?? 0
+  const notFound = [400, 404].includes(status)
+  // Too many requests keeps its own status, so the error page can say so.
+  const tooMany = status === 429
   throw createError({
-    statusCode: notFound ? 404 : 502,
-    statusMessage: notFound ? 'Game not found' : 'Game data unavailable',
+    statusCode: notFound ? 404 : tooMany ? 429 : 502,
+    statusMessage: notFound
+      ? 'Game not found'
+      : tooMany
+        ? 'Too many requests'
+        : 'Game data unavailable',
     fatal: true,
   })
 }

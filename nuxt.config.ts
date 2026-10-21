@@ -72,6 +72,15 @@ export default defineNuxtConfig({
     '/u/**': { ssr: false },
   },
   runtimeConfig: {
+    // Per-client request limits (server/middleware/rate-limit.ts). The e2e
+    // server turns them off with NUXT_RATE_LIMIT_ENABLED=false.
+    rateLimitEnabled: true,
+    // Only CloudFront may reach a deployed server (server/middleware/
+    // origin-check.ts). The secret is set by the deploy with
+    // NUXT_ORIGIN_SECRET. A built server run locally sets
+    // NUXT_ORIGIN_CHECK=false.
+    originCheck: true,
+    originSecret: '',
     public: {
       // The real domain, for canonical links and link previews. Set in
       // production with NUXT_PUBLIC_SITE_URL.

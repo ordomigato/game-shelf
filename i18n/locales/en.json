@@ -166,6 +166,8 @@
     "notFoundBody": "We couldn't find this page.",
     "genericTitle": "Something went wrong",
     "genericBody": "Please try again in a moment.",
+    "tooManyTitle": "Too many requests",
+    "tooManyBody": "Wait a minute and try again.",
     "backHome": "Back to home"
   },
   "search": {
@@ -381,7 +383,8 @@
     }
   },
   "common": {
-    "genericError": "Something went wrong. Try again."
+    "genericError": "Something went wrong. Try again.",
+    "rateLimited": "Too many requests. Wait a moment and try again."
   },
   "authErrors": {
     "UsernameExistsException": "An account with that email already exists. Try signing in.",

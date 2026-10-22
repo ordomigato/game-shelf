@@ -1,5 +1,5 @@
 {
-  "id": "1aab38f6-0aca-46d4-91d1-f410c899d1d1",
+  "id": "68bc5cb0-72e7-4f4c-b304-5bda832e31a6",
   "prevId": "19566543-e53f-4a58-8671-fb1e3ee7e2ee",
   "version": "7",
   "dialect": "postgresql",
@@ -8,33 +8,10 @@
       "name": "barcode_lookups",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "barcode_lookups_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "2147483647",
-            "cache": "1",
-            "cycle": false
-          }
-        },
         "code": {
           "name": "code",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true
         },
         "igdb_id": {
@@ -55,159 +32,20 @@
           "primaryKey": false,
           "notNull": false
         },
-        "submitted_by": {
-          "name": "submitted_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sent_at": {
-          "name": "sent_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "fetched_at": {
           "name": "fetched_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
           "notNull": true,
           "default": "now()"
         }
       },
-      "indexes": {
-        "barcode_lookups_scandex_idx": {
-          "name": "barcode_lookups_scandex_idx",
-          "columns": [
-            {
-              "expression": "code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"barcode_lookups\".\"source\" = 'scandex'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "barcode_lookups_pick_idx": {
-          "name": "barcode_lookups_pick_idx",
-          "columns": [
-            {
-              "expression": "code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "submitted_by",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"barcode_lookups\".\"source\" = 'user' and \"barcode_lookups\".\"submitted_by\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "barcode_lookups_review_idx": {
-          "name": "barcode_lookups_review_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"barcode_lookups\".\"source\" = 'user'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "barcode_lookups_submitted_by_idx": {
-          "name": "barcode_lookups_submitted_by_idx",
-          "columns": [
-            {
-              "expression": "submitted_by",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "barcode_lookups_submitted_by_users_id_fk": {
-          "name": "barcode_lookups_submitted_by_users_id_fk",
-          "tableFrom": "barcode_lookups",
-          "tableTo": "users",
-          "columnsFrom": [
-            "submitted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "barcode_lookups_source": {
-          "name": "barcode_lookups_source",
-          "value": "\"barcode_lookups\".\"source\" in ('scandex', 'user')"
-        },
-        "barcode_lookups_status": {
-          "name": "barcode_lookups_status",
-          "value": "\"barcode_lookups\".\"status\" in ('pending', 'approved', 'rejected')"
-        },
-        "barcode_lookups_source_parts": {
-          "name": "barcode_lookups_source_parts",
-          "value": "(\"barcode_lookups\".\"source\" = 'scandex' and \"barcode_lookups\".\"status\" is null and \"barcode_lookups\".\"fetched_at\" is not null) or (\"barcode_lookups\".\"source\" = 'user' and \"barcode_lookups\".\"status\" is not null and \"barcode_lookups\".\"igdb_id\" is not null)"
-        },
         "barcode_lookups_match_parts": {
           "name": "barcode_lookups_match_parts",
           "value": "\"barcode_lookups\".\"igdb_id\" is not null or (\"barcode_lookups\".\"platform_id\" is null and \"barcode_lookups\".\"platform_name\" is null)"
@@ -849,6 +687,78 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.user_barcodes": {
+      "name": "user_barcodes",
+      "schema": "",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "igdb_id": {
+          "name": "igdb_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_id": {
+          "name": "platform_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_barcodes_owner_id_users_id_fk": {
+          "name": "user_barcodes_owner_id_users_id_fk",
+          "tableFrom": "user_barcodes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_barcodes_owner_id_code_pk": {
+          "name": "user_barcodes_owner_id_code_pk",
+          "columns": [
+            "owner_id",
+            "code"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -878,8 +788,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "reviews_barcodes": {
-          "name": "reviews_barcodes",
+        "contributes_barcodes": {
+          "name": "contributes_barcodes",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

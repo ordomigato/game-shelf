@@ -6,7 +6,7 @@ const journal = JSON.parse(
   readFileSync(new URL('meta/_journal.json', migrations), 'utf8'),
 ) as { entries: { idx: number; tag: string }[] }
 
-const tag = journal.entries.find((entry) => entry.tag.startsWith('0025_'))?.tag
+const tag = journal.entries.find((entry) => entry.tag.startsWith('0026_'))?.tag
 const statements = readFileSync(new URL(`${tag}.sql`, migrations), 'utf8')
   .split('--> statement-breakpoint')
   .map((statement) => statement.trim())
@@ -16,13 +16,14 @@ const touching = (column: string) =>
   statements.filter((statement) => statement.includes(`"${column}"`))
 
 describe('the barcode review migration', () => {
-  it('is the only 0025, and the user_barcodes one is gone', () => {
-    expect(
-      journal.entries.filter((entry) => entry.tag.startsWith('0025_')),
-    ).toHaveLength(1)
-    expect(tag).toBe('0025_barcode_review')
-    expect(statements.join('\n')).not.toContain('user_barcodes')
-    expect(statements.join('\n')).not.toContain('contributes_barcodes')
+  it('comes after the user_barcodes migration and drops its table and flag', () => {
+    expect(tag).toBe('0026_barcode_review')
+    expect(journal.entries.at(-2)?.tag).toBe('0025_user_barcodes')
+    const text = statements.join('\n')
+    expect(text).toContain('DROP TABLE "user_barcodes"')
+    expect(text).toContain(
+      'ALTER TABLE "users" DROP COLUMN "contributes_barcodes"',
+    )
   })
 
   it('makes every row that is already there a ScanDex row', () => {

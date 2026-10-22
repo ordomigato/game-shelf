@@ -98,10 +98,12 @@ const RULES: Partial<Record<Action, Rule>> = {
   'collection.update': ownerOnly,
   'collection.delete': ownerOnly,
   'list.read': ownerOrPublic,
-  // The owner sees every field. Anyone else, only the ones not hidden.
+  // The owner sees every field. Anyone else, only the ones not hidden. The
+  // resource must say whether the field is hidden, or the answer is no.
   'field.read': (subject, resource) =>
     resource !== undefined &&
-    (ownerOnly(subject, resource) || resource.hidden !== true),
+    typeof resource.hidden === 'boolean' &&
+    (ownerOnly(subject, resource) || !resource.hidden),
   'export.read': ownData,
   'barcodes.lookup': signedIn,
 }

@@ -140,6 +140,15 @@ tests stub the API and won't catch it.
 - Each stage has its own Neon branch. `dev` is disposable. It can be reset
   from production in the Neon console.
 
+## Never drop or rename a column the running release reads
+
+A deploy runs `drizzle-kit migrate` first and `sst deploy` after, so for a
+minute or two the old code runs against the new schema. Never drop or
+rename a column the running release reads in the same release. Add the new
+column, ship the release that stops using the old one, then drop the old one
+in a later migration. Keep the old column in the Drizzle schema with a
+comment until then, so the drift check stays clean.
+
 ## Production migrations
 
 `npx sst shell --stage production -- npx drizzle-kit migrate` changes the

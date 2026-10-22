@@ -1,5 +1,5 @@
 {
-  "id": "729fbebb-70fb-43a2-92e5-6dde24309f0c",
+  "id": "8522a908-8ab5-4266-9762-29194e641069",
   "prevId": "bb727bca-472b-45ce-ab94-005819044b0f",
   "version": "7",
   "dialect": "postgresql",
@@ -877,6 +877,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "reviews_barcodes": {
+          "name": "reviews_barcodes",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "roles": {
           "name": "roles",

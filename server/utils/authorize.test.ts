@@ -7,6 +7,7 @@ const MISSING = '10000000-0000-4000-8000-0000000000ff'
 
 let token: { sub: string; username: string } | null
 let user: { id: string; roles: string[] } | undefined
+let creations = 0
 /** What a lookup of collections or items finds. */
 let found: { ownerId: string; visibility?: string }[]
 
@@ -18,7 +19,10 @@ vi.mock('./auth', () => ({
   optionalAuth: async () => token,
 }))
 vi.mock('./users', () => ({
-  findOrCreateUser: async () => user,
+  findOrCreateUser: async () => {
+    creations++
+    return user
+  },
   findUserBySub: async () => user,
 }))
 vi.stubGlobal('useDb', () => ({
@@ -32,6 +36,7 @@ vi.stubGlobal('useDb', () => ({
 const {
   assertCanOnCollections,
   authorize,
+  authorizeAccount,
   collectionOf,
   collectionResource,
   itemOf,
@@ -45,6 +50,7 @@ beforeEach(() => {
   token = { sub: 'sub-1', username: 'sub-1' }
   user = { id: OWNER, roles: [] }
   found = [{ ownerId: OWNER, visibility: 'private' }]
+  creations = 0
 })
 
 describe('authorize', () => {
@@ -105,6 +111,35 @@ describe('authorize', () => {
     user = { id: OWNER, roles: ['admin'] }
     await expect(
       authorize(event(), 'collection.update', { ownerId: OTHER }),
+    ).rejects.toMatchObject({ statusCode: 404 })
+  })
+})
+
+describe('authorizeAccount', () => {
+  it('is a 401 without a signed-in user', async () => {
+    token = null
+    await expect(
+      authorizeAccount(event(), 'account.delete'),
+    ).rejects.toMatchObject({ statusCode: 401 })
+  })
+
+  it('lets a signed-in user with a row through, without creating one', async () => {
+    const result = await authorizeAccount(event(), 'account.delete')
+    expect(result.subject).toEqual({ id: OWNER, roles: [] })
+    expect(result.claims).toBe(token)
+    expect(creations).toBe(0)
+  })
+
+  it('lets a signed-in user with no row through, and still creates none', async () => {
+    user = undefined
+    const result = await authorizeAccount(event(), 'account.delete')
+    expect(result.claims.sub).toBe('sub-1')
+    expect(creations).toBe(0)
+  })
+
+  it('still refuses an action the policy does not allow', async () => {
+    await expect(
+      authorizeAccount(event(), 'barcodes.review'),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })

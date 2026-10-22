@@ -42,6 +42,12 @@ export const users = pgTable(
     username: text('username').unique(),
     displayName: text('display_name'),
     /**
+     * Unused: replaced by the `admin` role in `roles`. Kept only so the
+     * release before this one, which still reads it, keeps working while
+     * a deploy is in progress. A later migration drops it.
+     */
+    reviewsBarcodes: boolean('reviews_barcodes').notNull().default(false),
+    /**
      * Roles beyond the implicit "user", set by hand. A new role needs a
      * migration that widens `users_roles` (see shared/utils/access.ts).
      */

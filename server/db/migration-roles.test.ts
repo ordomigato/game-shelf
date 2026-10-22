@@ -26,16 +26,17 @@ describe('the roles migration', () => {
     )
   })
 
-  it('makes every reviewer an admin after the column exists and before the flag goes', () => {
+  it('makes every reviewer an admin once the column exists', () => {
     const add = indexOf('ADD COLUMN "roles"')
     const copy = indexOf('UPDATE "users" SET "roles"')
-    const drop = indexOf('DROP COLUMN "reviews_barcodes"')
     expect(statements[copy]).toBe(
       'UPDATE "users" SET "roles" = \'{admin}\' WHERE "reviews_barcodes";',
     )
-    expect(add).toBeGreaterThanOrEqual(0)
     expect(copy).toBeGreaterThan(add)
-    expect(drop).toBeGreaterThan(copy)
+  })
+
+  it('leaves reviews_barcodes in place, for the release still running during a deploy', () => {
+    expect(statements.join('\n')).not.toMatch(/DROP COLUMN|RENAME/)
   })
 
   it('allows only known role names', () => {

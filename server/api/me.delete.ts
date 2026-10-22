@@ -12,7 +12,7 @@ const cognito = new CognitoIdentityProviderClient({})
  * already gone. Signing in again would just start a fresh, empty account.
  */
 export default defineEventHandler(async (event) => {
-  const { claims } = await authorize(event, 'account.delete')
+  const { claims } = await authorizeAccount(event, 'account.delete')
   await deleteAccountData(claims.sub)
 
   try {

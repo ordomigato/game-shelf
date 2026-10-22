@@ -50,6 +50,22 @@ export async function authorize(
 }
 
 /**
+ * Like `authorize` for an account action that must not create a user row
+ * (deleting the account). The subject comes from the verified token; an
+ * account with no row yet has no id or roles of its own.
+ */
+export async function authorizeAccount(
+  event: H3Event,
+  action: Action,
+): Promise<{ subject: Subject; claims: AuthClaims }> {
+  const claims = await requireAuth(event)
+  const user = await findUserBySub(claims.sub)
+  const subject = user ? subjectOf(user) : { id: claims.sub, roles: [] }
+  assertCan(subject, action)
+  return { subject, claims }
+}
+
+/**
  * Who is asking on a route anyone may call: null for a visitor, otherwise the
  * signed-in user. A token that is present but invalid is a 401. Never creates
  * a user row. Follow it with `assertCan` once the resource is known.

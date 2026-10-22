@@ -1,0 +1,18 @@
+import { z } from 'zod'
+import type { BarcodeReviewGroup } from '../../../shared/types/barcode'
+
+const querySchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected']).default('pending'),
+})
+
+/**
+ * The barcode picks with a status, grouped by barcode, game and platform,
+ * for the barcode reviewer. Anyone else gets a 404 before anything is read.
+ */
+export default defineEventHandler(
+  async (event): Promise<BarcodeReviewGroup[]> => {
+    await requireReviewer(event)
+    const { status } = await getValidatedQuery(event, querySchema.parse)
+    return listReviewGroups(status)
+  },
+)

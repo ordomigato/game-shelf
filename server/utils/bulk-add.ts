@@ -9,8 +9,8 @@ import {
 } from '../../shared/utils/bulk-add'
 import type { ListState } from '../../shared/utils/lists'
 import type { PlanLimits } from '../../shared/utils/plans'
-import { normalizeBarcode } from '../../shared/utils/barcode'
-import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
+import { MAX_PENDING_PICKS, normalizeBarcode } from '../../shared/utils/barcode'
+import { barcodeLookups, collectionItems, libraryItems } from '../db/schema'
 import { ensureCatalogGames } from './catalog'
 import { assertOwnsCollections, lastPositions } from './collections'
 
@@ -26,7 +26,7 @@ function noRoomFor(where: keyof typeof BULK_NO_ROOM, fit: number): never {
 /**
  * The barcodes the user matched themselves, for games that end up in the
  * library (added, or already there). Unknown games leave no trace, and a
- * ScanDex match is never kept here. The platform is kept only
+ * ScanDex match is never kept as a pick. The platform is kept only
  * if the catalog lists it for the game, as the add does. For a barcode named
  * twice in a batch, the last pick wins.
  */
@@ -56,25 +56,61 @@ function ownPicks(
 }
 
 /**
- * Stored picks are capped per user at the plan's game limit, since they are
- * keyed by barcode and a library of games doesn't bound them. Once a user is
- * at the cap, a pick for a barcode they have no pick for yet is left out.
- * Changing a pick they already have still works.
+ * Pending picks are capped per user (`MAX_PENDING_PICKS`), since picks are
+ * keyed by barcode and a library of games doesn't bound them. A pick that
+ * would add a pending one (a barcode they have no pick for yet, or one
+ * rejected that now names another game) is left out once the user is at the
+ * cap. Changing a pick that is already pending, or approved, takes no room.
+ * A rejected pick naming the same game and platform again is left alone: it
+ * stays rejected and isn't sent for review again.
  */
-async function withRoomForPicks<T extends { code: string }>(
-  ownerId: string,
-  limits: PlanLimits,
-  picks: T[],
-): Promise<T[]> {
+async function withRoomForPicks<
+  T extends { code: string; igdbId: number; platformId: number | null },
+>(ownerId: string, picks: T[]): Promise<T[]> {
   if (!picks.length) return picks
-  const stored = await useDb()
-    .select({ code: userBarcodes.code })
-    .from(userBarcodes)
-    .where(eq(userBarcodes.ownerId, ownerId))
-  const known = new Set(stored.map((row) => row.code))
-  let room = Math.max(0, limits.games - known.size)
+  const db = useDb()
+  const [stored, [pending]] = await Promise.all([
+    db
+      .select({
+        code: barcodeLookups.code,
+        igdbId: barcodeLookups.igdbId,
+        platformId: barcodeLookups.platformId,
+        status: barcodeLookups.status,
+      })
+      .from(barcodeLookups)
+      .where(
+        and(
+          eq(barcodeLookups.source, 'user'),
+          eq(barcodeLookups.submittedBy, ownerId),
+          inArray(
+            barcodeLookups.code,
+            picks.map((pick) => pick.code),
+          ),
+        ),
+      ),
+    db
+      .select({ n: count() })
+      .from(barcodeLookups)
+      .where(
+        and(
+          eq(barcodeLookups.source, 'user'),
+          eq(barcodeLookups.submittedBy, ownerId),
+          eq(barcodeLookups.status, 'pending'),
+        ),
+      ),
+  ])
+  const known = new Map(stored.map((row) => [row.code, row]))
+  let room = Math.max(0, MAX_PENDING_PICKS - (pending?.n ?? 0))
   return picks.filter((pick) => {
-    if (known.has(pick.code)) return true
+    const row = known.get(pick.code)
+    if (row?.status === 'pending' || row?.status === 'approved') return true
+    if (
+      row?.status === 'rejected' &&
+      row.igdbId === pick.igdbId &&
+      row.platformId === pick.platformId
+    ) {
+      return false
+    }
     if (room <= 0) return false
     room -= 1
     return true
@@ -225,26 +261,40 @@ export async function bulkAdd(
         on conflict do nothing`),
     )
   }
-  // A barcode is remembered for a game that is now in the library: one just
-  // added, or one that was already there.
+  // A barcode is saved as a pick, for review, for a game that is now in the
+  // library: one just added, or one that was already there.
   const inLibrary = new Set([...plan.present, ...existing.keys()])
   const picks = await withRoomForPicks(
     ownerId,
-    limits,
     ownPicks(input.entries, inLibrary, catalog),
   )
   if (picks.length) {
     statements.push(
       db
-        .insert(userBarcodes)
-        .values(picks.map((pick) => ({ ownerId, ...pick })))
+        .insert(barcodeLookups)
+        .values(
+          picks.map((pick) => ({
+            ...pick,
+            source: 'user' as const,
+            submittedBy: ownerId,
+            status: 'pending' as const,
+          })),
+        )
         .onConflictDoUpdate({
-          target: [userBarcodes.ownerId, userBarcodes.code],
+          target: [barcodeLookups.code, barcodeLookups.submittedBy],
+          targetWhere: sql`${barcodeLookups.source} = 'user' and ${barcodeLookups.submittedBy} is not null`,
           set: {
             igdbId: sql`excluded.igdb_id`,
             platformId: sql`excluded.platform_id`,
+            status: 'pending',
+            reviewedAt: null,
+            sentAt: null,
             updatedAt: new Date(),
           },
+          // An approved pick is not touched (it serves everyone), and a
+          // pick naming the same game and platform is left as it is, which
+          // keeps a rejected one rejected.
+          setWhere: sql`${barcodeLookups.status} <> 'approved' and (${barcodeLookups.igdbId}, ${barcodeLookups.platformId}) is distinct from (excluded.igdb_id, excluded.platform_id)`,
         }),
     )
   }

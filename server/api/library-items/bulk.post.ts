@@ -34,7 +34,7 @@ const bodySchema = z.object({
  * the user's collections when `collectionId` is given. Each game follows
  * the rules of adding it alone (see `planBulkAdd`). If the library or the
  * collection can't take them all, nothing is added. Items marked `own` carry
- * a barcode the user matched themselves, which is remembered for them alone
+ * a barcode the user matched themselves, which is saved as a pick for review
  * (see `bulkAdd`). Items marked `rememberOnly` are never added.
  */
 export default defineEventHandler(async (event): Promise<BulkAddResult> => {

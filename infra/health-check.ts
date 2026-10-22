@@ -45,14 +45,15 @@ export async function handler(): Promise<void> {
 }
 
 /**
- * Deletes cached "no match" answers too old to be used again (one
- * statement). Matches are kept for good. A failure is only logged.
+ * Deletes ScanDex's cached "no match" answers too old to be used again
+ * (one statement). Matches are kept for good, and so is every user's pick. A failure is only logged.
  */
-async function pruneBarcodeCache(): Promise<void> {
+export async function pruneBarcodeCache(): Promise<void> {
   try {
     await neon(Resource.DatabaseUrl.value)`
       delete from barcode_lookups
-      where igdb_id is null
+      where source = 'scandex'
+        and igdb_id is null
         and fetched_at < now() - make_interval(secs => ${BARCODE_NO_MATCH_TTL_MS / 1000}::double precision)`
   } catch (error) {
     console.error('barcode cache prune failed', error)

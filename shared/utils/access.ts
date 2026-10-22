@@ -88,9 +88,11 @@ const ownerOrPublic: Rule = (subject, resource) =>
   ownerOnly(subject, resource) || resource?.visibility === 'public'
 
 const RULES: Partial<Record<Action, Rule>> = {
-  'account.read': signedIn,
-  'account.update': signedIn,
-  'account.delete': signedIn,
+  // Your own account only. The /api/me routes act on the signed-in user, but
+  // a route that names an account must pass it, and only its owner may.
+  'account.read': ownData,
+  'account.update': ownData,
+  'account.delete': ownData,
   'library.read': ownData,
   'library.write': ownData,
   'collection.create': ownData,

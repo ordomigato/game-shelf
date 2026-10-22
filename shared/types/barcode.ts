@@ -85,6 +85,12 @@ export interface BarcodeReviewGroup {
   conflict: { name: string } | null
 }
 
+/** The groups with a status. `truncated` when more exist than are listed. */
+export interface BarcodeReviewList {
+  groups: BarcodeReviewGroup[]
+  truncated: boolean
+}
+
 export type BarcodeReviewAction =
   'approve' | 'approveAndSend' | 'reject' | 'send'
 
@@ -106,5 +112,6 @@ export type BarcodeReviewOutcome = BarcodeReviewTarget & {
   result: 'done' | 'conflict' | 'gone'
   send?:
     | { result: 'sent' }
+    | { result: 'already' }
     | { result: 'failed'; status: number; message: string | null }
 }

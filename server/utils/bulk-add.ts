@@ -59,10 +59,10 @@ function ownPicks(
  * Pending picks are capped per user (`MAX_PENDING_PICKS`), since picks are
  * keyed by barcode and a library of games doesn't bound them. A pick that
  * would add a pending one (a barcode they have no pick for yet, or one
- * rejected that now names another game) is left out once the user is at the
- * cap. Changing a pick that is already pending, or approved, takes no room.
- * A rejected pick naming the same game and platform again is left alone: it
- * stays rejected and isn't sent for review again.
+ * rejected or approved that now names another game) is left out once the user
+ * is at the cap. Changing a pick that is already pending takes no room.
+ * A pick naming the same game and platform as the stored one is left alone,
+ * so a rejected pick stays rejected and isn't sent for review again.
  */
 async function withRoomForPicks<
   T extends { code: string; igdbId: number; platformId: number | null },
@@ -103,14 +103,10 @@ async function withRoomForPicks<
   let room = Math.max(0, MAX_PENDING_PICKS - (pending?.n ?? 0))
   return picks.filter((pick) => {
     const row = known.get(pick.code)
-    if (row?.status === 'pending' || row?.status === 'approved') return true
-    if (
-      row?.status === 'rejected' &&
-      row.igdbId === pick.igdbId &&
-      row.platformId === pick.platformId
-    ) {
+    if (row?.igdbId === pick.igdbId && row.platformId === pick.platformId) {
       return false
     }
+    if (row?.status === 'pending') return true
     if (room <= 0) return false
     room -= 1
     return true
@@ -291,10 +287,11 @@ export async function bulkAdd(
             sentAt: null,
             updatedAt: new Date(),
           },
-          // An approved pick is not touched (it serves everyone), and a
-          // pick naming the same game and platform is left as it is, which
-          // keeps a rejected one rejected.
-          setWhere: sql`${barcodeLookups.status} <> 'approved' and (${barcodeLookups.igdbId}, ${barcodeLookups.platformId}) is distinct from (excluded.igdb_id, excluded.platform_id)`,
+          // A pick naming the same game and platform is left as it is, which
+          // keeps a rejected one rejected and an approved one approved. A
+          // different game moves the user's row back to pending, whatever it
+          // was. Other users' rows for the old game are not touched.
+          setWhere: sql`(${barcodeLookups.igdbId}, ${barcodeLookups.platformId}) is distinct from (excluded.igdb_id, excluded.platform_id)`,
         }),
     )
   }

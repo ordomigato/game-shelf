@@ -115,7 +115,9 @@
     "failed": "Couldn't send",
     "failedWith": "Couldn't send: {message}",
     "conflicted": "Another game is already approved for this barcode.",
-    "gone": "Nothing to change. Refresh the list."
+    "gone": "Nothing to change. Refresh the list.",
+    "alreadyDone": "Already sent",
+    "truncated": "Showing the first {count}. Act on these to see more."
   },
   "header": {
     "signIn": "Sign in",

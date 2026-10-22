@@ -6,7 +6,7 @@ const log = vi.fn()
 vi.mock('./log', () => ({ log }))
 
 const { PgDialect } = await import('drizzle-orm/pg-core')
-const { listReviewGroups, reviewGroups, requireReviewer } =
+const { listReviewGroups, reviewGroups, requireReviewer, MAX_REVIEW_GROUPS } =
   await import('./barcode-review')
 
 /** The SQL text and parameters of a condition. */
@@ -17,6 +17,7 @@ interface Call {
   set?: Record<string, unknown>
   where?: never
   steps: string[]
+  args: Record<string, unknown[]>
 }
 
 let calls: Call[]
@@ -49,6 +50,7 @@ function query(call: Call, answer: () => unknown) {
         }
         return (...args: unknown[]) => {
           call.steps.push(prop)
+          call.args[prop] = args
           if (prop === 'set') call.set = args[0] as Record<string, unknown>
           if (prop === 'where') call.where = args[0] as never
           return q
@@ -61,12 +63,12 @@ function query(call: Call, answer: () => unknown) {
 
 vi.stubGlobal('useDb', () => ({
   select: () => {
-    const call: Call = { kind: 'select', steps: [] }
+    const call: Call = { kind: 'select', steps: [], args: {} }
     calls.push(call)
     return query(call, () => selects.shift() ?? [])
   },
   update: () => {
-    const call: Call = { kind: 'update', steps: [] }
+    const call: Call = { kind: 'update', steps: [], args: {} }
     calls.push(call)
     return query(call, () => {
       const status = call.set?.status
@@ -137,31 +139,37 @@ describe('requireReviewer', () => {
 })
 
 describe('listReviewGroups', () => {
+  /** A group as the grouping statement returns it. */
   const row = (extra = {}) => ({
     code: CODE,
     igdbId: 26758,
     platformId: 130,
-    sentAt: null,
-    updatedAt: new Date('2026-10-02T00:00:00Z'),
-    username: 'ann',
     name: 'Super Mario Odyssey',
     coverId: 'co1',
     platform: 'Nintendo Switch',
+    people: 1,
+    users: ['ann'],
+    pickedAt: new Date('2026-10-02T00:00:00Z'),
+    unsent: 1,
     ...extra,
   })
+  const list = async (status: Parameters<typeof listReviewGroups>[0]) =>
+    (await listReviewGroups(status)).groups
 
-  it('groups picks by barcode, game and platform, and counts the people', async () => {
+  it('turns each grouped row into a group, with the people and who', async () => {
     selects = [
       [
-        row({ username: 'cy', updatedAt: new Date('2026-10-03T00:00:00Z') }),
-        row({ username: 'bob', updatedAt: new Date('2026-10-02T12:00:00Z') }),
-        row({ username: 'ann' }),
-        row({ igdbId: 9, name: 'Other', username: 'dee' }),
+        row({
+          people: 3,
+          users: ['ann', 'bob', 'cy'],
+          pickedAt: new Date('2026-10-03T00:00:00Z'),
+        }),
+        row({ igdbId: 9, name: 'Other', users: ['dee'] }),
       ],
       [],
       [],
     ]
-    const groups = await listReviewGroups('pending')
+    const groups = await list('pending')
     expect(groups).toHaveLength(2)
     expect(groups[0]).toMatchObject({
       code: CODE,
@@ -170,30 +178,64 @@ describe('listReviewGroups', () => {
       platform: 'Nintendo Switch',
       status: 'pending',
       people: 3,
-      // Oldest pick first.
       users: ['ann', 'bob', 'cy'],
       pickedAt: '2026-10-03T00:00:00.000Z',
     })
     expect(groups[1]).toMatchObject({ igdbId: 9, people: 1 })
   })
 
-  it('puts the most agreed pending groups first', async () => {
+  it('groups in one statement, most agreed first for pending, newest first otherwise', async () => {
+    selects = [[row()], [], []]
+    await list('pending')
+    selects = [[row()], []]
+    await list('approved')
+    const [pending, approved] = calls.filter((call) =>
+      call.steps.includes('groupBy'),
+    )
+    expect(pending!.steps).toEqual(
+      expect.arrayContaining(['groupBy', 'orderBy', 'limit']),
+    )
+    expect(pending!.args.orderBy).toHaveLength(3)
+    expect(approved!.args.orderBy).toHaveLength(2)
+    expect(calls.filter((c) => c.steps.includes('groupBy'))).toHaveLength(2)
+  })
+
+  it('reads one group more than it shows, to know if more exist', async () => {
+    selects = [[row()], [], []]
+    await list('pending')
+    expect(calls[0]!.args.limit).toEqual([MAX_REVIEW_GROUPS + 1])
+    expect(MAX_REVIEW_GROUPS).toBe(500)
+  })
+
+  it('says when more groups exist than are shown, and shows only the cap', async () => {
     selects = [
-      [
-        row({ igdbId: 1, name: 'One', username: 'a' }),
-        row({ igdbId: 2, name: 'Two', username: 'a' }),
-        row({ igdbId: 2, name: 'Two', username: 'b' }),
-      ],
+      Array.from({ length: MAX_REVIEW_GROUPS + 1 }, (_, i) =>
+        row({ igdbId: i + 1, code: String(4549659000000 + i) }),
+      ),
       [],
       [],
     ]
-    const groups = await listReviewGroups('pending')
-    expect(groups.map((g) => g.igdbId)).toEqual([2, 1])
+    const result = await listReviewGroups('pending')
+    expect(result.groups).toHaveLength(MAX_REVIEW_GROUPS)
+    expect(result.truncated).toBe(true)
+  })
+
+  it('does not say so when everything fits', async () => {
+    selects = [
+      Array.from({ length: MAX_REVIEW_GROUPS }, (_, i) =>
+        row({ igdbId: i + 1 }),
+      ),
+      [],
+      [],
+    ]
+    const result = await listReviewGroups('pending')
+    expect(result.groups).toHaveLength(MAX_REVIEW_GROUPS)
+    expect(result.truncated).toBe(false)
   })
 
   it('only reads the status asked for, and only user picks', async () => {
     selects = [[row()], [], []]
-    await listReviewGroups('rejected')
+    await list('rejected')
     const { sql, params } = sqlOf(calls[0]!.where!)
     expect(sql).toContain('"barcode_lookups"."source" = $1')
     expect(sql).toContain('"barcode_lookups"."status" = $2')
@@ -201,8 +243,21 @@ describe('listReviewGroups', () => {
   })
 
   it('has nothing to say, and asks nothing more, when there are no picks', async () => {
-    expect(await listReviewGroups('pending')).toEqual([])
+    expect(await listReviewGroups('pending')).toEqual({
+      groups: [],
+      truncated: false,
+    })
     expect(calls).toHaveLength(1)
+  })
+
+  it('counts a group as sent only when every row of it was', async () => {
+    selects = [
+      [row({ unsent: 0, people: 2 }), row({ igdbId: 9, unsent: 1, people: 2 })],
+      [],
+    ]
+    const [sent, mixed] = await list('approved')
+    expect(sent!.sent).toBe(true)
+    expect(mixed!.sent).toBe(false)
   })
 
   it('shows ScanDex’s answer and flags a different game', async () => {
@@ -224,7 +279,7 @@ describe('listReviewGroups', () => {
       ],
       [],
     ]
-    const [first, second] = await listReviewGroups('pending')
+    const [first, second] = await list('pending')
     expect(first).toMatchObject({
       scandex: { igdbId: 111, name: 'Something Else' },
       disagrees: true,
@@ -246,7 +301,7 @@ describe('listReviewGroups', () => {
       ],
       [],
     ]
-    const [fresh, old] = await listReviewGroups('pending')
+    const [fresh, old] = await list('pending')
     expect(fresh).toMatchObject({ scandex: 'none', disagrees: false })
     expect(old).toMatchObject({ scandex: null })
   })
@@ -260,21 +315,21 @@ describe('listReviewGroups', () => {
         { code: '0045496590055', igdbId: 5, platformId: 130, name: 'Five' },
       ],
     ]
-    const [conflicting, same] = await listReviewGroups('pending')
+    const [conflicting, same] = await list('pending')
     expect(conflicting!.conflict).toEqual({ name: 'Eight' })
     expect(same!.conflict).toBeNull()
   })
 
   it('does not look for conflicts among approved groups', async () => {
     selects = [[row()], []]
-    const [group] = await listReviewGroups('approved')
+    const [group] = await list('approved')
     expect(group!.conflict).toBeNull()
     expect(calls).toHaveLength(2)
   })
 
   it('keeps an approved pick whose picker is gone, with no name', async () => {
-    selects = [[row({ username: null, sentAt: new Date() })], [], []]
-    const [group] = await listReviewGroups('approved')
+    selects = [[row({ users: [], unsent: 0 })], [], []]
+    const [group] = await list('approved')
     expect(group).toMatchObject({ people: 1, users: [], sent: true })
   })
 })
@@ -386,15 +441,19 @@ describe('send', () => {
       name: 'Super Mario Odyssey',
       code: CODE,
     })
-    // One claim, never given back.
-    expect(updates().map((c) => c.set)).toEqual([{ sentAt: expect.any(Date) }])
+    // One claim, then every approved row of the group marked as sent. Nothing
+    // is given back.
+    expect(updates().map((c) => c.set)).toEqual([
+      { sentAt: expect.any(Date) },
+      { sentAt: expect.any(Date) },
+    ])
     const { sql, params } = sqlOf(updates()[0]!.where!)
     expect(sql).toContain('"barcode_lookups"."sent_at" is null')
     expect(params).toContain('approved')
   })
 
   it('sends a group once when two requests ask at the same time', async () => {
-    selects = [[names], [names]]
+    selects = [[names], [names], [{ id: 1 }]]
     claimable = [1]
     const [first, second] = await Promise.all([
       reviewGroups('send', [target()]),
@@ -402,7 +461,7 @@ describe('send', () => {
     ])
     expect(submitToScanDex).toHaveBeenCalledOnce()
     expect([first![0]!.send!.result, second![0]!.send!.result].sort()).toEqual([
-      'failed',
+      'already',
       'sent',
     ])
   })
@@ -458,6 +517,31 @@ describe('send', () => {
     ])
   })
 
+  it('says already when every row of the group was sent before, and sends nothing', async () => {
+    selects = [[names], [{ id: 4 }]]
+    claimable = []
+    const results = await reviewGroups('send', [target()])
+    expect(submitToScanDex).not.toHaveBeenCalled()
+    expect(results).toEqual([
+      { ...target(), result: 'done', send: { result: 'already' } },
+    ])
+    expect(updates()).toHaveLength(1)
+  })
+
+  it('claims only the unsent rows of a mixed group, and marks them all sent afterwards', async () => {
+    selects = [[names]]
+    claimable = [8, 9]
+    await reviewGroups('send', [target()])
+    expect(submitToScanDex).toHaveBeenCalledOnce()
+    const claim = sqlOf(updates()[0]!.where!)
+    expect(claim.sql).toContain('"barcode_lookups"."sent_at" is null')
+    expect(claim.params).toContain('approved')
+    const mark = sqlOf(updates()[1]!.where!)
+    expect(mark.sql).toContain('"barcode_lookups"."sent_at" is null')
+    expect(mark.params).toContain('approved')
+    expect(updates()[1]!.set).toEqual({ sentAt: expect.any(Date) })
+  })
+
   it('does not send a group that is not approved and unsent', async () => {
     selects = [[names]]
     claimable = []
@@ -509,6 +593,7 @@ describe('approve and send', () => {
     ])
     expect(updates().map((c) => c.set?.status ?? 'claim')).toEqual([
       'approved',
+      'claim',
       'claim',
     ])
   })

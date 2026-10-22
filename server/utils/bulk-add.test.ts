@@ -395,7 +395,7 @@ describe('bulkAdd', () => {
       })
     })
 
-    it('leaves an approved pick and an unchanged pick (so a rejected one stays rejected) alone', async () => {
+    it('changes a row only when the game or platform differs, whatever its status', async () => {
       await bulkAdd('u1', free, {
         list: 'owned',
         entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
@@ -405,11 +405,75 @@ describe('bulkAdd', () => {
         targetWhere: never
       }
       const where = new PgDialect().sqlToQuery(setWhere).sql
-      expect(where).toContain(`"barcode_lookups"."status" <> 'approved'`)
+      // Not by status: an approved row moves back to pending too.
+      expect(where).not.toContain('status')
       expect(where).toContain('is distinct from (excluded.igdb_id')
       expect(new PgDialect().sqlToQuery(targetWhere).sql).toContain(
         `"barcode_lookups"."source" = 'user'`,
       )
+    })
+
+    it('moves the user’s own approved pick back to pending when it names another game', async () => {
+      fake.stored = [
+        { code, igdbId: 5, platformId: SWITCH, status: 'approved' },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({
+          code,
+          igdbId: 1,
+          submittedBy: 'u1',
+          status: 'pending',
+        }),
+      ])
+      const { set } = pickStatement()!.config as unknown as {
+        set: Record<string, unknown>
+      }
+      expect(set).toMatchObject({
+        status: 'pending',
+        reviewedAt: null,
+        sentAt: null,
+      })
+      // Only the user's own row is the target. Other users' rows for the
+      // approved game are other rows and stay approved.
+      expect(pickStatement()?.config.target).toEqual([
+        barcodeLookups.code,
+        barcodeLookups.submittedBy,
+      ])
+    })
+
+    it('leaves an approved pick alone when it names the same game and platform', async () => {
+      fake.stored = [
+        { code, igdbId: 1, platformId: SWITCH, status: 'approved' },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()).toBeUndefined()
+    })
+
+    it('counts a re-pick of an approved pick toward the pending cap', async () => {
+      fake.pending = MAX_PENDING_PICKS
+      fake.stored = [
+        { code, igdbId: 5, platformId: SWITCH, status: 'approved' },
+      ]
+      const result = await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(result.added).toBe(1)
+      expect(pickStatement()).toBeUndefined()
+      fake.pending = MAX_PENDING_PICKS - 1
+      batches.length = 0
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toHaveLength(1)
     })
 
     it('does not save a rejected pick again for the same game and platform', async () => {

@@ -1,9 +1,10 @@
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { createError, type H3Event } from 'h3'
 import type {
   BarcodeReviewAction,
   BarcodeReviewGroup,
+  BarcodeReviewList,
   BarcodeReviewOutcome,
   BarcodeReviewStatus,
   BarcodeReviewTarget,
@@ -17,10 +18,11 @@ import { submitToScanDex } from './scandex'
 export const MAX_REVIEWS = 20
 
 /**
- * The most pick rows one listing reads. Only a safety cap: picks waiting
- * for review are expected to number in the low hundreds at most.
+ * The most groups one listing returns. Picks waiting for review are expected
+ * to number in the low hundreds at most, so this is only a safety cap, and
+ * the listing says when it cut something off.
  */
-export const MAX_LISTED = 1000
+export const MAX_REVIEW_GROUPS = 500
 
 /**
  * The signed-in user, only if they review barcodes (`users.reviews_barcodes`,
@@ -58,19 +60,26 @@ const inGroup = (target: BarcodeReviewTarget) =>
  */
 export async function listReviewGroups(
   status: BarcodeReviewStatus,
-): Promise<BarcodeReviewGroup[]> {
+): Promise<BarcodeReviewList> {
   const db = useDb()
+  // One statement groups the picks. It reads one group more than it shows,
+  // to know whether more exist.
+  const people = sql<number>`count(*)::int`
+  const latest = sql<Date>`max(${barcodeLookups.updatedAt})`
   const rows = await db
     .select({
       code: barcodeLookups.code,
       igdbId: barcodeLookups.igdbId,
       platformId: barcodeLookups.platformId,
-      sentAt: barcodeLookups.sentAt,
-      updatedAt: barcodeLookups.updatedAt,
-      username: users.username,
       name: games.name,
       coverId: games.coverId,
       platform: platforms.name,
+      people,
+      users: sql<
+        string[]
+      >`coalesce(array_agg(${users.username} order by ${barcodeLookups.updatedAt}) filter (where ${users.username} is not null), '{}')`,
+      pickedAt: latest,
+      unsent: sql<number>`(count(*) filter (where ${barcodeLookups.sentAt} is null))::int`,
     })
     .from(barcodeLookups)
     .innerJoin(games, eq(games.igdbId, barcodeLookups.igdbId))
@@ -79,26 +88,31 @@ export async function listReviewGroups(
     .where(
       and(eq(barcodeLookups.source, 'user'), eq(barcodeLookups.status, status)),
     )
-    .orderBy(desc(barcodeLookups.updatedAt))
-    .limit(MAX_LISTED)
-  if (!rows.length) return []
+    .groupBy(
+      barcodeLookups.code,
+      barcodeLookups.igdbId,
+      barcodeLookups.platformId,
+      games.name,
+      games.coverId,
+      platforms.name,
+    )
+    .orderBy(
+      ...(status === 'pending' ? [desc(people)] : []),
+      desc(latest),
+      barcodeLookups.code,
+    )
+    .limit(MAX_REVIEW_GROUPS + 1)
+  if (!rows.length) return { groups: [], truncated: false }
+  const truncated = rows.length > MAX_REVIEW_GROUPS
 
-  const byKey = new Map<string, BarcodeReviewGroup>()
-  for (const row of rows) {
-    const key = groupKey({
-      code: row.code,
-      igdbId: row.igdbId!,
-      platformId: row.platformId,
-    })
-    const group = byKey.get(key)
-    if (group) {
-      group.people += 1
-      if (row.username) group.users.push(row.username)
-      if (row.sentAt) group.sent = true
-      continue
-    }
-    byKey.set(key, {
-      key,
+  const found: BarcodeReviewGroup[] = rows
+    .slice(0, MAX_REVIEW_GROUPS)
+    .map((row) => ({
+      key: groupKey({
+        code: row.code,
+        igdbId: row.igdbId!,
+        platformId: row.platformId,
+      }),
       code: row.code,
       igdbId: row.igdbId!,
       platformId: row.platformId,
@@ -106,18 +120,15 @@ export async function listReviewGroups(
       coverId: row.coverId,
       platform: row.platform,
       status,
-      people: 1,
-      users: row.username ? [row.username] : [],
-      // Newest first, so the first row of a group is its latest pick.
-      pickedAt: row.updatedAt.toISOString(),
-      sent: row.sentAt !== null,
+      people: row.people,
+      users: row.users,
+      pickedAt: new Date(row.pickedAt).toISOString(),
+      // Sent only when every row of the group was.
+      sent: row.unsent === 0,
       scandex: null,
       disagrees: false,
       conflict: null,
-    })
-  }
-  const found = [...byKey.values()]
-  for (const group of found) group.users.reverse()
+    }))
 
   const codes = [...new Set(found.map((group) => group.code))]
   const approved = alias(barcodeLookups, 'approved')
@@ -184,11 +195,7 @@ export async function listReviewGroups(
     }
   }
 
-  return found.sort(
-    (a, b) =>
-      (status === 'pending' ? b.people - a.people : 0) ||
-      b.pickedAt.localeCompare(a.pickedAt),
-  )
+  return { groups: found, truncated }
 }
 
 /**
@@ -270,7 +277,8 @@ function logFailure(error: unknown) {
 }
 
 /**
- * Sends an approved group to ScanDex, once. Only the barcode and the IGDB
+ * Sends an approved group to ScanDex, once. Only the rows not sent yet are
+ * claimed and sent for. `already` when every row was sent before. Only the barcode and the IGDB
  * game and platform go, with their names from our catalog, never anything
  * about the people. `sent_at` is claimed in one statement before sending, so
  * two requests never send the same group, and given back when the send
@@ -301,7 +309,21 @@ async function send(target: BarcodeReviewTarget): Promise<SendResult> {
       )
       .returning({ id: barcodeLookups.id })
     claimed.push(...won.map((row) => row.id))
-    if (!claimed.length) return failed()
+    if (!claimed.length) {
+      // Nothing unsent is left: say so when the group was sent before.
+      const [before] = await db
+        .select({ id: barcodeLookups.id })
+        .from(barcodeLookups)
+        .where(
+          and(
+            inGroup(target),
+            eq(barcodeLookups.status, 'approved'),
+            isNotNull(barcodeLookups.sentAt),
+          ),
+        )
+        .limit(1)
+      return before ? { result: 'already' } : failed()
+    }
     const outcome = await submitToScanDex({
       igdbId: target.igdbId,
       platformId: target.platformId,
@@ -311,6 +333,22 @@ async function send(target: BarcodeReviewTarget): Promise<SendResult> {
     })
     if (outcome.ok) {
       sent = true
+      // One suggestion goes out per barcode and game, so every row of the
+      // group counts as sent, including one approved while this was sending.
+      try {
+        await db
+          .update(barcodeLookups)
+          .set({ sentAt: new Date() })
+          .where(
+            and(
+              inGroup(target),
+              eq(barcodeLookups.status, 'approved'),
+              isNull(barcodeLookups.sentAt),
+            ),
+          )
+      } catch (error) {
+        logFailure(error)
+      }
       return { result: 'sent' }
     }
     return failed(outcome.status, outcome.message)

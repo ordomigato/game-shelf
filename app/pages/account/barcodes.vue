@@ -50,6 +50,8 @@ const statuses: {
 ]
 const status = ref<BarcodeReviewStatus>('pending')
 const groups = ref<BarcodeReviewGroup[] | null>(null)
+// More picks exist than the list shows.
+const truncated = ref(false)
 const failed = ref(false)
 const ticked = ref(new Set<string>())
 const busy = ref(false)
@@ -68,11 +70,15 @@ async function load() {
   const mine = ++loadId
   failed.value = false
   groups.value = null
+  truncated.value = false
   ticked.value = new Set()
   outcomes.value = new Map()
   try {
     const found = await review.list(status.value)
-    if (mine === loadId) groups.value = found
+    if (mine === loadId) {
+      groups.value = found.groups
+      truncated.value = found.truncated
+    }
   } catch {
     if (mine === loadId) failed.value = true
   }
@@ -133,7 +139,12 @@ function apply(action: BarcodeReviewAction, round: BarcodeReviewOutcome[]) {
     if (action === 'reject') group.status = 'rejected'
     else {
       if (action !== 'send') group.status = 'approved'
-      if (outcome.send?.result === 'sent') group.sent = true
+      if (
+        outcome.send?.result === 'sent' ||
+        outcome.send?.result === 'already'
+      ) {
+        group.sent = true
+      }
     }
     if (group.status === 'approved') {
       // Other games for the same barcode now conflict with this one.
@@ -188,6 +199,9 @@ function message(key: string): { text: string; bad: boolean } | null {
         : t('barcodeReview.failed'),
       bad: true,
     }
+  }
+  if (outcome.send?.result === 'already') {
+    return { text: t('barcodeReview.alreadyDone'), bad: false }
   }
   const sent = outcome.send?.result === 'sent'
   return {
@@ -271,6 +285,13 @@ const scandexLine = (group: BarcodeReviewGroup) =>
         {{ $t(emptyKey) }}
       </p>
       <template v-else>
+        <p
+          v-if="truncated"
+          class="text-sm font-medium"
+          data-testid="review-truncated"
+        >
+          {{ $t('barcodeReview.truncated', { count: groups.length }) }}
+        </p>
         <div class="flex flex-wrap items-center gap-2">
           <p
             class="mr-auto text-sm text-muted-foreground"

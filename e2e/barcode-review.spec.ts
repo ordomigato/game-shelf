@@ -86,7 +86,10 @@ async function stubReviews(
     const status = new URL(request.url()).searchParams.get('status') as Status
     seen.lists.push(status)
     return route.fulfill({
-      json: groups.filter((g) => g.status === status),
+      json: {
+        groups: groups.filter((g) => g.status === status),
+        truncated: false,
+      },
     })
   })
   return seen
@@ -378,7 +381,7 @@ test('45 groups are approved and sent in 3 rounds with progress, and only the fa
         })),
       })
     }
-    return route.fulfill({ json: all })
+    return route.fulfill({ json: { groups: all, truncated: false } })
   })
   await page.goto('/account/barcodes')
   await expect(page.getByTestId('review-count')).toHaveText(
@@ -418,7 +421,7 @@ test('the tab says when the list cannot load, and retries', async ({
   await page.route('**/api/barcodes/reviews**', (route) =>
     fail
       ? route.fulfill({ status: 500, json: {} })
-      : route.fulfill({ json: [group(1)] }),
+      : route.fulfill({ json: { groups: [group(1)], truncated: false } }),
   )
   await page.goto('/account/barcodes')
   await expect(page.getByText("Couldn't load the picks.")).toBeVisible()
@@ -475,4 +478,35 @@ test('the scanner no longer asks to share anything after an add', async ({
   await expect(page.getByTestId('share')).toHaveCount(0)
   await expect(page.getByText(/Share .* with ScanDex/)).toHaveCount(0)
   expect(seen.lists).toEqual([])
+})
+
+test('says plainly when more groups exist than the list shows', async ({
+  page,
+}) => {
+  await signIn(page, true)
+  const all = Array.from({ length: 500 }, (_, i) => group(i + 1))
+  await page.route('**/api/barcodes/reviews**', (route) =>
+    route.fulfill({ json: { groups: all, truncated: true } }),
+  )
+  await page.goto('/account/barcodes')
+  await expect(page.getByTestId('review-truncated')).toHaveText(
+    'Showing the first 500. Act on these to see more.',
+  )
+  await expect(page.getByTestId('review-count')).toHaveText(
+    '500 matches, 0 selected',
+  )
+})
+
+test('sending a group that was already sent says so, not that it failed', async ({
+  page,
+}) => {
+  await signIn(page, true)
+  await stubReviews(page, [group(1, { status: 'approved' })], () => ({
+    send: { result: 'already' },
+  }))
+  await page.goto('/account/barcodes')
+  await page.getByTestId('filter-approved').click()
+  await page.getByRole('button', { name: 'Send to ScanDex' }).click()
+  await expect(page.getByTestId('group-result')).toHaveText('Already sent')
+  await expect(page.getByTestId('group-sent')).toHaveText('Sent to ScanDex')
 })

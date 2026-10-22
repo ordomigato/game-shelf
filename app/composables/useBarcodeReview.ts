@@ -1,6 +1,6 @@
 import type {
   BarcodeReviewAction,
-  BarcodeReviewGroup,
+  BarcodeReviewList,
   BarcodeReviewOutcome,
   BarcodeReviewStatus,
   BarcodeReviewTarget,
@@ -34,7 +34,7 @@ export function useBarcodeReview() {
 
   /** The picks with a status, grouped by barcode, game and platform. */
   function list(status: BarcodeReviewStatus) {
-    return auth.apiFetch<BarcodeReviewGroup[]>('/api/barcodes/reviews', {
+    return auth.apiFetch<BarcodeReviewList>('/api/barcodes/reviews', {
       query: { status },
       retry: 0,
     })

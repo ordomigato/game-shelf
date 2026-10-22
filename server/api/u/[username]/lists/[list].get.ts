@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { seesAllOf } from '../../../../../shared/utils/access'
 import type { ListDetail } from '../../../../../shared/types/collection'
 
 const paramsSchema = z.object({
@@ -18,17 +19,17 @@ export default defineEventHandler(async (event): Promise<ListDetail> => {
     event,
     paramsSchema.parse,
   )
-  const [owner, claims] = await Promise.all([
+  const [owner, viewer] = await Promise.all([
     findUserByUsername(username),
-    optionalAuth(event),
+    viewerOf(event),
   ])
   if (!owner) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  const viewerIsOwner = claims?.sub === owner.cognitoSub
-  assertCanViewList(owner, list, viewerIsOwner)
+  assertCan(viewer, 'list.read', listResource(owner, list))
+  const viewerIsOwner = seesAllOf(viewer, owner.id)
   const allFields = await getUserFields(owner.id)
   const fields = viewerIsOwner
     ? allFields
-    : await visitorFieldsOfList(owner.id, list, allFields)
+    : await visitorFieldsOfList(owner.id, list, allFields, viewer)
   const query = parseListQuery(getQuery(event), fields, viewerIsOwner)
-  return getListPage(owner, list, query, fields)
+  return getListPage(owner, list, query, fields, viewer)
 })

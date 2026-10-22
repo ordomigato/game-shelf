@@ -21,15 +21,63 @@ description: >
   the tokens. `useAuth()` (`app/composables/useAuth.ts`) wraps every action
   and exposes `status` (`loading | signedOut | signedIn`) and `me`.
 - **The server** never trusts the browser about who it is. A route that acts
-  on the current user calls `requireAuth(event)` (`server/utils/auth.ts`),
+  on the current user calls `authorize(event, action, resource?)`
+  (`server/utils/authorize.ts`). It runs `requireAuth` (`server/utils/auth.ts`),
   which verifies the Cognito **access token** from `Authorization: Bearer`
-  (signature, expiry, issuer, client) and returns `{ sub, username }`. The
-  user comes from there only, never from the body, query or route params.
+  (signature, expiry, issuer, client) and gets `{ sub, username }`, then loads
+  the user and asks the access policy (below). The user comes from the token
+  only, never from the body, query or route params.
   Call routes from the browser with `useAuth().apiFetch`, which attaches the
   token.
 - **Postgres** `users` rows are keyed by `cognito_sub` and created on the
   first `/api/me` call (`findOrCreateUser`). No email or password is stored
   in Postgres.
+
+## Who may do what: one access policy
+
+`can(subject, action, resource?)` in `shared/utils/access.ts` decides every
+access question, on the server and in the browser. It is pure and returns a
+boolean. `subject` is `null` for a visitor, otherwise `{ id, roles }`.
+Actions are named `resource.verb` (`collection.update`, `list.read`,
+`field.read`, `export.read`, `barcodes.review`, and so on, see `ACTIONS`).
+An action with no rule is refused. Permissions are the union of what the
+subject's roles grant and what the attribute rules allow. There are no deny
+rules.
+
+- **Roles** live in `users.roles text[]` (default `{user}`, not null). Every
+  account holds `user`, stored like any other role. The owner and reviewers
+  also hold `admin`, which today grants `barcodes.review` and nothing else. It
+  does not read other people's private data or bypass ownership or
+  visibility. `user` grants no actions itself (`ROLE_ACTIONS.user` is empty):
+  basic permissions come from the attribute rules in `RULES`, which apply to
+  any signed-in subject and don't look at roles. Roles are granted by hand in
+  SQL, with no UI. A check constraint (`users_roles`) allows only known names
+  and requires `user`.
+- **Routes** call `authorize(event, action, resource?)` and use what it
+  returns (`{ user, subject, claims }`). It answers 401 without a signed-in
+  user and 404 when the policy refuses (never 403, so a refusal doesn't
+  reveal that someone else's resource or a feature exists). Give it the
+  resource when the action concerns a specific thing, or a loader such as
+  `collectionOf(event)` or `itemOf(event)`. Leave it out for the user's own
+  data. Public routes use `viewerOf(event)` (null for a visitor) and
+  `assertCan(subject, action, resource)`. A route never compares roles or
+  `owner_id` itself, and never reads `field.hidden` or `visibility` to decide
+  access: data shaping asks `can(subject, 'field.read', ...)`.
+- **Queries keep their `owner_id` scoping** as defence in depth. The SQL
+  filter stays even when the policy has already said yes.
+- **The browser** uses the same `can()` through `useAuth().can(action)` to
+  show or hide things (the Barcodes tab). It only hides what the user
+  couldn't use. The server still decides. `/api/me` returns the user's own
+  `roles`, and public profile data never does.
+
+To add an action: add it to `ACTIONS` and give it a rule in `RULES` (or list
+it under a role in `ROLE_ACTIONS`), add its row to the table in
+`access.test.ts`, then call `authorize` with it from the route.
+
+To add a role: add it to `ROLES` and `ROLE_ACTIONS`, widen the check in a
+migration (`users_roles`, keeping `user` required, with the data to grant it) and grant it by hand. A
+role-granted action ignores who owns the thing (say `comment.hide` for a
+moderator), so list it under the role and keep it out of `RULES`.
 
 ## Pages and rendering
 

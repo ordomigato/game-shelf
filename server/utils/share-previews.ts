@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq } from 'drizzle-orm'
 import en from '../../i18n/locales/en.json'
 import type { ListName } from '../../shared/types/collection'
 import type { Message } from '../../shared/types/message'
+import { can } from '../../shared/utils/access'
 import { igdbImageUrl } from '../../shared/utils/igdb-images'
 import {
   collectionPreview,
@@ -148,7 +149,8 @@ async function listPreview(
   list: ListName,
   ownerName: string,
 ): Promise<SharePreview | null> {
-  if (listVisibility(owner, list) !== 'public') return null
+  // Link previews are for visitors: only what a visitor may open.
+  if (!can(null, 'list.read', listResource(owner, list))) return null
   const db = useDb()
   const flag = list === 'owned' ? libraryItems.owned : libraryItems.wishlisted
   const onList = and(eq(libraryItems.ownerId, owner.id), eq(flag, true))
@@ -224,7 +226,15 @@ export async function findSharePreview(
         eq(collections.visibility, 'public'),
       ),
     )
-  if (!collection) return null
+  if (
+    !collection ||
+    !can(null, 'collection.read', {
+      ownerId: owner.id,
+      visibility: collection.visibility,
+    })
+  ) {
+    return null
+  }
   const [[{ value: itemCount } = { value: 0 }], first] = await Promise.all([
     db
       .select({ value: count() })

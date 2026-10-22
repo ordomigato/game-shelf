@@ -8,9 +8,12 @@ const bodySchema = z.object({
 
 /** Pins a collection to the user's sidebar, or moves its pin. */
 export default defineEventHandler(async (event) => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(
+    event,
+    'collection.update',
+    collectionOf(event),
+  )
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const { afterCollectionId } = await readValidatedBody(event, bodySchema.parse)
-  const user = await findOrCreateUser(sub)
   return pinCollection(user.id, id, afterCollectionId)
 })

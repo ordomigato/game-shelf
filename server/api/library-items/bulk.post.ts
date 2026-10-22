@@ -38,12 +38,14 @@ const bodySchema = z.object({
  * (see `bulkAdd`). Items marked `rememberOnly` are never added.
  */
 export default defineEventHandler(async (event): Promise<BulkAddResult> => {
-  const { sub } = await requireAuth(event)
+  const { user, subject } = await authorize(event, 'library.write')
   const { list, collectionId, items } = await readValidatedBody(
     event,
     bodySchema.parse,
   )
-  const user = await findOrCreateUser(sub)
+  if (collectionId) {
+    await assertCanOnCollections(subject, 'collection.update', [collectionId])
+  }
   return bulkAdd(user.id, userLimits(user), {
     list,
     collectionId,

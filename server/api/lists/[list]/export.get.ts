@@ -9,9 +9,8 @@ const paramsSchema = z.object({ list: z.enum(['owned', 'wishlist']) })
  * Search and filters on screen don't narrow it.
  */
 export default defineEventHandler(async (event) => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'export.read')
   const { list } = await getValidatedRouterParams(event, paramsSchema.parse)
-  const user = await findOrCreateUser(sub)
   await rateLimit(event, `export-list:${user.id}`, {
     limit: 3,
     windowSeconds: 600,

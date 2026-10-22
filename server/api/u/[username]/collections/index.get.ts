@@ -13,13 +13,12 @@ export default defineEventHandler(
       event,
       paramsSchema.parse,
     )
-    const [owner, claims] = await Promise.all([
+    const [owner, viewer] = await Promise.all([
       findUserByUsername(username),
-      optionalAuth(event),
+      viewerOf(event),
     ])
     if (!owner)
       throw createError({ statusCode: 404, statusMessage: 'Not found' })
-    const isOwner = claims?.sub === owner.cognitoSub
-    return listCollections(owner.id, { publicOnly: !isOwner })
+    return listVisibleCollections(owner.id, viewer)
   },
 )

@@ -9,10 +9,10 @@ const paramsSchema = z.object({ username: z.string().max(20) })
  */
 export default defineEventHandler(async (event): Promise<ListSummary[]> => {
   const { username } = await getValidatedRouterParams(event, paramsSchema.parse)
-  const [owner, claims] = await Promise.all([
+  const [owner, viewer] = await Promise.all([
     findUserByUsername(username),
-    optionalAuth(event),
+    viewerOf(event),
   ])
   if (!owner) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  return listSummaries(owner, claims?.sub === owner.cognitoSub)
+  return listSummaries(owner, viewer)
 })

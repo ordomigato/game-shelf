@@ -1,3 +1,4 @@
+import { can, seesAllOf, type Viewer } from './access'
 import type { ChartWidget } from '../types/charts'
 import type { FieldDefinition, FieldValue, ItemData } from '../types/collection'
 
@@ -95,10 +96,20 @@ export function applyFieldValues(
   return invalidFieldIds.length ? { invalidFieldIds } : { data: next }
 }
 
-/** The ids of the fields kept from visitors. */
-function hiddenIds(fields: FieldDefinition[]): Set<string> {
-  return new Set(fields.filter((f) => f.hidden).map((f) => f.id))
+/** Whether the viewer may read this field: the owner all, others the unhidden. */
+function mayRead(viewer: Viewer, field: FieldDefinition): boolean {
+  return can(viewer.subject, 'field.read', {
+    ownerId: viewer.ownerId,
+    hidden: field.hidden === true,
+  })
 }
+
+/** The ids of the fields kept from this viewer. */
+function hiddenIds(viewer: Viewer, fields: FieldDefinition[]): Set<string> {
+  return new Set(fields.filter((f) => !mayRead(viewer, f)).map((f) => f.id))
+}
+
+const seesAll = (viewer: Viewer) => seesAllOf(viewer.subject, viewer.ownerId)
 
 /** The field ids a chart reads: its measure, grouping and timeline. */
 function widgetFieldIds(widget: ChartWidget): string[] {
@@ -114,12 +125,12 @@ function widgetFieldIds(widget: ChartWidget): string[] {
  * gets none that read a hidden field.
  */
 export function chartsFor(
-  viewerIsOwner: boolean,
+  viewer: Viewer,
   fields: FieldDefinition[],
   dashboard: ChartWidget[],
 ): ChartWidget[] {
-  if (viewerIsOwner) return dashboard
-  const hidden = hiddenIds(fields)
+  if (seesAll(viewer)) return dashboard
+  const hidden = hiddenIds(viewer, fields)
   return dashboard.filter(
     (widget) => !widgetFieldIds(widget).some((id) => hidden.has(id)),
   )
@@ -130,11 +141,11 @@ export function chartsFor(
  * values of the given (visible) fields.
  */
 export function dataFor(
-  viewerIsOwner: boolean,
+  viewer: Viewer,
   visibleFields: FieldDefinition[],
   data: ItemData,
 ): ItemData {
-  if (viewerIsOwner) return data
+  if (seesAll(viewer)) return data
   const visible = new Set(visibleFields.map((f) => f.id))
   return Object.fromEntries(
     Object.entries(data).filter(([id]) => visible.has(id)),
@@ -147,10 +158,13 @@ export function dataFor(
  * listed. Hidden fields are never listed.
  */
 export function visitorFields(
+  viewer: Viewer,
   fields: FieldDefinition[],
   usedIds: ReadonlySet<string>,
 ): FieldDefinition[] {
-  return fields.filter((field) => !field.hidden && usedIds.has(field.id))
+  return fields.filter(
+    (field) => mayRead(viewer, field) && usedIds.has(field.id),
+  )
 }
 
 /**
@@ -159,12 +173,12 @@ export function visitorFields(
  * a value for, or that one of its charts uses (see `visitorFields`).
  */
 export function fieldsFor(
-  viewerIsOwner: boolean,
+  viewer: Viewer,
   fields: FieldDefinition[],
   items: { data: ItemData }[],
   dashboard: ChartWidget[],
 ): FieldDefinition[] {
-  if (viewerIsOwner) return fields
+  if (seesAll(viewer)) return fields
   const used = new Set<string>()
   for (const item of items) {
     for (const id of Object.keys(item.data)) used.add(id)
@@ -172,5 +186,5 @@ export function fieldsFor(
   for (const widget of dashboard) {
     for (const id of widgetFieldIds(widget)) used.add(id)
   }
-  return visitorFields(fields, used)
+  return visitorFields(viewer, fields, used)
 }

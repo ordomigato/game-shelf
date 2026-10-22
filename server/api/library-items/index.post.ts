@@ -28,12 +28,12 @@ const bodySchema = z
  */
 export default defineEventHandler(
   async (event): Promise<{ item: LibraryItem; collectionIds: string[] }> => {
-    const { sub } = await requireAuth(event)
+    const { user, subject } = await authorize(event, 'library.write')
     const { collectionIds, list, platforms, ...game } = await readValidatedBody(
       event,
       bodySchema.parse,
     )
-    const user = await findOrCreateUser(sub)
+    await assertCanOnCollections(subject, 'collection.update', collectionIds)
     const limits = userLimits(user)
     const existingId = await itemIdForIgdb(user.id, game.igdbId)
     await assertRoomToAdd(user.id, existingId, collectionIds, limits)

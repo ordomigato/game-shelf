@@ -32,8 +32,8 @@ const group = (n: number, extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-/** Signs in as an account that is, or isn't, the barcode reviewer. */
-async function signIn(page: Page, reviewsBarcodes: boolean) {
+/** Signs in as an account that is, or isn't, an admin (who reviews barcodes). */
+async function signIn(page: Page, admin: boolean) {
   await signInAs(page, { username: 'retro_fan' })
   // Registered last, so it answers before the shared stub.
   await page.route('**/api/me', (route) =>
@@ -44,7 +44,7 @@ async function signIn(page: Page, reviewsBarcodes: boolean) {
         displayName: null,
         createdAt: '2026-01-01T00:00:00.000Z',
         plan: 'free',
-        reviewsBarcodes,
+        roles: admin ? ['user', 'admin'] : ['user'],
       },
     }),
   )

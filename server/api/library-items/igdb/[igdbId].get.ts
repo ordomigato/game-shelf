@@ -19,9 +19,8 @@ export default defineEventHandler(
     collectionIds: string[]
     platforms: { id: number; name: string }[]
   }> => {
-    const { sub } = await requireAuth(event)
+    const { user } = await authorize(event, 'library.read')
     const { igdbId } = await getValidatedRouterParams(event, paramsSchema.parse)
-    const user = await findOrCreateUser(sub)
     const db = useDb()
     const [[found], [catalogGame]] = await Promise.all([
       db

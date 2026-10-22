@@ -26,6 +26,12 @@ import {
   dataFor,
   fieldsFor,
 } from '../../shared/utils/field-values'
+import {
+  can,
+  seesAllOf,
+  type Subject,
+  type Viewer,
+} from '../../shared/utils/access'
 import { slugify } from '../../shared/utils/slug'
 import { knownHiddenColumns } from '../../shared/utils/columns'
 import type { ListState } from '../../shared/utils/lists'
@@ -37,6 +43,7 @@ import {
   platforms,
   users,
 } from '../db/schema'
+import { assertCan } from './assert-can'
 import { isForeignKeyViolation, isUniqueViolation } from './db-errors'
 import { positionBetween } from './positions'
 
@@ -235,6 +242,25 @@ export async function listCollections(
 }
 
 /**
+ * The owner's collections the viewer (null for a visitor) may read: all of
+ * them for the owner, only the public ones for anyone else.
+ */
+export async function listVisibleCollections(
+  ownerId: string,
+  viewer: Subject | null,
+): Promise<CollectionSummary[]> {
+  const all = await listCollections(ownerId, {
+    publicOnly: !seesAllOf(viewer, ownerId),
+  })
+  return all.filter((collection) =>
+    can(viewer, 'collection.read', {
+      ownerId,
+      visibility: collection.visibility,
+    }),
+  )
+}
+
+/**
  * The owner's collections each item is in, by title, for the lists
  * (owner only).
  */
@@ -267,12 +293,17 @@ export async function customCollectionsOf(
   return byItem
 }
 
-/** One collection with its owner's fields and items, or 404 if it isn't visible. */
+/**
+ * One collection with its owner's fields and items, or 404 if the viewer
+ * (null for a visitor) may not read it.
+ */
 export async function getCollectionBySlug(
   ownerId: string,
   slug: string,
-  viewerIsOwner: boolean,
+  viewerSubject: Subject | null,
 ): Promise<CollectionDetail> {
+  const viewer: Viewer = { subject: viewerSubject, ownerId }
+  const viewerIsOwner = seesAllOf(viewerSubject, ownerId)
   const db = useDb()
   const [found] = await db
     .select({ collection: collections, fields: users.fields })
@@ -280,8 +311,10 @@ export async function getCollectionBySlug(
     .innerJoin(users, eq(users.id, collections.ownerId))
     .where(and(eq(collections.ownerId, ownerId), eq(collections.slug, slug)))
   if (!found) throw notFound()
-  if (!viewerIsOwner && found.collection.visibility !== 'public')
-    throw notFound()
+  assertCan(viewerSubject, 'collection.read', {
+    ownerId,
+    visibility: found.collection.visibility,
+  })
 
   const entries = await db
     .select({
@@ -309,11 +342,7 @@ export async function getCollectionBySlug(
       ...entry.item.wantedOn,
     ]),
   )
-  const dashboard = chartsFor(
-    viewerIsOwner,
-    found.fields,
-    found.collection.dashboard,
-  )
+  const dashboard = chartsFor(viewer, found.fields, found.collection.dashboard)
   const rawItems: CollectionEntry[] = entries.map((entry) => ({
     ...toCollectionEntry(
       entry.item,
@@ -326,10 +355,10 @@ export async function getCollectionBySlug(
       inCollections: inCollections.get(entry.item.id) ?? [],
     }),
   }))
-  const fields = fieldsFor(viewerIsOwner, found.fields, rawItems, dashboard)
+  const fields = fieldsFor(viewer, found.fields, rawItems, dashboard)
   const items = rawItems.map((item) => ({
     ...item,
-    data: dataFor(viewerIsOwner, fields, item.data),
+    data: dataFor(viewer, fields, item.data),
   }))
   return {
     ...toSummary(found.collection, items.length),

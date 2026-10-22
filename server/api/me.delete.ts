@@ -12,14 +12,14 @@ const cognito = new CognitoIdentityProviderClient({})
  * already gone. Signing in again would just start a fresh, empty account.
  */
 export default defineEventHandler(async (event) => {
-  const { sub, username } = await requireAuth(event)
-  await deleteAccountData(sub)
+  const { claims } = await authorizeAccount(event, 'account.delete')
+  await deleteAccountData(claims.sub)
 
   try {
     await cognito.send(
       new AdminDeleteUserCommand({
         UserPoolId: Resource.Users.id,
-        Username: username,
+        Username: claims.username,
       }),
     )
   } catch (error) {

@@ -13,7 +13,7 @@ import { reviewGroupKey } from '#shared/utils/barcode'
  * ScanDex. Not found for everyone else.
  */
 const auth = useAuth()
-if (!auth.me.value?.reviewsBarcodes) {
+if (!auth.can('barcodes.review')) {
   throw createError({
     statusCode: 404,
     statusMessage: 'Page not found',

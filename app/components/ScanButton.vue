@@ -39,6 +39,9 @@ async function press() {
     @click="press"
   >
     <ScanBarcode />
-    <span v-if="!iconOnly">{{ $t('scan.button') }}</span>
+    <!-- Icon only on phones, where the row of buttons runs out of room. -->
+    <span v-if="!iconOnly" class="hidden sm:inline">{{
+      $t('scan.button')
+    }}</span>
   </Button>
 </template>

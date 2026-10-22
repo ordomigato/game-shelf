@@ -530,7 +530,7 @@ function onRenamed(saved: LibraryItem) {
             }}
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <VisibilityMenu
             v-if="data.isOwner"
             :visibility="data.visibility"

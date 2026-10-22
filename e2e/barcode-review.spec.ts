@@ -170,7 +170,7 @@ test('the reviewer sees the tab and the pending groups, with who picked and what
   ])
 })
 
-test('the filters show approved and rejected groups, with a Send button only for unsent approved ones', async ({
+test('the filters show approved groups with their own buttons, and rejected ones that can still be approved', async ({
   page,
 }) => {
   await signIn(page, true)
@@ -198,10 +198,23 @@ test('the filters show approved and rejected groups, with a Send button only for
     'Sent to ScanDex',
   )
   await expect(rows.nth(1).getByRole('button')).toHaveCount(0)
+  // Approved groups are acted on one at a time, so there are no ticks.
+  await expect(page.getByRole('checkbox')).toHaveCount(0)
+  await expect(page.getByTestId('review-bulk')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Select all' })).toHaveCount(0)
 
   await page.getByTestId('filter-rejected').click()
   await expect(rows).toHaveCount(1)
-  await expect(rows.first().getByRole('button')).toHaveCount(0)
+  await expect(
+    rows.first().getByRole('button', { name: 'Approve', exact: true }),
+  ).toBeVisible()
+  await expect(
+    rows.first().getByRole('button', { name: 'Approve and send to ScanDex' }),
+  ).toBeVisible()
+  await expect(
+    rows.first().getByRole('button', { name: 'Reject' }),
+  ).toHaveCount(0)
+  await expect(page.getByTestId('bulk-reject')).toHaveCount(0)
   expect(seen.lists).toEqual(['pending', 'approved', 'rejected'])
 })
 

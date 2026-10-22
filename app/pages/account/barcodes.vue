@@ -101,9 +101,9 @@ const date = computed(
 )
 
 const shown = computed(() => groups.value ?? [])
-// Rejected groups are done with, and a sent one has nothing left to do.
-const selectable = (group: BarcodeReviewGroup) =>
-  group.status === 'pending' || (group.status === 'approved' && !group.sent)
+// Ticks are for deciding many at once: pending groups, and rejected ones
+// that can still be approved. Approved groups have their own buttons.
+const selectable = (group: BarcodeReviewGroup) => group.status !== 'approved'
 const chosen = computed(() =>
   shown.value.filter(
     (group) => ticked.value.has(group.key) && selectable(group),
@@ -150,7 +150,7 @@ function apply(action: BarcodeReviewAction, round: BarcodeReviewOutcome[]) {
       // Other games for the same barcode now conflict with this one.
       for (const other of shown.value) {
         if (
-          other.status === 'pending' &&
+          other.status !== 'approved' &&
           other.code === group.code &&
           other.key !== group.key
         ) {
@@ -305,65 +305,54 @@ const scandexLine = (group: BarcodeReviewGroup) =>
               )
             }}
           </p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            :disabled="busy"
-            @click="tickAll(true)"
-          >
-            {{ $t('barcodeReview.selectAll') }}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            :disabled="busy"
-            @click="tickAll(false)"
-          >
-            {{ $t('barcodeReview.clear') }}
-          </Button>
+          <template v-if="status !== 'approved'">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              :disabled="busy"
+              @click="tickAll(true)"
+            >
+              {{ $t('barcodeReview.selectAll') }}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              :disabled="busy"
+              @click="tickAll(false)"
+            >
+              {{ $t('barcodeReview.clear') }}
+            </Button>
+          </template>
         </div>
 
         <div
-          v-if="status !== 'rejected'"
+          v-if="status !== 'approved'"
           class="flex flex-wrap items-center gap-2"
           data-testid="review-bulk"
         >
-          <template v-if="status === 'pending'">
-            <Button
-              type="button"
-              size="sm"
-              :disabled="busy || !chosen.length"
-              data-testid="bulk-approve"
-              @click="run('approve', chosen)"
-            >
-              {{ $t('barcodeReview.bulkApprove', { count: chosen.length }) }}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              :disabled="busy || !chosen.length"
-              data-testid="bulk-approve-send"
-              @click="run('approveAndSend', chosen)"
-            >
-              {{
-                $t('barcodeReview.bulkApproveSend', { count: chosen.length })
-              }}
-            </Button>
-          </template>
           <Button
-            v-else
             type="button"
             size="sm"
             :disabled="busy || !chosen.length"
-            data-testid="bulk-send"
-            @click="run('send', chosen)"
+            data-testid="bulk-approve"
+            @click="run('approve', chosen)"
           >
-            {{ $t('barcodeReview.bulkSend', { count: chosen.length }) }}
+            {{ $t('barcodeReview.bulkApprove', { count: chosen.length }) }}
           </Button>
           <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            :disabled="busy || !chosen.length"
+            data-testid="bulk-approve-send"
+            @click="run('approveAndSend', chosen)"
+          >
+            {{ $t('barcodeReview.bulkApproveSend', { count: chosen.length }) }}
+          </Button>
+          <Button
+            v-if="status === 'pending'"
             type="button"
             size="sm"
             variant="outline"
@@ -468,7 +457,7 @@ const scandexLine = (group: BarcodeReviewGroup) =>
                 {{ message(group.key)!.text }}
               </p>
               <div class="mt-1 flex flex-wrap gap-2">
-                <template v-if="group.status === 'pending'">
+                <template v-if="group.status !== 'approved'">
                   <Button
                     type="button"
                     size="sm"
@@ -488,6 +477,7 @@ const scandexLine = (group: BarcodeReviewGroup) =>
                     {{ $t('barcodeReview.approveSend') }}
                   </Button>
                   <Button
+                    v-if="group.status === 'pending'"
                     type="button"
                     size="sm"
                     variant="outline"

@@ -335,7 +335,7 @@ describe('listReviewGroups', () => {
 })
 
 describe('approve', () => {
-  it('approves all the group’s pending picks in one statement, only if no other game is approved', async () => {
+  it('approves all the group’s pending or rejected picks in one statement, only if no other game is approved', async () => {
     approves = [[{ id: 1 }, { id: 2 }]]
     const results = await reviewGroups('approve', [target()])
     expect(results).toEqual([{ ...target(), result: 'done' }])
@@ -345,8 +345,8 @@ describe('approve', () => {
       reviewedAt: expect.any(Date),
     })
     const { sql, params } = sqlOf(updates()[0]!.where!)
-    expect(sql).toContain('"barcode_lookups"."status" = $')
-    expect(params).toContain('pending')
+    expect(sql).toContain('"barcode_lookups"."status" in ($')
+    expect(params).toEqual(expect.arrayContaining(['pending', 'rejected']))
     expect(params).toContain(CODE)
     expect(sql).toContain('not exists')
     expect(sql).toContain('is distinct from')
@@ -361,7 +361,7 @@ describe('approve', () => {
     ])
   })
 
-  it('reports a group with nothing pending as gone', async () => {
+  it('reports a group with nothing left to approve as gone', async () => {
     approves = [[]]
     selects = [[]]
     expect(await reviewGroups('approve', [target()])).toEqual([

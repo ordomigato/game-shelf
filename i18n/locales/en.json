@@ -93,7 +93,6 @@
     "tick": "Select {name}",
     "bulkApprove": "Approve {count}",
     "bulkApproveSend": "Approve and send {count} to ScanDex",
-    "bulkSend": "Send {count} to ScanDex",
     "bulkReject": "Reject {count}",
     "progress": "Done {done} of {total}",
     "requestFailed": "Couldn't finish. Try again.",

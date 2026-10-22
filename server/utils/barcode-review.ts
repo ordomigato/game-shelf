@@ -148,7 +148,7 @@ export async function listReviewGroups(
           inArray(barcodeLookups.code, codes),
         ),
       ),
-    status === 'pending'
+    status !== 'approved'
       ? db
           .select({
             code: approved.code,
@@ -199,9 +199,9 @@ export async function listReviewGroups(
 }
 
 /**
- * Approves a pending group: all its rows in one statement, and only if no
- * other game is approved for the barcode. `conflict` when there is one,
- * `gone` when the group has nothing pending any more.
+ * Approves a pending or rejected group: all its rows in one statement, and
+ * only if no other game is approved for the barcode. `conflict` when there
+ * is one, `gone` when the group has nothing left to approve.
  */
 async function approve(
   target: BarcodeReviewTarget,
@@ -213,7 +213,7 @@ async function approve(
     .where(
       and(
         inGroup(target),
-        eq(barcodeLookups.status, 'pending'),
+        inArray(barcodeLookups.status, ['pending', 'rejected']),
         // No other game or platform is approved for the barcode.
         sql`not exists (
           select 1 from ${barcodeLookups} as other
@@ -226,12 +226,17 @@ async function approve(
     )
     .returning({ id: barcodeLookups.id })
   if (done.length) return 'done'
-  const [pending] = await db
+  const [waiting] = await db
     .select({ id: barcodeLookups.id })
     .from(barcodeLookups)
-    .where(and(inGroup(target), eq(barcodeLookups.status, 'pending')))
+    .where(
+      and(
+        inGroup(target),
+        inArray(barcodeLookups.status, ['pending', 'rejected']),
+      ),
+    )
     .limit(1)
-  return pending ? 'conflict' : 'gone'
+  return waiting ? 'conflict' : 'gone'
 }
 
 /**

@@ -42,7 +42,7 @@ const post = (await import('./reviews.post')).default as (
 const group = { code: '0045496590048', igdbId: 26758, platformId: 130 }
 
 beforeEach(() => {
-  roles = ['admin']
+  roles = ['user', 'admin']
   query = {}
   body = { action: 'approve', groups: [group] }
   listReviewGroups.mockReset()
@@ -53,7 +53,7 @@ beforeEach(() => {
 
 describe('GET /api/barcodes/reviews', () => {
   it('is a 404 for an account without the admin role, without reading anything', async () => {
-    roles = []
+    roles = ['user']
     await expect(get({})).rejects.toMatchObject({ statusCode: 404 })
     expect(listReviewGroups).not.toHaveBeenCalled()
   })
@@ -76,13 +76,13 @@ describe('GET /api/barcodes/reviews', () => {
 
 describe('POST /api/barcodes/reviews', () => {
   it('is a 404 for an account without the admin role, without doing anything', async () => {
-    roles = []
+    roles = ['user']
     await expect(post({})).rejects.toMatchObject({ statusCode: 404 })
     expect(reviewGroups).not.toHaveBeenCalled()
   })
 
   it('does not even read the body for anyone else', async () => {
-    roles = []
+    roles = ['user']
     body = 'not even a body'
     await expect(post({})).rejects.toMatchObject({ statusCode: 404 })
   })

@@ -48,14 +48,14 @@ export const users = pgTable(
      */
     reviewsBarcodes: boolean('reviews_barcodes').notNull().default(false),
     /**
-     * Roles beyond the implicit "user", set by hand. A new role needs a
+     * Every account has "user"; others (admin) are set by hand. A new role needs a
      * migration that widens `users_roles` (see shared/utils/access.ts).
      */
     roles: text('roles')
       .array()
       .$type<Role[]>()
       .notNull()
-      .default(sql`'{}'::text[]`),
+      .default(sql`'{user}'::text[]`),
     /** What the account may store (shared/utils/plans.ts). */
     plan: text('plan')
       .$type<'free' | 'pro' | 'max'>()
@@ -96,7 +96,10 @@ export const users = pgTable(
       sql`${table.username} ~ '^[a-z0-9_]{3,20}$'`,
     ),
     check('users_plan', sql`${table.plan} in ('free', 'pro', 'max')`),
-    check('users_roles', sql`${table.roles} <@ array['admin']::text[]`),
+    check(
+      'users_roles',
+      sql`${table.roles} <@ array['user','admin']::text[] and 'user' = any(${table.roles})`,
+    ),
   ],
 )
 

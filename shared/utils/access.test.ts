@@ -8,10 +8,10 @@ import {
   type Subject,
 } from './access'
 
-const owner: Subject = { id: 'owner', roles: [] }
-const other: Subject = { id: 'other', roles: [] }
-const admin: Subject = { id: 'admin', roles: ['admin'] }
-const ownerAdmin: Subject = { id: 'owner', roles: ['admin'] }
+const owner: Subject = { id: 'owner', roles: ['user'] }
+const other: Subject = { id: 'other', roles: ['user'] }
+const admin: Subject = { id: 'admin', roles: ['user', 'admin'] }
+const ownerAdmin: Subject = { id: 'owner', roles: ['user', 'admin'] }
 
 const mine = { ownerId: 'owner' }
 const publicOf = (ownerId: string): Resource => ({
@@ -112,6 +112,15 @@ describe('can', () => {
       expect(can(subject, 'constructor' as Action)).toBe(false)
       expect(can(subject, 'toString' as Action, mine)).toBe(false)
     }
+  })
+
+  it('does not make the attribute rules depend on the user role', () => {
+    const bare = { id: 'owner', roles: [] } as Subject
+    expect(can(bare, 'library.read')).toBe(can(owner, 'library.read'))
+    expect(can(bare, 'collection.update', mine)).toBe(
+      can(owner, 'collection.update', mine),
+    )
+    expect(can(bare, 'collection.read', publicOf('other'))).toBe(true)
   })
 
   it('ignores a role it does not know', () => {

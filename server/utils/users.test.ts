@@ -17,18 +17,18 @@ const row = (roles: string[]) =>
 
 describe('toMe', () => {
   it("gives the user's own roles", () => {
-    expect(toMe(row(['admin'])).roles).toEqual(['admin'])
-    expect(toMe(row([])).roles).toEqual([])
+    expect(toMe(row(['user', 'admin'])).roles).toEqual(['user', 'admin'])
+    expect(toMe(row(['user'])).roles).toEqual(['user'])
   })
 
   it('no longer carries the old reviewer flag', () => {
-    expect(toMe(row(['admin']))).not.toHaveProperty('reviewsBarcodes')
+    expect(toMe(row(['user', 'admin']))).not.toHaveProperty('reviewsBarcodes')
   })
 })
 
 describe('toPublicProfile', () => {
   it('never carries roles or anything else private', () => {
-    expect(toPublicProfile(row(['admin']))).toEqual({
+    expect(toPublicProfile(row(['user', 'admin']))).toEqual({
       username: 'retro_fan',
       displayName: 'Retro Fan',
       memberSince: '2026-01-01T00:00:00.000Z',

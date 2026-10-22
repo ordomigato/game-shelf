@@ -48,7 +48,7 @@ const event = (params: Record<string, string> = {}) =>
 
 beforeEach(() => {
   token = { sub: 'sub-1', username: 'sub-1' }
-  user = { id: OWNER, roles: [] }
+  user = { id: OWNER, roles: ['user'] }
   found = [{ ownerId: OWNER, visibility: 'private' }]
   creations = 0
 })
@@ -66,7 +66,7 @@ describe('authorize', () => {
   it('gives the user, their subject and the token claims', async () => {
     const result = await authorize(event(), 'account.read')
     expect(result.user).toBe(user)
-    expect(result.subject).toEqual({ id: OWNER, roles: [] })
+    expect(result.subject).toEqual({ id: OWNER, roles: ['user'] })
     expect(result.claims).toBe(token)
   })
 
@@ -103,12 +103,12 @@ describe('authorize', () => {
     await expect(authorize(event(), 'barcodes.review')).rejects.toMatchObject({
       statusCode: 404,
     })
-    user = { id: OWNER, roles: ['admin'] }
+    user = { id: OWNER, roles: ['user', 'admin'] }
     await expect(authorize(event(), 'barcodes.review')).resolves.toBeTruthy()
   })
 
   it("keeps an admin out of other people's data", async () => {
-    user = { id: OWNER, roles: ['admin'] }
+    user = { id: OWNER, roles: ['user', 'admin'] }
     await expect(
       authorize(event(), 'collection.update', { ownerId: OTHER }),
     ).rejects.toMatchObject({ statusCode: 404 })
@@ -125,7 +125,7 @@ describe('authorizeAccount', () => {
 
   it('lets a signed-in user with a row through, without creating one', async () => {
     const result = await authorizeAccount(event(), 'account.delete')
-    expect(result.subject).toEqual({ id: OWNER, roles: [] })
+    expect(result.subject).toEqual({ id: OWNER, roles: ['user'] })
     expect(result.claims).toBe(token)
     expect(creations).toBe(0)
   })
@@ -151,8 +151,11 @@ describe('viewerOf', () => {
   })
 
   it('is the signed-in user as a subject', async () => {
-    user = { id: OWNER, roles: ['admin'] }
-    expect(await viewerOf(event())).toEqual({ id: OWNER, roles: ['admin'] })
+    user = { id: OWNER, roles: ['user', 'admin'] }
+    expect(await viewerOf(event())).toEqual({
+      id: OWNER,
+      roles: ['user', 'admin'],
+    })
   })
 
   it('is a visitor when the token has no user row yet', async () => {
@@ -195,20 +198,25 @@ describe('loading a resource', () => {
 
   it('checks every collection a request names', async () => {
     await expect(
-      assertCanOnCollections({ id: OWNER, roles: [] }, 'collection.update', [
-        COLLECTION,
-      ]),
+      assertCanOnCollections(
+        { id: OWNER, roles: ['user'] },
+        'collection.update',
+        [COLLECTION],
+      ),
     ).resolves.toBeUndefined()
     await expect(
-      assertCanOnCollections({ id: OTHER, roles: [] }, 'collection.update', [
-        COLLECTION,
-      ]),
+      assertCanOnCollections(
+        { id: OTHER, roles: ['user'] },
+        'collection.update',
+        [COLLECTION],
+      ),
     ).rejects.toMatchObject({ statusCode: 404 })
     await expect(
-      assertCanOnCollections({ id: OWNER, roles: [] }, 'collection.update', [
-        COLLECTION,
-        MISSING,
-      ]),
+      assertCanOnCollections(
+        { id: OWNER, roles: ['user'] },
+        'collection.update',
+        [COLLECTION, MISSING],
+      ),
     ).rejects.toMatchObject({ statusCode: 404 })
   })
 })

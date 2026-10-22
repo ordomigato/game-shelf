@@ -1,5 +1,5 @@
 {
-  "id": "8522a908-8ab5-4266-9762-29194e641069",
+  "id": "1017448c-2066-4a11-8654-94f7bf8b5f54",
   "prevId": "bb727bca-472b-45ce-ab94-005819044b0f",
   "version": "7",
   "dialect": "postgresql",
@@ -890,7 +890,7 @@
           "type": "text[]",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::text[]"
+          "default": "'{user}'::text[]"
         },
         "plan": {
           "name": "plan",
@@ -985,7 +985,7 @@
         },
         "users_roles": {
           "name": "users_roles",
-          "value": "\"users\".\"roles\" <@ array['admin']::text[]"
+          "value": "\"users\".\"roles\" <@ array['user','admin']::text[] and 'user' = any(\"users\".\"roles\")"
         }
       },
       "isRLSEnabled": false

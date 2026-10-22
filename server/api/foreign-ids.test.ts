@@ -29,8 +29,8 @@ vi.mock('../utils/auth', () => ({
   optionalAuth: async () => null,
 }))
 vi.mock('../utils/users', () => ({
-  findOrCreateUser: async () => ({ id: ME, roles: [], fields: [] }),
-  findUserBySub: async () => ({ id: ME, roles: [] }),
+  findOrCreateUser: async () => ({ id: ME, roles: ['user'], fields: [] }),
+  findUserBySub: async () => ({ id: ME, roles: ['user'] }),
 }))
 
 // A lookup answers with the next prepared rows. Any write is recorded, and

@@ -67,7 +67,7 @@ const owner = {
   ownedPublic: false,
   wishlistPublic: false,
 }
-const asOwner = { id: owner.id, roles: [] }
+const asOwner = { id: owner.id, roles: ['user' as const] }
 const row = (n: number) => ({
   item: {
     id: `30000000-0000-4000-8000-00000000000${n}`,
@@ -286,8 +286,8 @@ describe('who can open a list', () => {
     ownedPublic: true,
     wishlistPublic: false,
   }
-  const other = { id: 'other', roles: [] }
-  const admin = { id: 'admin', roles: ['admin' as const] }
+  const other = { id: 'other', roles: ['user' as const] }
+  const admin = { id: 'admin', roles: ['user' as const, 'admin' as const] }
 
   it('reads each list from its own setting', () => {
     expect(listVisibility(user, 'owned')).toBe('public')

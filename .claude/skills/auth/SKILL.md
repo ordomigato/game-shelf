@@ -44,12 +44,15 @@ An action with no rule is refused. Permissions are the union of what the
 subject's roles grant and what the attribute rules allow. There are no deny
 rules.
 
-- **Roles** live in `users.roles text[]` (default empty). They are the extras
-  only: "user" is implicit for every account and never stored. The only role
-  is `admin`, which today grants `barcodes.review` and nothing else. It does
-  not read other people's private data or bypass ownership or visibility.
-  Roles are granted by hand in SQL, with no UI. A check constraint
-  (`users_roles`) allows only known names.
+- **Roles** live in `users.roles text[]` (default `{user}`, not null). Every
+  account holds `user`, stored like any other role. The owner and reviewers
+  also hold `admin`, which today grants `barcodes.review` and nothing else. It
+  does not read other people's private data or bypass ownership or
+  visibility. `user` grants no actions itself (`ROLE_ACTIONS.user` is empty):
+  basic permissions come from the attribute rules in `RULES`, which apply to
+  any signed-in subject and don't look at roles. Roles are granted by hand in
+  SQL, with no UI. A check constraint (`users_roles`) allows only known names
+  and requires `user`.
 - **Routes** call `authorize(event, action, resource?)` and use what it
   returns (`{ user, subject, claims }`). It answers 401 without a signed-in
   user and 404 when the policy refuses (never 403, so a refusal doesn't
@@ -72,7 +75,7 @@ it under a role in `ROLE_ACTIONS`), add its row to the table in
 `access.test.ts`, then call `authorize` with it from the route.
 
 To add a role: add it to `ROLES` and `ROLE_ACTIONS`, widen the check in a
-migration (`users_roles`, with the data to grant it) and grant it by hand. A
+migration (`users_roles`, keeping `user` required, with the data to grant it) and grant it by hand. A
 role-granted action ignores who owns the thing (say `comment.hide` for a
 moderator), so list it under the role and keep it out of `RULES`.
 

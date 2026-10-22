@@ -52,7 +52,7 @@ export async function authorize(
 /**
  * Like `authorize` for an account action that must not create a user row
  * (deleting the account). The subject comes from the verified token; an
- * account with no row yet has no id or roles of its own.
+ * account with no row yet has no id of its own, and holds the basic `user` role.
  */
 export async function authorizeAccount(
   event: H3Event,
@@ -60,7 +60,9 @@ export async function authorizeAccount(
 ): Promise<{ subject: Subject; claims: AuthClaims }> {
   const claims = await requireAuth(event)
   const user = await findUserBySub(claims.sub)
-  const subject = user ? subjectOf(user) : { id: claims.sub, roles: [] }
+  const subject: Subject = user
+    ? subjectOf(user)
+    : { id: claims.sub, roles: ['user'] }
   assertCan(subject, action)
   return { subject, claims }
 }

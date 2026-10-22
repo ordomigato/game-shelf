@@ -11,7 +11,7 @@ import {
 } from './field-values'
 
 const asOwner: Viewer = {
-  subject: { id: 'owner', roles: [] },
+  subject: { id: 'owner', roles: ['user'] },
   ownerId: 'owner',
 }
 const asVisitor: Viewer = { subject: null, ownerId: 'owner' }
@@ -254,12 +254,12 @@ describe('hidden fields', () => {
     ['a visitor', asVisitor, false],
     [
       'another user',
-      { subject: { id: 'other', roles: [] }, ownerId: 'owner' },
+      { subject: { id: 'other', roles: ['user'] }, ownerId: 'owner' },
       false,
     ],
     [
       'an admin',
-      { subject: { id: 'admin', roles: ['admin'] }, ownerId: 'owner' },
+      { subject: { id: 'admin', roles: ['user', 'admin'] }, ownerId: 'owner' },
       false,
     ],
   ]

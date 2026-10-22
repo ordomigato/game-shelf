@@ -3,8 +3,8 @@
  * the server routes and the browser ask the same question the same way:
  * `can(subject, action, resource?)` answers true or false.
  *
- * - `subject` is `null` for a visitor, otherwise `{ id, roles }`. "user" is
- *   implicit for every signed-in account and is never stored in `roles`.
+ * - `subject` is `null` for a visitor, otherwise `{ id, roles }`. Every
+ *   account holds the "user" role, stored in `roles` like any other.
  * - `action` is named `resource.verb`. Anything without a rule is refused.
  * - `resource` carries the attributes a rule needs (the owner, a
  *   collection's visibility, a field's hidden flag). Actions on the
@@ -32,8 +32,8 @@
  * data.
  */
 
-/** The roles an account can hold besides the implicit "user". */
-export const ROLES = ['admin'] as const
+/** The roles an account can hold. Every account has "user". */
+export const ROLES = ['user', 'admin'] as const
 export type Role = (typeof ROLES)[number]
 
 export interface Subject {
@@ -71,6 +71,10 @@ type Rule = (subject: Subject | null, resource?: Resource) => boolean
 
 /** Actions a role grants on its own, whoever owns the thing. */
 const ROLE_ACTIONS: Record<Role, readonly Action[]> = {
+  // Every account's basic permissions (own data, public things) come from the
+  // attribute rules in `RULES`. Roles only add actions on top, so don't list
+  // basic actions here or the rules get duplicated.
+  user: [],
   admin: ['barcodes.review'],
 }
 
@@ -87,6 +91,9 @@ const ownerOnly: Rule = (subject, resource) =>
 const ownerOrPublic: Rule = (subject, resource) =>
   ownerOnly(subject, resource) || resource?.visibility === 'public'
 
+// These rules apply to any signed-in subject and don't look at the `user`
+// role. An account without it (a future suspension, say) would need an
+// explicit rule.
 const RULES: Partial<Record<Action, Rule>> = {
   // Your own account only. The /api/me routes act on the signed-in user, but
   // a route that names an account must pass it, and only its owner may.

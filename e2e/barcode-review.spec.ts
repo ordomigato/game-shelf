@@ -44,7 +44,7 @@ async function signIn(page: Page, admin: boolean) {
         displayName: null,
         createdAt: '2026-01-01T00:00:00.000Z',
         plan: 'free',
-        roles: admin ? ['admin'] : [],
+        roles: admin ? ['user', 'admin'] : ['user'],
       },
     }),
   )

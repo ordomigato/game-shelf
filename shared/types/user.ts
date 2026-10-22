@@ -12,7 +12,7 @@ export interface Me {
   plan: Plan
   /** The limits in effect: the plan's, with any custom limits on top. */
   limits: PlanLimits
-  /** The roles this account holds besides "user". Never on public data. */
+  /** The roles this account holds (always including "user"). Never on public data. */
   roles: Role[]
 }
 

@@ -20,17 +20,17 @@ describe('the roles migration', () => {
     expect(journal.entries.at(-2)?.tag).toBe('0026_barcode_review')
   })
 
-  it('adds roles as a list that is empty for everyone', () => {
+  it('adds roles as a list that holds user for everyone', () => {
     expect(statements[indexOf('ADD COLUMN "roles"')]).toBe(
-      'ALTER TABLE "users" ADD COLUMN "roles" text[] DEFAULT \'{}\'::text[] NOT NULL;',
+      'ALTER TABLE "users" ADD COLUMN "roles" text[] DEFAULT \'{user}\'::text[] NOT NULL;',
     )
   })
 
-  it('makes every reviewer an admin once the column exists', () => {
+  it('makes every reviewer a user and an admin once the column exists', () => {
     const add = indexOf('ADD COLUMN "roles"')
     const copy = indexOf('UPDATE "users" SET "roles"')
     expect(statements[copy]).toBe(
-      'UPDATE "users" SET "roles" = \'{admin}\' WHERE "reviews_barcodes";',
+      'UPDATE "users" SET "roles" = \'{user,admin}\' WHERE "reviews_barcodes";',
     )
     expect(copy).toBeGreaterThan(add)
   })
@@ -39,9 +39,11 @@ describe('the roles migration', () => {
     expect(statements.join('\n')).not.toMatch(/DROP COLUMN|RENAME/)
   })
 
-  it('allows only known role names', () => {
-    expect(statements.join('\n')).toContain(
-      'ADD CONSTRAINT "users_roles" CHECK ("users"."roles" <@ array[\'admin\']::text[])',
+  it('allows only known role names and always requires user', () => {
+    const add = indexOf('ADD CONSTRAINT "users_roles"')
+    expect(statements[add]).toBe(
+      'ALTER TABLE "users" ADD CONSTRAINT "users_roles" CHECK ("users"."roles" <@ array[\'user\',\'admin\']::text[] and \'user\' = any("users"."roles"));',
     )
+    expect(add).toBeGreaterThan(indexOf('UPDATE "users" SET "roles"'))
   })
 })

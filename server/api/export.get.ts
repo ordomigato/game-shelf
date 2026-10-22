@@ -3,8 +3,7 @@
  * Wishlist, as CSV files in one zip.
  */
 export default defineEventHandler(async (event) => {
-  const { sub } = await requireAuth(event)
-  const user = await findOrCreateUser(sub)
+  const { user } = await authorize(event, 'export.read')
   // Cheap, but not free: a few exports per user every ten minutes.
   await rateLimit(event, `export:${user.id}`, { limit: 3, windowSeconds: 600 })
   const zip = await exportEverything(user.id)

@@ -9,6 +9,12 @@ import {
   type SQL,
 } from 'drizzle-orm'
 import { createError } from 'h3'
+import {
+  can,
+  seesAllOf,
+  type Resource,
+  type Subject,
+} from '../../shared/utils/access'
 import type {
   CollectionLink,
   CollectionVisibility,
@@ -39,7 +45,6 @@ import {
   customCollectionsOf,
   getOwnedItem,
   itemName,
-  notFound,
   platformNames,
   toCollectionEntry,
   toLibraryItem,
@@ -60,18 +65,15 @@ export function listVisibility(
 }
 
 /**
- * Lets the owner see their own list, and anyone else only a public one.
- * Anything else is a 404, like a private collection, so a private list's
- * existence isn't revealed.
+ * What the policy needs to decide who may open a list: its owner and
+ * whether they made it public. The owner may always, anyone else only a
+ * public one (a 404 otherwise, like a private collection).
  */
-export function assertCanViewList(
-  owner: Pick<UserRow, 'ownedPublic' | 'wishlistPublic'>,
+export function listResource(
+  owner: Pick<UserRow, 'id' | 'ownedPublic' | 'wishlistPublic'>,
   list: ListName,
-  viewerIsOwner: boolean,
-): void {
-  if (!viewerIsOwner && listVisibility(owner, list) !== 'public') {
-    throw notFound()
-  }
+): Resource {
+  return { ownerId: owner.id, visibility: listVisibility(owner, list) }
 }
 
 /** Makes Owned or the Wishlist private or public. */
@@ -91,16 +93,16 @@ export async function setListVisibility(
 }
 
 /**
- * The lists a viewer can open, with their sizes: both for the owner, only
- * the public ones for anyone else.
+ * The lists a viewer (null for a visitor) can open, with their sizes: both
+ * for the owner, only the public ones for anyone else.
  */
 export async function listSummaries(
   owner: UserRow,
-  viewerIsOwner: boolean,
+  viewer: Subject | null,
 ): Promise<ListSummary[]> {
   const counts = await listCounts(owner.id)
   return (['owned', 'wishlist'] as const)
-    .filter((list) => viewerIsOwner || listVisibility(owner, list) === 'public')
+    .filter((list) => can(viewer, 'list.read', listResource(owner, list)))
     .map((list) => ({
       list,
       visibility: listVisibility(owner, list),
@@ -123,6 +125,7 @@ export async function visitorFieldsOfList(
   ownerId: string,
   list: ListName,
   fields: FieldDefinition[],
+  viewer: Subject | null,
 ): Promise<FieldDefinition[]> {
   const rows = await useDb()
     .selectDistinct({
@@ -130,7 +133,11 @@ export async function visitorFieldsOfList(
     })
     .from(libraryItems)
     .where(onListOf(ownerId, list))
-  return visitorFields(fields, new Set(rows.map((row) => row.id)))
+  return visitorFields(
+    { subject: viewer, ownerId },
+    fields,
+    new Set(rows.map((row) => row.id)),
+  )
 }
 
 /** A row's place on the two lists. */
@@ -190,7 +197,7 @@ async function genreChoices(
  * One page of Owned or the Wishlist: the owner's games on that list that
  * match the search and filters, in the asked order. The owner also gets
  * the custom collections each game is in and the platforms to pick from.
- * A visitor (`query.viewerIsOwner` false, on a public list) gets neither:
+ * A visitor (anyone but the owner, on a public list) gets neither:
  * only the list's own platforms and the `fields` they may see. A page past
  * the end comes back as the last one. The sort, search and filters run in
  * SQL (see `list-query.ts`), so only this page's rows leave the database.
@@ -201,10 +208,11 @@ export async function getListPage(
   list: ListName,
   query: ListQuery,
   fields: FieldDefinition[],
+  viewer: Subject | null,
 ): Promise<ListDetail> {
   const db = useDb()
   const ownerId = owner.id
-  const viewerIsOwner = query.viewerIsOwner
+  const viewerIsOwner = seesAllOf(viewer, ownerId)
   const where = listWhere(ownerId, list, query)
   const order = listOrder(ownerId, list, query)
   const onList = onListOf(ownerId, list)
@@ -268,7 +276,7 @@ export async function getListPage(
       viewerIsOwner ? undefined : list,
     ),
     ...(inCollections && { inCollections: inCollections.get(item.id) ?? [] }),
-    data: dataFor(viewerIsOwner, fields, item.data),
+    data: dataFor({ subject: viewer, ownerId }, fields, item.data),
   }))
   return {
     list,

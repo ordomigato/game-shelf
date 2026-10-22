@@ -4,18 +4,19 @@ const reviewGroups = vi.fn()
 const listReviewGroups = vi.fn()
 vi.mock('../../utils/scandex', () => ({ submitToScanDex: vi.fn() }))
 
-let reviews: boolean
-const requireAuth = vi.fn(async () => ({ sub: 'sub-1' }))
-const findOrCreateUser = vi.fn(async () => ({
-  id: 'u1',
-  reviewsBarcodes: reviews,
+let roles: string[]
+vi.mock('../../utils/auth', () => ({
+  requireAuth: async () => ({ sub: 'sub-1', username: 'sub-1' }),
+  optionalAuth: async () => null,
+}))
+vi.mock('../../utils/users', () => ({
+  findOrCreateUser: async () => ({ id: 'u1', roles }),
+  findUserBySub: async () => undefined,
 }))
 let body: unknown
 let query: unknown
 
 vi.stubGlobal('defineEventHandler', (handler: unknown) => handler)
-vi.stubGlobal('requireAuth', requireAuth)
-vi.stubGlobal('findOrCreateUser', findOrCreateUser)
 vi.stubGlobal(
   'readValidatedBody',
   async (_event: unknown, parse: (value: unknown) => unknown) => parse(body),
@@ -25,9 +26,9 @@ vi.stubGlobal(
   async (_event: unknown, parse: (value: unknown) => unknown) => parse(query),
 )
 
-// The routes use Nitro's auto-imports. The gate is the real one.
-const { requireReviewer } = await import('../../utils/barcode-review')
-vi.stubGlobal('requireReviewer', requireReviewer)
+// The routes use Nitro's auto-imports. The policy check is the real one.
+const { authorize } = await import('../../utils/authorize')
+vi.stubGlobal('authorize', authorize)
 vi.stubGlobal('listReviewGroups', listReviewGroups)
 vi.stubGlobal('reviewGroups', reviewGroups)
 
@@ -41,7 +42,7 @@ const post = (await import('./reviews.post')).default as (
 const group = { code: '0045496590048', igdbId: 26758, platformId: 130 }
 
 beforeEach(() => {
-  reviews = true
+  roles = ['admin']
   query = {}
   body = { action: 'approve', groups: [group] }
   listReviewGroups.mockReset()
@@ -51,8 +52,8 @@ beforeEach(() => {
 })
 
 describe('GET /api/barcodes/reviews', () => {
-  it('is a 404 for an account that does not review barcodes, without reading anything', async () => {
-    reviews = false
+  it('is a 404 for an account without the admin role, without reading anything', async () => {
+    roles = []
     await expect(get({})).rejects.toMatchObject({ statusCode: 404 })
     expect(listReviewGroups).not.toHaveBeenCalled()
   })
@@ -74,14 +75,14 @@ describe('GET /api/barcodes/reviews', () => {
 })
 
 describe('POST /api/barcodes/reviews', () => {
-  it('is a 404 for an account that does not review barcodes, without doing anything', async () => {
-    reviews = false
+  it('is a 404 for an account without the admin role, without doing anything', async () => {
+    roles = []
     await expect(post({})).rejects.toMatchObject({ statusCode: 404 })
     expect(reviewGroups).not.toHaveBeenCalled()
   })
 
   it('does not even read the body for anyone else', async () => {
-    reviews = false
+    roles = []
     body = 'not even a body'
     await expect(post({})).rejects.toMatchObject({ statusCode: 404 })
   })

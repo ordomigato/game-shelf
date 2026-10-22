@@ -8,11 +8,10 @@ import type {
  * many of the user's games would lose a value.
  */
 export default defineEventHandler(async (event): Promise<FieldsImpact> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'account.read')
   const { fields, optionRenames } = await readValidatedBody(
     event,
     fieldsBodySchema.parse,
   )
-  const user = await findOrCreateUser(sub)
   return previewUserFields(user.id, fields as FieldDefinition[], optionRenames)
 })

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Viewer } from './access'
 import type { FieldDefinition, ItemData } from '../types/collection'
 import type { ChartWidget } from '../types/charts'
 import {
@@ -8,6 +9,12 @@ import {
   fieldsFor,
   normalizeFieldValue,
 } from './field-values'
+
+const asOwner: Viewer = {
+  subject: { id: 'owner', roles: [] },
+  ownerId: 'owner',
+}
+const asVisitor: Viewer = { subject: null, ownerId: 'owner' }
 
 const field = (type: FieldDefinition['type'], options?: string[]) =>
   ({ id: 'f', name: 'F', type, options }) as FieldDefinition
@@ -134,11 +141,11 @@ describe('fieldsFor', () => {
   })
 
   it('gives the owner every field', () => {
-    expect(fieldsFor(true, all, items, [])).toEqual(all)
+    expect(fieldsFor(asOwner, all, items, [])).toEqual(all)
   })
 
   it('gives a visitor only fields with a value in the collection', () => {
-    expect(fieldsFor(false, all, items, []).map((f) => f.id)).toEqual([
+    expect(fieldsFor(asVisitor, all, items, []).map((f) => f.id)).toEqual([
       'a',
       'b',
     ])
@@ -153,17 +160,13 @@ describe('fieldsFor', () => {
         timeline: { source: 'e', bucket: 'month', cumulative: false },
       }),
     ]
-    expect(fieldsFor(false, all, items, dashboard).map((f) => f.id)).toEqual([
-      'a',
-      'b',
-      'c',
-      'd',
-      'e',
-    ])
+    expect(
+      fieldsFor(asVisitor, all, items, dashboard).map((f) => f.id),
+    ).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 
   it('shows a visitor nothing when no game has a value', () => {
-    expect(fieldsFor(false, all, [{ data: {} }], [])).toEqual([])
+    expect(fieldsFor(asVisitor, all, [{ data: {} }], [])).toEqual([])
   })
 })
 
@@ -187,13 +190,13 @@ describe('hidden fields', () => {
 
   it('never lists a hidden field to a visitor, even with values or a chart', () => {
     const dashboard = [widget({ measure: { op: 'sum', fieldId: 'p' } })]
-    expect(fieldsFor(false, all, items, dashboard).map((f) => f.id)).toEqual([
-      'a',
-    ])
+    expect(
+      fieldsFor(asVisitor, all, items, dashboard).map((f) => f.id),
+    ).toEqual(['a'])
   })
 
   it('gives the owner hidden fields too', () => {
-    expect(fieldsFor(true, all, items, [])).toEqual(all)
+    expect(fieldsFor(asOwner, all, items, [])).toEqual(all)
   })
 
   it('leaves out charts that read a hidden field for a visitor only', () => {
@@ -206,29 +209,68 @@ describe('hidden fields', () => {
     })
     const count = widget({ id: '4' })
     const dashboard = [total, byPrice, overTime, count]
-    expect(chartsFor(false, all, dashboard)).toEqual([count])
-    expect(chartsFor(true, all, dashboard)).toEqual(dashboard)
+    expect(chartsFor(asVisitor, all, dashboard)).toEqual([count])
+    expect(chartsFor(asOwner, all, dashboard)).toEqual(dashboard)
   })
 
   it('keeps platforms charts for visitors, who are sent the platforms', () => {
     const byPlatform = widget({ id: '5', kind: 'bar', groupBy: 'platforms' })
     const byGenre = widget({ id: '6', kind: 'bar', groupBy: 'genre' })
-    expect(chartsFor(false, all, [byPlatform, byGenre])).toEqual([
+    expect(chartsFor(asVisitor, all, [byPlatform, byGenre])).toEqual([
       byPlatform,
       byGenre,
     ])
-    expect(chartsFor(true, all, [byPlatform, byGenre])).toEqual([
+    expect(chartsFor(asOwner, all, [byPlatform, byGenre])).toEqual([
       byPlatform,
       byGenre,
     ])
   })
 
   it('strips item data down to the visible fields for a visitor', () => {
-    const visible = fieldsFor(false, all, items, [])
-    expect(dataFor(false, visible, { a: 'hi', p: 60, gone: 'x' })).toEqual({
+    const visible = fieldsFor(asVisitor, all, items, [])
+    expect(dataFor(asVisitor, visible, { a: 'hi', p: 60, gone: 'x' })).toEqual({
       a: 'hi',
     })
     const data = { a: 'hi', p: 60 }
-    expect(dataFor(true, all, data)).toBe(data)
+    expect(dataFor(asOwner, all, data)).toBe(data)
   })
+})
+
+describe('hidden fields', () => {
+  const fields: FieldDefinition[] = [
+    { id: 'a', name: 'Notes', type: 'text' },
+    { id: 'p', name: 'Price paid', type: 'number', hidden: true },
+  ]
+  const items: { data: ItemData }[] = [{ data: { a: 'hi', p: 60 } }]
+  const price: ChartWidget = {
+    id: 'w',
+    kind: 'number',
+    title: '',
+    size: 'small',
+    measure: { op: 'sum', fieldId: 'p' },
+  }
+  const viewers: [string, Viewer, boolean][] = [
+    ['the owner', asOwner, true],
+    ['a visitor', asVisitor, false],
+    [
+      'another user',
+      { subject: { id: 'other', roles: [] }, ownerId: 'owner' },
+      false,
+    ],
+    [
+      'an admin',
+      { subject: { id: 'admin', roles: ['admin'] }, ownerId: 'owner' },
+      false,
+    ],
+  ]
+
+  for (const [who, viewer, seesHidden] of viewers) {
+    it(`${seesHidden ? 'shows' : 'keeps'} a hidden field ${seesHidden ? 'to' : 'from'} ${who}`, () => {
+      const shown = fieldsFor(viewer, fields, items, [price]).map((f) => f.id)
+      expect(shown).toEqual(seesHidden ? ['a', 'p'] : ['a'])
+      expect(chartsFor(viewer, fields, [price])).toHaveLength(
+        seesHidden ? 1 : 0,
+      )
+    })
+  }
 })

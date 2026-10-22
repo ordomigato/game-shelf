@@ -39,10 +39,13 @@ const bodySchema = z
   .refine((body) => Object.values(body).some((value) => value !== undefined))
 
 export default defineEventHandler(async (event): Promise<CollectionSummary> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(
+    event,
+    'collection.update',
+    collectionOf(event),
+  )
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const body = await readValidatedBody(event, bodySchema.parse)
-  const user = await findOrCreateUser(sub)
   if (
     body.hiddenColumns &&
     !allColumnsKnown(

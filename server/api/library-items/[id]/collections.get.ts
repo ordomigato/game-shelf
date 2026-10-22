@@ -8,8 +8,7 @@ const paramsSchema = z.object({ id: z.uuid() })
  * off its last list, since that deletes it from them too.
  */
 export default defineEventHandler(async (event): Promise<CollectionLink[]> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'library.read', itemOf(event))
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
-  const user = await findOrCreateUser(sub)
   return collectionsOfItem(user.id, id)
 })

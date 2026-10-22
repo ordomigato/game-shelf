@@ -56,8 +56,9 @@ vi.mock('./collections', async (importOriginal) => ({
   platformNames: async () => new Map([[19, 'SNES']]),
 }))
 
-const { assertCanViewList, getListPage, listVisibility } =
-  await import('./lists')
+const { getListPage, listResource, listVisibility } = await import('./lists')
+const { can } = await import('../../shared/utils/access')
+const { assertCan } = await import('./assert-can')
 const { parseListQuery } = await import('./list-query')
 
 const owner = {
@@ -66,6 +67,7 @@ const owner = {
   ownedPublic: false,
   wishlistPublic: false,
 }
+const asOwner = { id: owner.id, roles: [] }
 const row = (n: number) => ({
   item: {
     id: `30000000-0000-4000-8000-00000000000${n}`,
@@ -99,6 +101,7 @@ describe('getListPage', () => {
       'owned',
       parseListQuery({ page: '2', size: '25' }, [], true),
       [],
+      asOwner,
     )
     expect(countCalls).toBe(2)
     expect(asked).toHaveLength(1)
@@ -124,6 +127,7 @@ describe('getListPage', () => {
       'owned',
       parseListQuery({ q: 'zelda' }, [], true),
       [],
+      asOwner,
     )
     expect(countCalls).toBe(3)
     expect(result).toMatchObject({ total: 3, itemCount: 120, page: 1 })
@@ -137,6 +141,7 @@ describe('getListPage', () => {
       'wishlist',
       parseListQuery({ page: '9', size: '50' }, [], true),
       [],
+      asOwner,
     )
     expect(asked.map((call) => call.offset)).toEqual([400, 50])
     expect(result.page).toBe(2)
@@ -151,6 +156,7 @@ describe('getListPage', () => {
       'owned',
       parseListQuery({ page: '4' }, [], true),
       [],
+      asOwner,
     )
     expect(result).toMatchObject({ page: 1, total: 0, itemCount: 0, items: [] })
   })
@@ -178,6 +184,7 @@ describe('getListPage', () => {
       'owned',
       parseListQuery({}, [], true),
       [],
+      asOwner,
     )
     // Platform 5 has no name in the platforms table, so it can't be shown.
     expect(result.items[0]).toMatchObject({
@@ -221,6 +228,7 @@ describe('getListPage for a visitor', () => {
       'owned',
       visitorOf(),
       [],
+      null,
     )
     expect(result).toMatchObject({
       list: 'owned',
@@ -247,6 +255,7 @@ describe('getListPage for a visitor', () => {
       'wishlist',
       visitorOf(),
       [],
+      null,
     )
     expect(result.visibility).toBe('public')
     expect(result.items[0]).toMatchObject({
@@ -265,28 +274,45 @@ describe('getListPage for a visitor', () => {
         item: { ...row(1).item, data: { a: 'hi', secret: 'x' } },
       },
     ])
-    const result = await getListPage(owner, 'owned', visitorOf(), [shown])
+    const result = await getListPage(owner, 'owned', visitorOf(), [shown], null)
     expect(result.fields).toEqual([shown])
     expect(result.items[0]!.data).toEqual({ a: 'hi' })
   })
 })
 
 describe('who can open a list', () => {
-  const user = { ownedPublic: true, wishlistPublic: false }
+  const user = {
+    id: owner.id,
+    ownedPublic: true,
+    wishlistPublic: false,
+  }
+  const other = { id: 'other', roles: [] }
+  const admin = { id: 'admin', roles: ['admin' as const] }
 
   it('reads each list from its own setting', () => {
     expect(listVisibility(user, 'owned')).toBe('public')
     expect(listVisibility(user, 'wishlist')).toBe('private')
+    expect(listResource(user, 'owned')).toEqual({
+      ownerId: owner.id,
+      visibility: 'public',
+    })
   })
 
-  it('always lets the owner in, and a visitor only to a public list', () => {
-    expect(() => assertCanViewList(user, 'wishlist', true)).not.toThrow()
-    expect(() => assertCanViewList(user, 'owned', false)).not.toThrow()
+  it('always lets the owner in, and anyone else only to a public list', () => {
+    for (const viewer of [asOwner, other, admin, null]) {
+      const allowed = viewer === asOwner
+      expect(can(viewer, 'list.read', listResource(user, 'owned'))).toBe(true)
+      expect(can(viewer, 'list.read', listResource(user, 'wishlist'))).toBe(
+        allowed,
+      )
+    }
   })
 
-  it('answers a visitor of a private list with a 404, like a private collection', () => {
-    expect(() => assertCanViewList(user, 'wishlist', false)).toThrow(
-      expect.objectContaining({ statusCode: 404 }),
-    )
+  it('answers anyone else of a private list with a 404, like a private collection', () => {
+    for (const viewer of [other, admin, null]) {
+      expect(() =>
+        assertCan(viewer, 'list.read', listResource(user, 'wishlist')),
+      ).toThrow(expect.objectContaining({ statusCode: 404 }))
+    }
   })
 })

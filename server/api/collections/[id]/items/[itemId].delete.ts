@@ -9,12 +9,16 @@ const paramsSchema = z.object({ id: z.uuid(), itemId: z.uuid() })
  */
 export default defineEventHandler(
   async (event): Promise<{ collectionIds: string[] }> => {
-    const { sub } = await requireAuth(event)
+    const { user, subject } = await authorize(
+      event,
+      'collection.update',
+      collectionOf(event),
+    )
     const { id, itemId } = await getValidatedRouterParams(
       event,
       paramsSchema.parse,
     )
-    const user = await findOrCreateUser(sub)
+    assertCan(subject, 'library.write', await itemResource(itemId))
     await getOwnedItem(user.id, itemId)
     await removeItemFromCollection(user.id, id, itemId)
     return { collectionIds: await collectionIdsForItem(itemId) }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Action } from '#shared/utils/access'
+
 definePageMeta({ middleware: 'auth' })
 
 // The parent page stays mounted while tabs change, and its `useRoute()` keeps
@@ -8,8 +10,8 @@ const currentPath = computed(() => router.currentRoute.value.path)
 
 const auth = useAuth()
 
-// Barcodes is only listed for the barcode reviewer.
-const allTabs = [
+// Barcodes is only listed for those who may review barcodes.
+const allTabs: { to: string; labelKey: string; action?: Action }[] = [
   { to: '/account', labelKey: 'account.tabs.profile' },
   { to: '/account/security', labelKey: 'account.tabs.security' },
   { to: '/account/fields', labelKey: 'account.tabs.fields' },
@@ -17,12 +19,12 @@ const allTabs = [
   {
     to: '/account/barcodes',
     labelKey: 'account.tabs.barcodes',
-    reviewer: true,
+    action: 'barcodes.review',
   },
   { to: '/account/settings', labelKey: 'account.tabs.settings' },
 ]
 const tabs = computed(() =>
-  allTabs.filter((tab) => !tab.reviewer || auth.me.value?.reviewsBarcodes),
+  allTabs.filter((tab) => !tab.action || auth.can(tab.action)),
 )
 </script>
 

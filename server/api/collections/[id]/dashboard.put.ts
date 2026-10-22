@@ -36,10 +36,13 @@ const bodySchema = z.object({
  * can change later anyway, so the dashboard checks them when it draws.
  */
 export default defineEventHandler(async (event): Promise<ChartWidget[]> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(
+    event,
+    'collection.update',
+    collectionOf(event),
+  )
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const { dashboard } = await readValidatedBody(event, bodySchema.parse)
-  const user = await findOrCreateUser(sub)
   assertChartCount(dashboard.length, userLimits(user))
   return updateDashboard(user.id, id, dashboard)
 })

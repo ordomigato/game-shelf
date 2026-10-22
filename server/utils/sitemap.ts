@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
+import { can } from '../../shared/utils/access'
 import { INDEXABLE_PAGES } from '../../shared/utils/seo'
 
 /** The most URLs one sitemap file may list (the sitemap protocol's limit). */
@@ -49,17 +50,25 @@ export function sitemapEntries(data: SitemapData): SitemapEntry[] {
     list.push(entry)
     shelves.set(username, list)
   }
+  // The sitemap is for visitors: a page is listed only if a visitor may open it.
+  const visitorMayOpen = (isPublic: boolean) =>
+    can(null, 'list.read', { visibility: isPublic ? 'public' : 'private' })
   for (const user of data.users) {
     const base = `/u/${encodePart(user.username)}/shelf`
-    if (user.ownedPublic && user.hasOwned) {
+    if (visitorMayOpen(user.ownedPublic) && user.hasOwned) {
       add(user.username, { path: `${base}/owned` })
     }
-    if (user.wishlistPublic && user.hasWishlist) {
+    if (visitorMayOpen(user.wishlistPublic) && user.hasWishlist) {
       add(user.username, { path: `${base}/wishlist` })
     }
   }
   for (const collection of data.collections) {
-    if (collection.visibility !== 'public' || collection.itemCount < 1) continue
+    if (
+      !can(null, 'collection.read', { visibility: collection.visibility }) ||
+      collection.itemCount < 1
+    ) {
+      continue
+    }
     add(collection.username, {
       path: `/u/${encodePart(collection.username)}/shelf/${encodePart(collection.slug)}`,
       ...(collection.lastmod && { lastmod: collection.lastmod }),

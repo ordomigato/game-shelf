@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { can } from '../../shared/utils/access'
 import type { ExplorePage } from '../../shared/types/collection'
 
 export const EXPLORE_PAGE_SIZE = 24
@@ -7,6 +8,7 @@ interface ExploreRow extends Record<string, unknown> {
   id: string
   title: string
   slug: string
+  visibility: 'private' | 'public'
   description: string | null
   item_count: number
   active_at: string | Date
@@ -24,7 +26,7 @@ export async function listExplore(page: number): Promise<ExplorePage> {
   const offset = (page - 1) * EXPLORE_PAGE_SIZE
   const result = await useDb().execute<ExploreRow>(sql`
     select
-      c.id, c.title, c.slug, c.description,
+      c.id, c.title, c.slug, c.visibility, c.description,
       stats.item_count,
       greatest(c.updated_at, stats.last_added) as active_at,
       u.username, u.display_name,
@@ -59,16 +61,21 @@ export async function listExplore(page: number): Promise<ExplorePage> {
   `)
   const rows = result.rows
   return {
-    collections: rows.slice(0, EXPLORE_PAGE_SIZE).map((row) => ({
-      id: row.id,
-      title: row.title,
-      slug: row.slug,
-      description: row.description,
-      itemCount: row.item_count,
-      activeAt: new Date(row.active_at).toISOString(),
-      owner: { username: row.username, displayName: row.display_name },
-      preview: row.preview ?? [],
-    })),
+    collections: rows
+      .slice(0, EXPLORE_PAGE_SIZE)
+      .filter((row) =>
+        can(null, 'collection.read', { visibility: row.visibility }),
+      )
+      .map((row) => ({
+        id: row.id,
+        title: row.title,
+        slug: row.slug,
+        description: row.description,
+        itemCount: row.item_count,
+        activeAt: new Date(row.active_at).toISOString(),
+        owner: { username: row.username, displayName: row.display_name },
+        preview: row.preview ?? [],
+      })),
     hasMore: rows.length > EXPLORE_PAGE_SIZE,
   }
 }

@@ -23,7 +23,7 @@ const bodySchema = z.object({
  */
 export default defineEventHandler(
   async (event): Promise<BarcodeReviewOutcome[]> => {
-    await requireReviewer(event)
+    await authorize(event, 'barcodes.review')
     const { action, groups } = await readValidatedBody(event, bodySchema.parse)
     return reviewGroups(action, groups)
   },

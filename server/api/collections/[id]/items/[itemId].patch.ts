@@ -8,12 +8,16 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event): Promise<LibraryItem> => {
-  const { sub } = await requireAuth(event)
+  const { user, subject } = await authorize(
+    event,
+    'collection.update',
+    collectionOf(event),
+  )
   const { id, itemId } = await getValidatedRouterParams(
     event,
     paramsSchema.parse,
   )
   const { values } = await readValidatedBody(event, bodySchema.parse)
-  const user = await findOrCreateUser(sub)
+  assertCan(subject, 'library.write', await itemResource(itemId))
   return updateItemValues(user.id, id, itemId, values)
 })

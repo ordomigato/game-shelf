@@ -13,10 +13,9 @@ const bodySchema = z.object({
 
 /** Saves which columns the signed-in user hides on Owned or the Wishlist. */
 export default defineEventHandler(async (event): Promise<string[]> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'account.update')
   const { list } = await getValidatedRouterParams(event, paramsSchema.parse)
   const { hidden } = await readValidatedBody(event, bodySchema.parse)
-  const user = await findOrCreateUser(sub)
   const fieldIds = user.fields.map((field) => field.id)
   if (!allColumnsKnown(hidden, 'list', fieldIds)) {
     throw createError({ statusCode: 400, statusMessage: 'Unknown column' })

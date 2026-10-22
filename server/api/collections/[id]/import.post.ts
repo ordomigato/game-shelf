@@ -34,9 +34,12 @@ const bodySchema = z.object({
 
 /** Imports one chunk of a CSV file's games into a collection. */
 export default defineEventHandler(async (event): Promise<ImportResult> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(
+    event,
+    'collection.update',
+    collectionOf(event),
+  )
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
-  const user = await findOrCreateUser(sub)
   // About 15,000 games in ten minutes: plenty for real files.
   await rateLimit(event, `import:${user.id}`, { limit: 60, windowSeconds: 600 })
   const { fields, rows } = await readValidatedBody(event, bodySchema.parse)

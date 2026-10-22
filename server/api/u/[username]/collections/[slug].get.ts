@@ -16,10 +16,10 @@ export default defineEventHandler(async (event): Promise<CollectionDetail> => {
     event,
     paramsSchema.parse,
   )
-  const [owner, claims] = await Promise.all([
+  const [owner, viewer] = await Promise.all([
     findUserByUsername(username),
-    optionalAuth(event),
+    viewerOf(event),
   ])
   if (!owner) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  return getCollectionBySlug(owner.id, slug, claims?.sub === owner.cognitoSub)
+  return getCollectionBySlug(owner.id, slug, viewer)
 })

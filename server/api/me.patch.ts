@@ -25,9 +25,8 @@ const bodySchema = z
   )
 
 export default defineEventHandler(async (event): Promise<Me> => {
-  const { sub } = await requireAuth(event)
+  const { claims } = await authorize(event, 'account.update')
   const body = await readValidatedBody(event, bodySchema.parse)
-  await findOrCreateUser(sub)
 
   try {
     const [updated] = await useDb()
@@ -38,7 +37,7 @@ export default defineEventHandler(async (event): Promise<Me> => {
           displayName: body.displayName,
         }),
       })
-      .where(eq(users.cognitoSub, sub))
+      .where(eq(users.cognitoSub, claims.sub))
       .returning()
     if (!updated) throw new Error('User row missing during update')
     return toMe(updated)

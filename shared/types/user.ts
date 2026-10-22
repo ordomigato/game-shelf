@@ -1,3 +1,4 @@
+import type { Role } from '../utils/access'
 import type { Plan, PlanLimits } from '../utils/plans'
 
 /** The signed-in user, as returned by `/api/me`. */
@@ -11,8 +12,8 @@ export interface Me {
   plan: Plan
   /** The limits in effect: the plan's, with any custom limits on top. */
   limits: PlanLimits
-  /** The account reviews the barcodes people matched themselves. Never on public data. */
-  reviewsBarcodes: boolean
+  /** The roles this account holds besides "user". Never on public data. */
+  roles: Role[]
 }
 
 /** How much of their plan a user has used, for Settings. */

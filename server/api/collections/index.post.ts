@@ -26,12 +26,11 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event): Promise<CollectionSummary> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'collection.create')
   const { title, description, color } = await readValidatedBody(
     event,
     bodySchema.parse,
   )
-  const user = await findOrCreateUser(sub)
   await assertCollectionRoom(user.id, userLimits(user))
   const created = await createCollection(user.id, {
     title,

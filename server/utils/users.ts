@@ -21,6 +21,17 @@ export async function findOrCreateUser(cognitoSub: string): Promise<UserRow> {
   return existing
 }
 
+/** The `users` row for a Cognito user, or undefined. Never creates one. */
+export async function findUserBySub(
+  cognitoSub: string,
+): Promise<UserRow | undefined> {
+  const [user] = await useDb()
+    .select()
+    .from(users)
+    .where(eq(users.cognitoSub, cognitoSub))
+  return user
+}
+
 /** The user with this username, or undefined. */
 export async function findUserByUsername(
   username: string,
@@ -48,6 +59,6 @@ export function toMe(user: UserRow): Me {
     createdAt: user.createdAt.toISOString(),
     plan: effectivePlan(user),
     limits: userLimits(user),
-    reviewsBarcodes: user.reviewsBarcodes,
+    roles: user.roles,
   }
 }

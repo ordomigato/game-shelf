@@ -13,6 +13,7 @@ import {
 } from 'aws-amplify/auth'
 import type { NitroFetchOptions, NitroFetchRequest } from 'nitropack'
 import type { Me } from '#shared/types/user'
+import { can, type Action, type Resource } from '#shared/utils/access'
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn'
 
@@ -41,6 +42,16 @@ export function useAuth() {
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 30,
   })
+
+  /**
+   * Whether the signed-in user may do this, by the same policy the server
+   * uses (`shared/utils/access.ts`). Hides what they couldn't use. The
+   * server still decides.
+   */
+  function allowed(action: Action, resource?: Resource): boolean {
+    const user = me.value
+    return can(user && { id: user.id, roles: user.roles }, action, resource)
+  }
 
   function setSignedIn(user: Me) {
     me.value = user
@@ -102,6 +113,7 @@ export function useAuth() {
     status,
     me,
     hint,
+    can: allowed,
     apiFetch,
     refresh,
     ensureLoaded,

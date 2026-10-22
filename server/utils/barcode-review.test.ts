@@ -6,7 +6,7 @@ const log = vi.fn()
 vi.mock('./log', () => ({ log }))
 
 const { PgDialect } = await import('drizzle-orm/pg-core')
-const { listReviewGroups, reviewGroups, requireReviewer, MAX_REVIEW_GROUPS } =
+const { listReviewGroups, reviewGroups, MAX_REVIEW_GROUPS } =
   await import('./barcode-review')
 
 /** The SQL text and parameters of a condition. */
@@ -114,29 +114,6 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 const updates = () => calls.filter((call) => call.kind === 'update')
-
-describe('requireReviewer', () => {
-  const requireAuth = vi.fn(async () => ({ sub: 'sub-1' }))
-  let reviews = false
-  const findOrCreateUser = vi.fn(async () => ({
-    id: 'u1',
-    reviewsBarcodes: reviews,
-  }))
-  vi.stubGlobal('requireAuth', requireAuth)
-  vi.stubGlobal('findOrCreateUser', findOrCreateUser)
-
-  it('is a 404 for anyone who does not review barcodes', async () => {
-    reviews = false
-    await expect(requireReviewer({} as never)).rejects.toMatchObject({
-      statusCode: 404,
-    })
-  })
-
-  it('gives the reviewer their user', async () => {
-    reviews = true
-    expect(await requireReviewer({} as never)).toMatchObject({ id: 'u1' })
-  })
-})
 
 describe('listReviewGroups', () => {
   /** A group as the grouping statement returns it. */

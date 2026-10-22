@@ -48,6 +48,6 @@ export function toMe(user: UserRow): Me {
     createdAt: user.createdAt.toISOString(),
     plan: effectivePlan(user),
     limits: userLimits(user),
-    contributesBarcodes: user.contributesBarcodes,
+    reviewsBarcodes: user.reviewsBarcodes,
   }
 }

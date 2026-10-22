@@ -183,6 +183,13 @@
       "when": 1792621264650,
       "tag": "0025_user_barcodes",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792627463550,
+      "tag": "0026_barcode_review",
+      "breakpoints": true
     }
   ]
 }

@@ -40,10 +40,11 @@ export const users = pgTable(
     /** Chosen after the first sign-in. Null until then. */
     username: text('username').unique(),
     displayName: text('display_name'),
-    /** May suggest games to ScanDex. Set by hand, off for everyone else. */
-    contributesBarcodes: boolean('contributes_barcodes')
-      .notNull()
-      .default(false),
+    /**
+     * Reviews the barcodes people matched themselves (and may send approved
+     * ones to ScanDex). Set by hand, off for everyone else. Not an admin flag.
+     */
+    reviewsBarcodes: boolean('reviews_barcodes').notNull().default(false),
     /** What the account may store (shared/utils/plans.ts). */
     plan: text('plan')
       .$type<'free' | 'pro' | 'max'>()
@@ -289,55 +290,71 @@ export const rateLimits = pgTable('rate_limits', {
 })
 
 /**
- * ScanDex's answers for barcodes, so the same box isn't asked about twice.
- * Only what ScanDex said is kept, never anything a user typed or chose. A
- * row with no `igdbId` means ScanDex has no game for the barcode. Keys are
- * normalised (`shared/utils/barcode.ts`). See `server/utils/barcodes.ts`.
+ * What we know about barcodes, from two sources (`source`):
+ * - `scandex`: ScanDex's answer, so the same box isn't asked about twice. A
+ *   row with no `igdbId` means ScanDex has no game for the barcode. One row
+ *   per code. Matches are kept for good, no-match rows for a day.
+ * - `user`: a game a user matched to the box themselves (Find it or Change in
+ *   the scanner), saved when their batch is added. One row per user and code.
+ *   It starts `pending`, and only the barcode reviewer approves or rejects
+ *   it. Nothing is approved automatically. An approved row serves everyone,
+ *   a pending one only its picker, a rejected one nobody. Approved rows
+ *   outlive the account (`submitted_by` becomes null), pending and rejected
+ *   ones go with it.
+ * Keys are normalised (`shared/utils/barcode.ts`). See
+ * `server/utils/barcodes.ts` and `server/utils/barcode-review.ts`.
  */
 export const barcodeLookups = pgTable(
   'barcode_lookups',
   {
-    code: text('code').primaryKey(),
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    code: text('code').notNull(),
+    source: text('source').$type<'scandex' | 'user'>().notNull(),
     igdbId: integer('igdb_id'),
     /** The IGDB platform (version) the box is for. */
     platformId: integer('platform_id'),
     platformName: text('platform_name'),
-    fetchedAt: timestamp('fetched_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    /** The picker, for `user` rows. Null once their account is deleted. */
+    submittedBy: uuid('submitted_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    /** Null for `scandex` rows, always set for `user` rows. */
+    status: text('status').$type<'pending' | 'approved' | 'rejected'>(),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    /** When an approved pick was sent to ScanDex. Null if it never was. */
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    /** When ScanDex answered, for `scandex` rows. */
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }),
+    ...timestamps,
   },
   (table) => [
+    check(
+      'barcode_lookups_source',
+      sql`${table.source} in ('scandex', 'user')`,
+    ),
+    check(
+      'barcode_lookups_status',
+      sql`${table.status} in ('pending', 'approved', 'rejected')`,
+    ),
+    check(
+      'barcode_lookups_source_parts',
+      sql`(${table.source} = 'scandex' and ${table.status} is null and ${table.fetchedAt} is not null) or (${table.source} = 'user' and ${table.status} is not null and ${table.igdbId} is not null)`,
+    ),
     check(
       'barcode_lookups_match_parts',
       sql`${table.igdbId} is not null or (${table.platformId} is null and ${table.platformName} is null)`,
     ),
+    uniqueIndex('barcode_lookups_scandex_idx')
+      .on(table.code)
+      .where(sql`${table.source} = 'scandex'`),
+    uniqueIndex('barcode_lookups_pick_idx')
+      .on(table.code, table.submittedBy)
+      .where(
+        sql`${table.source} = 'user' and ${table.submittedBy} is not null`,
+      ),
+    index('barcode_lookups_review_idx')
+      .on(table.status, table.code)
+      .where(sql`${table.source} = 'user'`),
+    index('barcode_lookups_submitted_by_idx').on(table.submittedBy),
   ],
-)
-
-/**
- * A game a user matched to a barcode themselves (Find it or Change in the
- * scanner), kept for that user only so scanning the box again is instant.
- * It is never shared, never copied into `barcode_lookups` and never sent to
- * ScanDex. A row is written only in a bulk add, for a game that is in the
- * user's library then. Rows are keyed by barcode, so the library doesn't
- * bound them: `bulkAdd` stops saving new ones once a user holds as many as
- * their plan's game limit. Every query is scoped by `owner_id`. Keys are
- * normalised like `barcode_lookups.code`.
- */
-export const userBarcodes = pgTable(
-  'user_barcodes',
-  {
-    ownerId: uuid('owner_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    code: text('code').notNull(),
-    igdbId: integer('igdb_id').notNull(),
-    platformId: integer('platform_id'),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    /** When the pick was suggested to ScanDex. Null if it never was. */
-    submittedAt: timestamp('submitted_at', { withTimezone: true }),
-  },
-  (table) => [primaryKey({ columns: [table.ownerId, table.code] })],
 )

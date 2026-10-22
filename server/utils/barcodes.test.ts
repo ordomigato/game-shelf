@@ -20,56 +20,43 @@ vi.stubGlobal(
 
 const DAY = 24 * 60 * 60 * 1000
 let failSave = false
+// The ScanDex row for the code, as the table holds it.
 let cached: Record<string, unknown> | undefined
-// Rows of user_barcodes, as the table holds them.
-let ownRows: Record<string, unknown>[] = []
-const ownConditions: unknown[] = []
+// User rows the database hands back. A real database only returns the ones
+// the query asks for, so a test can put rows here that it would not return:
+// the code must not trust the query alone.
+let userRows: Record<string, unknown>[] = []
+let failPicks = false
+const conditions: { sql: string; params: unknown[] }[] = []
 const saved: Record<string, unknown>[] = []
+const conflicts: Record<string, unknown>[] = []
 vi.stubGlobal('useDb', () => ({
   select: () => ({
     from: (table: unknown) => ({
-      where: async (condition: unknown) => {
-        if (table === userBarcodes) {
-          ownConditions.push(condition)
-          return ownRows.filter((row) => matches(condition, row))
-        }
-        if (table === barcodeLookups) return cached ? [cached] : []
-        return []
+      where: async (condition: never) => {
+        if (table !== barcodeLookups) return []
+        const query = new PgDialect().sqlToQuery(condition)
+        conditions.push(query)
+        if (query.params.includes('scandex')) return cached ? [cached] : []
+        if (failPicks) throw new Error('db down')
+        return userRows
       },
     }),
   }),
   insert: () => ({
     values: (values: Record<string, unknown>) => ({
-      onConflictDoUpdate: async () => {
+      onConflictDoUpdate: async (config: Record<string, unknown>) => {
         if (failSave) throw new Error('db down')
         saved.push(values)
+        conflicts.push(config)
       },
     }),
   }),
 }))
 
-// Reads the owner and code a `findOwnPick` query was scoped to.
-function matches(condition: unknown, row: Record<string, unknown>): boolean {
-  const values: unknown[] = []
-  const walk = (node: unknown) => {
-    if (!node || typeof node !== 'object') return
-    const chunk = node as { queryChunks?: unknown[]; value?: unknown }
-    if (chunk.queryChunks) chunk.queryChunks.forEach(walk)
-    else if (
-      'encoder' in chunk &&
-      'value' in chunk &&
-      typeof chunk.value === 'string'
-    )
-      values.push(chunk.value)
-  }
-  walk(condition)
-  return values.includes(row.ownerId) && values.includes(row.code)
-}
-
 const { PgDialect } = await import('drizzle-orm/pg-core')
-const { userBarcodes, barcodeLookups } = await import('../db/schema')
-const { lookupBarcode, findOwnPick, resolveBarcode } =
-  await import('./barcodes')
+const { barcodeLookups } = await import('../db/schema')
+const { lookupBarcode, findPicks, resolveBarcode } = await import('./barcodes')
 const { ScanDexError } = await import('./scandex')
 
 const match = {
@@ -81,9 +68,11 @@ const match = {
 
 beforeEach(() => {
   cached = undefined
-  ownRows = []
-  ownConditions.length = 0
+  userRows = []
+  failPicks = false
+  conditions.length = 0
   saved.length = 0
+  conflicts.length = 0
   askScanDex.mockReset()
   ensureCatalogGames.mockReset()
   ensureCatalogGames.mockImplementation(async (ids: number[]) =>
@@ -181,66 +170,95 @@ describe('lookupBarcode', () => {
   })
 })
 
-describe('findOwnPick', () => {
-  const pick = {
-    ownerId: 'user-a',
-    code: '0045496590048',
-    igdbId: 7,
-    platformId: 130,
-  }
+const CODE = '0045496590048'
+const user = (row: Record<string, unknown>) => ({
+  source: 'user',
+  code: CODE,
+  platformId: 130,
+  submittedBy: 'user-a',
+  status: 'pending',
+  ...row,
+})
 
-  it('gives the user their own pick, without asking ScanDex', async () => {
-    ownRows = [pick]
-    expect(await findOwnPick('user-a', '0045496590048')).toEqual({
+describe('findPicks', () => {
+  it('asks only for the user’s own pending picks and approved picks', async () => {
+    await findPicks('user-a', CODE)
+    const { sql, params } = conditions[0]!
+    expect(sql).toContain('"barcode_lookups"."code" = $1')
+    expect(sql).toContain('"barcode_lookups"."source" = $2')
+    expect(sql).toContain('"barcode_lookups"."status" = $3')
+    expect(sql).toContain('"barcode_lookups"."submitted_by" = $5')
+    expect(params).toEqual([CODE, 'user', 'approved', 'pending', 'user-a'])
+  })
+
+  it('gives the user their own pending pick', async () => {
+    userRows = [user({ igdbId: 7 })]
+    expect((await findPicks('user-a', CODE)).own).toEqual({
       kind: 'match',
       igdbId: 7,
       platformId: 130,
       platformName: null,
     })
-    expect(askScanDex).not.toHaveBeenCalled()
   })
 
-  it('filters on the owner and the barcode in the query itself', async () => {
-    await findOwnPick('user-a', '0045496590048')
-    const { sql, params } = new PgDialect().sqlToQuery(
-      ownConditions[0] as never,
-    )
-    expect(sql).toContain('"user_barcodes"."owner_id" = $1')
-    expect(sql).toContain('"user_barcodes"."code" = $2')
-    expect(params).toEqual(['user-a', '0045496590048'])
+  it('never serves a pending pick to another user', async () => {
+    userRows = [user({ igdbId: 7, submittedBy: 'user-a' })]
+    expect(await findPicks('user-b', CODE)).toEqual({
+      own: null,
+      approved: null,
+    })
   })
 
-  it('keeps two users’ picks for one barcode apart', async () => {
-    ownRows = [
-      { ownerId: 'user-a', code: '0045496590048', igdbId: 7 },
-      { ownerId: 'user-b', code: '0045496590048', igdbId: 9 },
-    ]
-    expect(await findOwnPick('user-a', '0045496590048')).toMatchObject({
+  it('serves an approved pick to everyone, as not their own', async () => {
+    userRows = [user({ igdbId: 7, status: 'approved', submittedBy: 'user-a' })]
+    const other = await findPicks('user-b', CODE)
+    expect(other.own).toBeNull()
+    expect(other.approved).toMatchObject({ igdbId: 7 })
+    const mine = await findPicks('user-a', CODE)
+    expect(mine.own).toMatchObject({ igdbId: 7 })
+  })
+
+  it('serves an approved pick whose picker is gone', async () => {
+    userRows = [user({ igdbId: 7, status: 'approved', submittedBy: null })]
+    expect((await findPicks('user-b', CODE)).approved).toMatchObject({
       igdbId: 7,
     })
-    expect(await findOwnPick('user-b', '0045496590048')).toMatchObject({
-      igdbId: 9,
+  })
+
+  it('never serves a rejected pick, not even to its picker', async () => {
+    userRows = [user({ igdbId: 7, status: 'rejected' })]
+    expect(await findPicks('user-a', CODE)).toEqual({
+      own: null,
+      approved: null,
+    })
+    expect(await findPicks('user-b', CODE)).toEqual({
+      own: null,
+      approved: null,
     })
   })
 
-  it('never gives one user another user’s pick', async () => {
-    ownRows = [pick]
-    expect(await findOwnPick('user-b', '0045496590048')).toBeNull()
-  })
-
-  it('has nothing for a barcode the user never matched', async () => {
-    ownRows = [pick]
-    expect(await findOwnPick('user-a', '0045496590055')).toBeNull()
+  it('ignores ScanDex rows and other barcodes', async () => {
+    userRows = [
+      user({ igdbId: 7, source: 'scandex', status: null }),
+      user({ igdbId: 8, code: '0045496590055', status: 'approved' }),
+    ]
+    expect(await findPicks('user-a', CODE)).toEqual({
+      own: null,
+      approved: null,
+    })
   })
 })
 
 describe('resolveBarcode', () => {
-  const barcode = { code: '0045496590048', scanned: '0045496590048' }
+  const barcode = { code: CODE, scanned: CODE }
   const cap = vi.fn(async () => {})
   beforeEach(() => cap.mockClear())
 
-  it('prefers the user’s own pick to the shared cache and ScanDex', async () => {
-    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+  it('prefers the user’s own pick to the approved pick, the ScanDex row and ScanDex', async () => {
+    userRows = [
+      user({ igdbId: 7, submittedBy: 'user-a' }),
+      user({ igdbId: 8, status: 'approved', submittedBy: 'user-c' }),
+    ]
     cached = { igdbId: 26758, fetchedAt: new Date() }
     const result = await resolveBarcode('user-a', barcode, cap)
     expect(result.own).toBe(true)
@@ -249,15 +267,37 @@ describe('resolveBarcode', () => {
     expect(cap).not.toHaveBeenCalled()
   })
 
-  it('overrides a ScanDex match for that user only', async () => {
-    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+  it('serves the approved pick to everyone else, over the ScanDex row, without a ScanDex call', async () => {
+    userRows = [
+      user({ igdbId: 7, submittedBy: 'user-a' }),
+      user({ igdbId: 8, status: 'approved', submittedBy: 'user-c' }),
+    ]
     cached = { igdbId: 26758, fetchedAt: new Date() }
     const other = await resolveBarcode('user-b', barcode, cap)
     expect(other.own).toBeUndefined()
+    expect(other.match?.igdbId).toBe(8)
+    expect(askScanDex).not.toHaveBeenCalled()
+    expect(cap).not.toHaveBeenCalled()
+  })
+
+  it('does not serve a pending pick to another user: the ScanDex row answers', async () => {
+    userRows = [user({ igdbId: 7, submittedBy: 'user-a' })]
+    cached = { igdbId: 26758, fetchedAt: new Date() }
+    const other = await resolveBarcode('user-b', barcode, cap)
     expect(other.match?.igdbId).toBe(26758)
   })
 
-  it('uses the shared cache when the user has no pick', async () => {
+  it('does not serve a rejected pick to anyone, its picker included', async () => {
+    userRows = [user({ igdbId: 7, status: 'rejected' })]
+    cached = { igdbId: 26758, fetchedAt: new Date() }
+    for (const id of ['user-a', 'user-b']) {
+      const result = await resolveBarcode(id, barcode, cap)
+      expect(result.own).toBeUndefined()
+      expect(result.match?.igdbId).toBe(26758)
+    }
+  })
+
+  it('uses the ScanDex row when nobody picked, even a day-old no match is not used', async () => {
     cached = { igdbId: 26758, fetchedAt: new Date() }
     const result = await resolveBarcode('user-a', barcode, cap)
     expect(result.match?.igdbId).toBe(26758)
@@ -272,8 +312,25 @@ describe('resolveBarcode', () => {
     expect(askScanDex).toHaveBeenCalledOnce()
   })
 
-  it('falls through to the cache when reading the picked game fails', async () => {
-    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+  it('keeps ScanDex’s answer as a ScanDex row for everyone', async () => {
+    askScanDex.mockResolvedValue(match)
+    await resolveBarcode('user-a', barcode, cap)
+    expect(saved[0]).toMatchObject({ source: 'scandex', code: CODE })
+    expect(saved[0]).not.toHaveProperty('submittedBy')
+    expect(
+      new PgDialect().sqlToQuery(conflicts[0]!.targetWhere as never).sql,
+    ).toContain(`= 'scandex'`)
+  })
+
+  it('asks ScanDex when reading the picks fails', async () => {
+    failPicks = true
+    askScanDex.mockResolvedValue(match)
+    const result = await resolveBarcode('user-a', barcode, cap)
+    expect(result.match?.igdbId).toBe(26758)
+  })
+
+  it('falls through to the ScanDex row when reading the picked game fails', async () => {
+    userRows = [user({ igdbId: 7 })]
     cached = { igdbId: 26758, fetchedAt: new Date() }
     ensureCatalogGames.mockImplementation(async (ids: number[]) => {
       if (ids.includes(7)) throw new Error('IGDB down')
@@ -290,7 +347,7 @@ describe('resolveBarcode', () => {
   })
 
   it('falls back to ScanDex when IGDB no longer knows the picked game', async () => {
-    ownRows = [{ ownerId: 'user-a', code: barcode.code, igdbId: 7 }]
+    userRows = [user({ igdbId: 7 })]
     ensureCatalogGames.mockImplementation(async (ids: number[]) =>
       ids
         .filter((id) => id !== 7)

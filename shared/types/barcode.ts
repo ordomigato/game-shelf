@@ -50,22 +50,68 @@ export interface BulkAddResult {
   inCollection: number
 }
 
-/** A pick of the user's that ScanDex could be told about. */
-export interface BarcodeSuggestion {
+export type BarcodeReviewStatus = 'pending' | 'approved' | 'rejected'
+
+/**
+ * The people who matched one barcode to one game and platform, as the barcode
+ * reviewer sees them. The reviewer's view only: it carries usernames.
+ */
+export interface BarcodeReviewGroup {
+  /** Identifies the group in the list. */
+  key: string
   code: string
   igdbId: number
+  /** Null when the picker gave no platform. Such a group can't be sent. */
+  platformId: number | null
   /** The game's name in our catalog. */
   name: string
   coverId: string | null
   /** The platform's name in our catalog. */
-  platform: string
+  platform: string | null
+  status: BarcodeReviewStatus
+  /** How many people picked it. */
+  people: number
+  /** Their usernames, oldest pick first. */
+  users: string[]
+  /** When the latest pick was made. */
+  pickedAt: string
+  /** Approved groups only: whether it was sent to ScanDex. */
+  sent: boolean
+  /** What ScanDex says about this barcode now. Null when we never asked. */
+  scandex: { igdbId: number; name: string | null } | 'none' | null
+  /** ScanDex has a different game for the barcode. */
+  disagrees: boolean
+  /** Pending groups only: another game is already approved for the barcode. */
+  conflict: { name: string } | null
+}
+
+/** The groups with a status. `truncated` when more exist than are listed. */
+export interface BarcodeReviewList {
+  groups: BarcodeReviewGroup[]
+  truncated: boolean
+}
+
+export type BarcodeReviewAction =
+  'approve' | 'approveAndSend' | 'reject' | 'send'
+
+/** Which group an action is for. */
+export interface BarcodeReviewTarget {
+  code: string
+  igdbId: number
+  platformId: number | null
 }
 
 /**
- * How sharing one pick went. `status` is ScanDex's HTTP status, or 0 when it
- * wasn't reached or the pick could no longer be sent. `message` is ScanDex's
- * own error text, trimmed to about 200 characters.
+ * How an action went for one group. `result` is about the approving or
+ * rejecting (`conflict`: another game is approved for the barcode, `gone`:
+ * nothing to act on any more). `send` is set when the action sent the group
+ * to ScanDex: `status` is ScanDex's HTTP status, or 0 when it wasn't reached,
+ * and `message` is ScanDex's own error text, trimmed to about 200 characters.
  */
-export type SuggestionResult =
-  | { code: string; result: 'sent' }
-  | { code: string; result: 'failed'; status: number; message: string | null }
+export type BarcodeReviewOutcome = BarcodeReviewTarget & {
+  result: 'done' | 'conflict' | 'gone'
+  send?:
+    | { result: 'sent' }
+    | { result: 'already' }
+    | { result: 'failed'; status: number; message: string | null }
+}

@@ -2,20 +2,18 @@ import {
   AdminDeleteUserCommand,
   CognitoIdentityProviderClient,
 } from '@aws-sdk/client-cognito-identity-provider'
-import { eq } from 'drizzle-orm'
 import { Resource } from 'sst'
-import { users } from '../db/schema'
 
 const cognito = new CognitoIdentityProviderClient({})
 
 /**
- * Deletes the signed-in user's data (their collections and items cascade)
+ * Deletes the signed-in user's data (see `deleteAccountData`)
  * and then their Cognito account. If the Cognito step fails, the data is
  * already gone. Signing in again would just start a fresh, empty account.
  */
 export default defineEventHandler(async (event) => {
   const { sub, username } = await requireAuth(event)
-  await useDb().delete(users).where(eq(users.cognitoSub, sub))
+  await deleteAccountData(sub)
 
   try {
     await cognito.send(

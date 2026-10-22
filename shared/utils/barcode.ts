@@ -7,6 +7,9 @@ const LENGTHS = new Set([8, 12, 13, 14])
  */
 export const BARCODE_NO_MATCH_TTL_MS = 24 * 60 * 60 * 1000
 
+/** The most picks of one user that wait for review at once. */
+export const MAX_PENDING_PICKS = 200
+
 /** The most barcodes the scanner keeps and adds in one go. */
 export const MAX_SCAN_BATCH = 100
 
@@ -78,4 +81,13 @@ export interface CachedBarcode {
 export function barcodeCacheFresh(row: CachedBarcode, now: Date): boolean {
   if (row.igdbId !== null) return true
   return now.getTime() - row.fetchedAt.getTime() < BARCODE_NO_MATCH_TTL_MS
+}
+
+/** Identifies a group of picks: one barcode, game and platform. */
+export function reviewGroupKey(target: {
+  code: string
+  igdbId: number
+  platformId: number | null
+}): string {
+  return `${target.code}:${target.igdbId}:${target.platformId ?? 0}`
 }

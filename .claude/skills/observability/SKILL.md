@@ -53,6 +53,12 @@ All lines go through `log()` in `server/utils/log.ts`.
   warning when an answer could not be saved. Count how often ScanDex is
   called against its 50,000 a month with
   `filter event = "barcode.lookup" and outcome like /scandex|error/ | stats count()`.
+  Picks people made are reviewed in `server/utils/barcode-review.ts`, which
+  logs `barcode.review_failed` (warning, with `status: -1` and the error
+  name only) when a review or send hits a database or code error. A pick
+  that could not be read logs `barcode.picks_failed` or
+  `barcode.own_pick_failed`. None of them carries a barcode, an id or a
+  username, and ScanDex's own error text goes only to the reviewer's screen.
 - **Existing events:** `igdb.slow`, `igdb.rate_limited`, `twitch.*`,
   `server.error` (unexpected errors only), `preview.failed`.
 

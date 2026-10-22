@@ -1,15 +1,17 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or, sql } from 'drizzle-orm'
 import { barcodeCacheFresh } from '../../shared/utils/barcode'
 import type { BarcodeMatch, BarcodeResult } from '../../shared/types/barcode'
-import { barcodeLookups, libraryItems, userBarcodes } from '../db/schema'
+import { barcodeLookups, libraryItems } from '../db/schema'
 import { ensureCatalogGames } from './catalog'
 import { platformNames } from './collections'
 import { log } from './log'
 import { askScanDex, ScanDexError, type ScanDexAnswer } from './scandex'
 
-type CacheRow = typeof barcodeLookups.$inferSelect
+type LookupRow = typeof barcodeLookups.$inferSelect
 
-function toAnswer(row: CacheRow): ScanDexAnswer {
+type Match = Extract<ScanDexAnswer, { kind: 'match' }>
+
+function toAnswer(row: LookupRow): ScanDexAnswer {
   return row.igdbId === null
     ? { kind: 'none' }
     : {
@@ -20,26 +22,53 @@ function toAnswer(row: CacheRow): ScanDexAnswer {
       }
 }
 
+const toMatch = (row: LookupRow): Match => ({
+  kind: 'match',
+  igdbId: row.igdbId!,
+  platformId: row.platformId,
+  platformName: null,
+})
+
 /**
- * The game this user matched to the barcode themselves, if any. Scoped to
- * the user: nobody else's pick is ever returned.
+ * The picks that can serve this user for a barcode: their own (pending or
+ * approved) and the approved one for everyone. Only these two ever leave the
+ * database for a user, and the rule is applied again on what comes back, so
+ * a pending pick of someone else or a rejected one never serves anyone.
  */
-export async function findOwnPick(
+export async function findPicks(
   ownerId: string,
   code: string,
-): Promise<Extract<ScanDexAnswer, { kind: 'match' }> | null> {
-  const [row] = await useDb()
+): Promise<{ own: Match | null; approved: Match | null }> {
+  const rows = await useDb()
     .select()
-    .from(userBarcodes)
-    .where(and(eq(userBarcodes.ownerId, ownerId), eq(userBarcodes.code, code)))
-  return row
-    ? {
-        kind: 'match',
-        igdbId: row.igdbId,
-        platformId: row.platformId,
-        platformName: null,
-      }
-    : null
+    .from(barcodeLookups)
+    .where(
+      and(
+        eq(barcodeLookups.code, code),
+        eq(barcodeLookups.source, 'user'),
+        or(
+          eq(barcodeLookups.status, 'approved'),
+          and(
+            eq(barcodeLookups.status, 'pending'),
+            eq(barcodeLookups.submittedBy, ownerId),
+          ),
+        ),
+      ),
+    )
+  const usable = rows.filter(
+    (row) =>
+      row.source === 'user' &&
+      row.code === code &&
+      row.igdbId !== null &&
+      (row.status === 'approved' ||
+        (row.status === 'pending' && row.submittedBy === ownerId)),
+  )
+  const own = usable.find((row) => row.submittedBy === ownerId)
+  const approved = usable.find((row) => row.status === 'approved')
+  return {
+    own: own ? toMatch(own) : null,
+    approved: approved ? toMatch(approved) : null,
+  }
 }
 
 /**
@@ -61,8 +90,16 @@ export async function lookupBarcode(
   const [cached] = await db
     .select()
     .from(barcodeLookups)
-    .where(eq(barcodeLookups.code, code))
-  if (cached && barcodeCacheFresh(cached, new Date())) {
+    .where(
+      and(eq(barcodeLookups.code, code), eq(barcodeLookups.source, 'scandex')),
+    )
+  if (
+    cached &&
+    barcodeCacheFresh(
+      { igdbId: cached.igdbId, fetchedAt: cached.fetchedAt ?? new Date(0) },
+      new Date(),
+    )
+  ) {
     log('info', 'barcode.lookup', { outcome: 'cache_hit' })
     return toAnswer(cached)
   }
@@ -93,8 +130,12 @@ export async function lookupBarcode(
     try {
       await db
         .insert(barcodeLookups)
-        .values({ code, ...values })
-        .onConflictDoUpdate({ target: barcodeLookups.code, set: values })
+        .values({ code, source: 'scandex', ...values })
+        .onConflictDoUpdate({
+          target: barcodeLookups.code,
+          targetWhere: sql`${barcodeLookups.source} = 'scandex'`,
+          set: values,
+        })
     } catch {
       // Not keeping the answer only costs a later lookup.
       log('warn', 'barcode.cache_failed')
@@ -119,7 +160,7 @@ export async function lookupBarcode(
  */
 export async function describeMatch(
   ownerId: string,
-  answer: Extract<ScanDexAnswer, { kind: 'match' }>,
+  answer: Match,
 ): Promise<BarcodeMatch | null> {
   const [game] = await ensureCatalogGames([answer.igdbId])
   if (!game) return null
@@ -162,22 +203,39 @@ export async function describeMatch(
 }
 
 /**
- * What a barcode stands for for this user. Their own pick comes first, then
- * our cache, then ScanDex. A pick costs no ScanDex call and isn't counted
- * by `beforeScanDex`. A pick whose game IGDB no longer knows is ignored.
+ * What a barcode stands for for this user, first found wins:
+ * 1. their own pick (pending or approved, never rejected),
+ * 2. the approved pick for the barcode, which serves everyone,
+ * 3. our copy of ScanDex's answer while it is fresh,
+ * 4. ScanDex itself.
+ * Steps 1 and 2 cost no ScanDex call and aren't counted by `beforeScanDex`.
+ * A pick whose game IGDB no longer knows is skipped.
  */
 export async function resolveBarcode(
   ownerId: string,
   barcode: { code: string; scanned: string },
   beforeScanDex: () => Promise<void>,
 ): Promise<BarcodeResult> {
-  const own = await findOwnPick(ownerId, barcode.code)
-  if (own) {
+  let picks: Awaited<ReturnType<typeof findPicks>> = {
+    own: null,
+    approved: null,
+  }
+  try {
+    picks = await findPicks(ownerId, barcode.code)
+  } catch {
+    // ScanDex's answer can still serve.
+    log('warn', 'barcode.picks_failed')
+  }
+  for (const [pick, own] of [
+    [picks.own, true],
+    [picks.approved, false],
+  ] as const) {
+    if (!pick) continue
     try {
-      const match = await describeMatch(ownerId, own)
-      if (match) return { match, own: true }
+      const match = await describeMatch(ownerId, pick)
+      if (match) return own ? { match, own: true } : { match }
     } catch {
-      // IGDB or the catalog failed: the cache and ScanDex can still answer.
+      // IGDB or the catalog failed: the next step can still answer.
       log('warn', 'barcode.own_pick_failed')
     }
   }

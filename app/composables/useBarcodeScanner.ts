@@ -264,7 +264,7 @@ export function useBarcodeScanner() {
   /**
    * Adds the ticked games in one request, empties the list and refreshes
    * what shows the user's games. Games the user matched themselves are sent
-   * with their barcode so the server can remember them for this user only.
+   * with their barcode so the server can save them as picks for review.
    * Throws the server's refusal (the plan's
    * limits, say) and keeps the list.
    */

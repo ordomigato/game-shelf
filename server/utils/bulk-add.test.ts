@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { limitsFor } from '../../shared/utils/plans'
-import { collectionItems, libraryItems, userBarcodes } from '../db/schema'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import { MAX_PENDING_PICKS } from '../../shared/utils/barcode'
+import { barcodeLookups, collectionItems, libraryItems } from '../db/schema'
 
 const ensureCatalogGames = vi.fn()
 const submitToScanDex = vi.fn()
@@ -19,8 +21,15 @@ interface Fake {
   libraryCount: number
   inCollection: { itemId: string }[]
   collectionCount: number
-  /** Codes the user already has picks for. */
-  stored: string[]
+  /** The user's picks for the codes in the batch, as the table holds them. */
+  stored: {
+    code: string
+    igdbId: number
+    platformId: number | null
+    status: 'pending' | 'approved' | 'rejected'
+  }[]
+  /** How many pending picks the user has in all. */
+  pending: number
 }
 let fake: Fake
 const batches: unknown[][] = []
@@ -38,8 +47,8 @@ vi.stubGlobal('useDb', () => ({
           reads.push(fields?.n ? 'collection count' : 'collection items')
           return fields?.n ? [{ n: fake.collectionCount }] : fake.inCollection
         }
-        if (table === userBarcodes) {
-          return fake.stored.map((code) => ({ code }))
+        if (table === barcodeLookups) {
+          return fields?.n ? [{ n: fake.pending }] : fake.stored
         }
         return []
       },
@@ -80,6 +89,7 @@ beforeEach(() => {
     inCollection: [],
     collectionCount: 0,
     stored: [],
+    pending: 0,
   }
   batches.length = 0
   reads.length = 0
@@ -233,7 +243,7 @@ describe('bulkAdd', () => {
     const picks = () =>
       (
         batches[0] as { table: unknown; values: Record<string, unknown>[] }[]
-      ).find((statement) => statement.table === userBarcodes)
+      ).find((statement) => statement.table === barcodeLookups)
 
     it('are saved in the same batch as the add, for that user', async () => {
       await bulkAdd('u1', free, {
@@ -251,10 +261,12 @@ describe('bulkAdd', () => {
       expect(batches).toHaveLength(1)
       expect(picks()?.values).toEqual([
         {
-          ownerId: 'u1',
           code: '0045496590048',
           igdbId: 1,
           platformId: SWITCH,
+          source: 'user',
+          submittedBy: 'u1',
+          status: 'pending',
         },
       ])
     })
@@ -306,8 +318,8 @@ describe('bulkAdd', () => {
         ],
       })
       expect(picks()?.values).toEqual([
-        { ownerId: 'u1', code: '0045496590048', igdbId: 1, platformId: SWITCH },
-        { ownerId: 'u1', code: '0045496590055', igdbId: 2, platformId: null },
+        expect.objectContaining({ code: '0045496590048', platformId: SWITCH }),
+        expect.objectContaining({ code: '0045496590055', platformId: null }),
       ])
     })
 
@@ -338,21 +350,21 @@ describe('bulkAdd', () => {
     }
     const pickStatement = () =>
       (batches[0] as Statement[] | undefined)?.find(
-        (statement) => statement.table === userBarcodes,
+        (statement) => statement.table === barcodeLookups,
       )
     const code = '0045496590048'
 
-    it('upserts on (owner_id, code), so one user never overwrites another', async () => {
+    it('upserts on (code, submitted_by) for user rows, so one user never overwrites another', async () => {
       await bulkAdd('u1', free, {
         list: 'owned',
         entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
       })
       expect(pickStatement()?.config.target).toEqual([
-        userBarcodes.ownerId,
-        userBarcodes.code,
+        barcodeLookups.code,
+        barcodeLookups.submittedBy,
       ])
       expect(pickStatement()?.values).toEqual([
-        expect.objectContaining({ ownerId: 'u1', code }),
+        expect.objectContaining({ submittedBy: 'u1', code }),
       ])
       // The same barcode from another user is a row of their own.
       batches.length = 0
@@ -361,7 +373,131 @@ describe('bulkAdd', () => {
         entries: [{ igdbId: 2, platformId: SWITCH, barcode: code, own: true }],
       })
       expect(pickStatement()?.values).toEqual([
-        expect.objectContaining({ ownerId: 'u2', code, igdbId: 2 }),
+        expect.objectContaining({ submittedBy: 'u2', code, igdbId: 2 }),
+      ])
+    })
+
+    it('saves every pick as pending, never approved, and never as a ScanDex row', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({ source: 'user', status: 'pending' }),
+      ])
+      const { set } = pickStatement()!.config as unknown as {
+        set: Record<string, unknown>
+      }
+      expect(set).toMatchObject({
+        status: 'pending',
+        reviewedAt: null,
+        sentAt: null,
+      })
+    })
+
+    it('changes a row only when the game or platform differs, whatever its status', async () => {
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      const { setWhere, targetWhere } = pickStatement()!.config as unknown as {
+        setWhere: never
+        targetWhere: never
+      }
+      const where = new PgDialect().sqlToQuery(setWhere).sql
+      // Not by status: an approved row moves back to pending too.
+      expect(where).not.toContain('status')
+      expect(where).toContain('is distinct from (excluded.igdb_id')
+      expect(new PgDialect().sqlToQuery(targetWhere).sql).toContain(
+        `"barcode_lookups"."source" = 'user'`,
+      )
+    })
+
+    it('moves the user’s own approved pick back to pending when it names another game', async () => {
+      fake.stored = [
+        { code, igdbId: 5, platformId: SWITCH, status: 'approved' },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({
+          code,
+          igdbId: 1,
+          submittedBy: 'u1',
+          status: 'pending',
+        }),
+      ])
+      const { set } = pickStatement()!.config as unknown as {
+        set: Record<string, unknown>
+      }
+      expect(set).toMatchObject({
+        status: 'pending',
+        reviewedAt: null,
+        sentAt: null,
+      })
+      // Only the user's own row is the target. Other users' rows for the
+      // approved game are other rows and stay approved.
+      expect(pickStatement()?.config.target).toEqual([
+        barcodeLookups.code,
+        barcodeLookups.submittedBy,
+      ])
+    })
+
+    it('leaves an approved pick alone when it names the same game and platform', async () => {
+      fake.stored = [
+        { code, igdbId: 1, platformId: SWITCH, status: 'approved' },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()).toBeUndefined()
+    })
+
+    it('counts a re-pick of an approved pick toward the pending cap', async () => {
+      fake.pending = MAX_PENDING_PICKS
+      fake.stored = [
+        { code, igdbId: 5, platformId: SWITCH, status: 'approved' },
+      ]
+      const result = await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(result.added).toBe(1)
+      expect(pickStatement()).toBeUndefined()
+      fake.pending = MAX_PENDING_PICKS - 1
+      batches.length = 0
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toHaveLength(1)
+    })
+
+    it('does not save a rejected pick again for the same game and platform', async () => {
+      fake.stored = [
+        { code, igdbId: 1, platformId: SWITCH, status: 'rejected' },
+      ]
+      const result = await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(result.added).toBe(1)
+      expect(pickStatement()).toBeUndefined()
+    })
+
+    it('saves a rejected pick again when it now names another game', async () => {
+      fake.stored = [
+        { code, igdbId: 5, platformId: SWITCH, status: 'rejected' },
+      ]
+      await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(pickStatement()?.values).toEqual([
+        expect.objectContaining({ code, igdbId: 1, status: 'pending' }),
       ])
     })
 
@@ -452,9 +588,26 @@ describe('bulkAdd', () => {
       expect(ensureCatalogGames.mock.calls[0]![0].sort()).toEqual([1, 2])
     })
 
-    it('stops saving new barcodes at the plan’s game limit, but updates existing ones and still adds', async () => {
-      fake.stored = Array.from({ length: free.games - 1 }, (_, i) => `s${i}`)
-      fake.stored.push('0045496590055')
+    it('stops saving picks at 200 pending, but still adds the games', async () => {
+      fake.pending = MAX_PENDING_PICKS
+      const result = await bulkAdd('u1', free, {
+        list: 'owned',
+        entries: [{ igdbId: 1, platformId: SWITCH, barcode: code, own: true }],
+      })
+      expect(result.added).toBe(1)
+      expect(pickStatement()).toBeUndefined()
+    })
+
+    it('saves only as many new picks as the cap has room for, but changes to pending picks take none', async () => {
+      fake.pending = MAX_PENDING_PICKS - 1
+      fake.stored = [
+        {
+          code: '0045496590055',
+          igdbId: 9,
+          platformId: SWITCH,
+          status: 'pending',
+        },
+      ]
       const result = await bulkAdd('u1', free, {
         list: 'owned',
         entries: [
@@ -474,15 +627,16 @@ describe('bulkAdd', () => {
         ],
       })
       expect(result.added).toBe(3)
-      // The user is at the cap: only the barcode they already had is kept.
+      // One slot is left: the first new pick takes it, the change is free.
       expect(pickStatement()?.values.map((v) => v.code)).toEqual([
+        code,
         '0045496590055',
       ])
     })
   })
 
-  describe('sharing with ScanDex', () => {
-    it('never calls ScanDex, even for an allowed account with a pick ScanDex did not know', async () => {
+  describe('sending to ScanDex', () => {
+    it('never calls ScanDex, even with a pick ScanDex did not know', async () => {
       await bulkAdd('u1', free, {
         list: 'owned',
         entries: [
@@ -497,7 +651,7 @@ describe('bulkAdd', () => {
       // The pick is saved as always, and nothing is sent.
       const saved = (
         batches[0] as { table: unknown; values: { code: string }[] }[]
-      ).find((statement) => statement.table === userBarcodes)
+      ).find((statement) => statement.table === barcodeLookups)
       expect(saved?.values.map((v) => v.code)).toEqual(['0045496590048'])
       expect(submitToScanDex).not.toHaveBeenCalled()
       expect(fetchMock).not.toHaveBeenCalled()

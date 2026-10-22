@@ -8,23 +8,21 @@ const currentPath = computed(() => router.currentRoute.value.path)
 
 const auth = useAuth()
 
-// ScanDex is only listed for accounts allowed to share barcodes.
+// Barcodes is only listed for the barcode reviewer.
 const allTabs = [
   { to: '/account', labelKey: 'account.tabs.profile' },
   { to: '/account/security', labelKey: 'account.tabs.security' },
   { to: '/account/fields', labelKey: 'account.tabs.fields' },
   { to: '/account/usage', labelKey: 'account.tabs.usage' },
   {
-    to: '/account/scandex',
-    labelKey: 'account.tabs.scandex',
-    contributors: true,
+    to: '/account/barcodes',
+    labelKey: 'account.tabs.barcodes',
+    reviewer: true,
   },
   { to: '/account/settings', labelKey: 'account.tabs.settings' },
 ]
 const tabs = computed(() =>
-  allTabs.filter(
-    (tab) => !tab.contributors || auth.me.value?.contributesBarcodes,
-  ),
+  allTabs.filter((tab) => !tab.reviewer || auth.me.value?.reviewsBarcodes),
 )
 </script>
 

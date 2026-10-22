@@ -76,7 +76,7 @@ function ownCodes(row: ScanRow): string[] {
  * other barcode of theirs. Those are never added. The server saves them
  * only if the game is in the library. A row unticked on purpose is left
  * out, but one that can't be ticked because the game is already on the
- * list still has its barcodes remembered. A ScanDex match sends none.
+ * list still has its barcodes saved as picks. A ScanDex match sends none.
  */
 export function batchEntries(rows: ScanRow[], list: ListName): BulkAddEntry[] {
   const adds = new Map<string, BulkAddEntry>()

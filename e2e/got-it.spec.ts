@@ -247,7 +247,7 @@ test('a collection that is full is named, and nothing is added until it is untic
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
 
   await expect(
-    page.getByText('A collection can hold up to 1000 games on your plan.'),
+    page.getByText('A collection can hold up to 1,000 games on your plan.'),
   ).toBeVisible()
   // The whole set is refused, so both stay ticked and the dialog stays open.
   await expect(dialog).toBeVisible()

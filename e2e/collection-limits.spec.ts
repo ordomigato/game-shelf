@@ -297,7 +297,7 @@ test('a refusal partway says how many rows were already imported', async ({
   await page.getByRole('button', { name: /^Import 300/ }).click()
   await expect(
     page.getByText(
-      'Imported 250 of 300 rows. Then: You can have up to 10000 games on your plan, owned or wishlisted.',
+      'Imported 250 of 300 rows. Then: You can have up to 10,000 games on your plan, owned or wishlisted.',
     ),
   ).toBeVisible()
 })

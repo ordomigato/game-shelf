@@ -98,7 +98,7 @@ test('a refusal from the server says which limit', async ({ page }) => {
   await page.getByRole('button', { name: 'Add to collection: Zelda' }).click()
   await page.getByRole('menuitemcheckbox', { name: 'NES Games' }).click()
   await expect(
-    page.getByText('A collection can hold up to 1000 games on your plan.'),
+    page.getByText('A collection can hold up to 1,000 games on your plan.'),
   ).toBeVisible()
 })
 

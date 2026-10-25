@@ -30,7 +30,7 @@ import type {
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
-const { t, n, locale } = useI18n()
+const { t, n } = useI18n()
 const { limits } = usePlan()
 const proGames = PLAN_LIMITS.pro.gamesPerCollection
 // Over the limit, games can be kept and removed but not added.
@@ -574,10 +574,8 @@ async function deleteCollection() {
         }}</AlertTitle>
         <AlertDescription>
           {{ $t('limits.overGamesHelp', { limit: limits.gamesPerCollection }) }}
-          <NuxtLink v-if="proGames > limits.gamesPerCollection" to="/pricing">{{
-            $t('limits.proAllows', {
-              limit: new Intl.NumberFormat(locale).format(proGames),
-            })
+          <NuxtLink v-if="proGames > limits.gamesPerCollection" to="/contact">{{
+            $t('limits.proAllows')
           }}</NuxtLink>
         </AlertDescription>
       </Alert>

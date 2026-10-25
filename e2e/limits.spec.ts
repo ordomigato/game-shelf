@@ -173,7 +173,9 @@ test('Pricing puts "Your plan" on Pro for a Pro user', async ({ page }) => {
   ).toHaveCount(0)
 })
 
-test('Pricing lists both plans from the real limits', async ({ page }) => {
+test("Pricing lists Free from the real limits, and Pro as let's talk", async ({
+  page,
+}) => {
   await page.goto('/pricing')
   await expect(
     page.getByRole('heading', { level: 1, name: 'Pricing' }),
@@ -184,12 +186,8 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
   ).toBeVisible()
   await expect(free.getByText('3,000 games, owned or wishlisted')).toBeVisible()
   const pro = page.getByRole('region', { name: 'Pro' })
-  await expect(
-    pro.getByText('100 collections, plus Owned and the Wishlist'),
-  ).toBeVisible()
-  await expect(
-    pro.getByText('2,000 characters per note or text field'),
-  ).toBeVisible()
+  // Pro is worked out per person, so it lists no numbers.
+  await expect(pro.getByRole('listitem')).toHaveCount(0)
   await expect(pro.getByText("Let's talk")).toBeVisible()
   await expect(pro.getByText('Pro is free too.')).toBeVisible()
   await expect(pro.getByRole('link', { name: 'Get in touch' })).toHaveAttribute(

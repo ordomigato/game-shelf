@@ -3,8 +3,9 @@ import { Check } from '@lucide/vue'
 import { PLAN_LIMITS } from '#shared/utils/plans'
 
 /**
- * Free, and Pro (free too, granted on request), with every limit listed
- * from the same numbers the server enforces. Rendered on the server.
+ * Free, with its limits listed from the same numbers the server enforces,
+ * and Pro (free too, worked out per person on request). Rendered on the
+ * server.
  */
 const { t, locale } = useI18n()
 useHead(() => ({ title: t('app.title', { page: t('pricing.title') }) }))
@@ -19,27 +20,22 @@ const { plan } = usePlan()
 const number = (value: number) =>
   new Intl.NumberFormat(locale.value).format(value)
 
-const rows = computed(() =>
-  (['free', 'pro'] as const).map((name) => {
-    const limits = PLAN_LIMITS[name]
-    return {
-      name,
-      items: [
-        t('pricing.collections', { count: number(limits.collections) }),
-        t('pricing.games', { count: number(limits.games) }),
-        t('pricing.gamesPerCollection', {
-          count: number(limits.gamesPerCollection),
-        }),
-        t('pricing.fields', { count: limits.fields }),
-        t('pricing.charts', { count: limits.chartsPerCollection }),
-        t('pricing.text', { count: number(limits.textLength) }),
-        t('pricing.importRows', { count: number(limits.importRows) }),
-      ],
-    }
-  }),
-)
-const free = computed(() => rows.value[0]!)
-const pro = computed(() => rows.value[1]!)
+// Pro is "let's talk": its limits are worked out per person, so only
+// Free's are listed.
+const freeItems = computed(() => {
+  const limits = PLAN_LIMITS.free
+  return [
+    t('pricing.collections', { count: number(limits.collections) }),
+    t('pricing.games', { count: number(limits.games) }),
+    t('pricing.gamesPerCollection', {
+      count: number(limits.gamesPerCollection),
+    }),
+    t('pricing.fields', { count: limits.fields }),
+    t('pricing.charts', { count: limits.chartsPerCollection }),
+    t('pricing.text', { count: number(limits.textLength) }),
+    t('pricing.importRows', { count: number(limits.importRows) }),
+  ]
+})
 </script>
 
 <template>
@@ -71,7 +67,7 @@ const pro = computed(() => rows.value[1]!)
           {{ $t('pricing.freeBlurb') }}
         </p>
         <ul class="flex flex-col gap-2 text-sm">
-          <li v-for="item in free.items" :key="item" class="flex gap-2">
+          <li v-for="item in freeItems" :key="item" class="flex gap-2">
             <Check
               class="mt-0.5 size-4 shrink-0 text-primary"
               aria-hidden="true"
@@ -101,18 +97,6 @@ const pro = computed(() => rows.value[1]!)
         </p>
         <p class="text-sm text-muted-foreground">
           {{ $t('pricing.proBlurb') }}
-        </p>
-        <ul class="flex flex-col gap-2 text-sm">
-          <li v-for="item in pro.items" :key="item" class="flex gap-2">
-            <Check
-              class="mt-0.5 size-4 shrink-0 text-primary"
-              aria-hidden="true"
-            />
-            {{ item }}
-          </li>
-        </ul>
-        <p class="text-sm text-muted-foreground">
-          {{ $t('pricing.proMore') }}
         </p>
         <Button as-child variant="outline" class="mt-auto">
           <NuxtLink to="/contact">{{ $t('pricing.proCta') }}</NuxtLink>

@@ -80,7 +80,7 @@ test('a collection over the limit warns and stops adding', async ({ page }) => {
     "You can keep and remove games, but you can't add more until it's down to 100.",
   )
   await expect(
-    alert.getByRole('link', { name: 'Pro allows 1,000. See plans.' }),
+    alert.getByRole('link', { name: 'Need more room? Get in touch.' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add games' })).toBeDisabled()
 })

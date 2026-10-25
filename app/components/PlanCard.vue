@@ -140,8 +140,8 @@ const pro = PLAN_LIMITS.pro
         }}</AlertTitle>
         <AlertDescription>
           {{ $t('limits.overLibraryHelp', { limit: number(overGames.limit) }) }}
-          <NuxtLink v-if="pro.games > overGames.limit" to="/pricing">{{
-            $t('limits.proAllows', { limit: number(pro.games) })
+          <NuxtLink v-if="pro.games > overGames.limit" to="/contact">{{
+            $t('limits.proAllows')
           }}</NuxtLink>
         </AlertDescription>
       </Alert>

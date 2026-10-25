@@ -326,8 +326,8 @@ const currencyNames = computed(() => {
       }}</AlertTitle>
       <AlertDescription>
         {{ $t('limits.overFieldsHelp', { limit: limits.fields }) }}
-        <NuxtLink v-if="proFields" to="/pricing">{{
-          $t('limits.proAllows', { limit: proFields })
+        <NuxtLink v-if="proFields" to="/contact">{{
+          $t('limits.proAllows')
         }}</NuxtLink>
       </AlertDescription>
     </Alert>

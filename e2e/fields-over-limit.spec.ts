@@ -48,7 +48,7 @@ test('over the field limit, the editor warns and Add is off', async ({
   )
   await expect(alert).toContainText("can't add more until you're down to 5")
   await expect(
-    dialog.getByRole('link', { name: /Pro allows 20/ }),
+    dialog.getByRole('link', { name: 'Need more room? Get in touch.' }),
   ).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Add field' })).toBeDisabled()
 })

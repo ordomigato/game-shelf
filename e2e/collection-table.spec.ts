@@ -232,7 +232,7 @@ test.describe('owners', () => {
     await page.getByRole('button', { name: 'Actions for Mega Man 2' }).click()
     await page.getByRole('menuitem', { name: 'Remove from collection' }).click()
     await expect(names(page)).toHaveText(['Chrono Trigger', 'EarthBound'])
-    await expect(page.getByText('2 of 100 games')).toBeVisible()
+    await expect(page.getByText('2 of 1,000 games')).toBeVisible()
     expect(removed).toBe(`DELETE ${items[2]!.id}`)
   })
 

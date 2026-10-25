@@ -65,13 +65,19 @@ function checkOnlyAdds(before: FieldDefinition[], after: FieldDefinition[]) {
 }
 
 /** Only the values that fit their fields, and how many didn't. */
-function validValues(fields: FieldDefinition[], values: ItemData) {
+export function validValues(
+  fields: FieldDefinition[],
+  values: ItemData,
+  maxTextLength: number,
+) {
   const byId = new Map(fields.map((field) => [field.id, field]))
   const valid: ItemData = {}
   let rejected = 0
   for (const [id, raw] of Object.entries(values)) {
     const field = byId.get(id)
-    const value = field ? normalizeFieldValue(field, raw) : undefined
+    const value = field
+      ? normalizeFieldValue(field, raw, maxTextLength)
+      : undefined
     if (value === undefined) rejected += 1
     else if (value !== null) valid[id] = value
   }
@@ -202,7 +208,11 @@ export async function importIntoCollection(
   const sorted = (ids: Iterable<number>) => [...ids].sort((a, b) => a - b)
 
   for (const row of rows) {
-    const { valid, rejected } = validValues(fields, row.values)
+    const { valid, rejected } = validValues(
+      fields,
+      row.values,
+      limits.textLength,
+    )
     rejectedValues += rejected
     const have = known(row) ? existingByIgdb.get(row.igdbId!) : undefined
     const gameId = known(row) ? row.igdbId! : null

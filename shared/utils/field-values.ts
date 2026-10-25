@@ -2,23 +2,26 @@ import { can, seesAllOf, type Viewer } from './access'
 import type { ChartWidget } from '../types/charts'
 import type { FieldDefinition, FieldValue, ItemData } from '../types/collection'
 
+/** Free's text limit, used when the caller doesn't know the account's. */
 export const TEXT_VALUE_MAX_LENGTH = 500
 
 /**
  * Checks one value against its field's type. Returns the value to store
  * (trimmed or rounded where that matters), or undefined when it isn't
- * valid. `null` means "clear this value" and is always allowed.
+ * valid. `null` means "clear this value" and is always allowed. Text may be
+ * up to `maxTextLength` characters, which is the account's limit.
  */
 export function normalizeFieldValue(
   field: FieldDefinition,
   value: unknown,
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): FieldValue | null | undefined {
   if (value === null) return null
   switch (field.type) {
     case 'text': {
       if (typeof value !== 'string') return undefined
       const text = value.trim()
-      if (text.length > TEXT_VALUE_MAX_LENGTH) return undefined
+      if (text.length > maxTextLength) return undefined
       return text || null
     }
     case 'select':
@@ -78,6 +81,7 @@ export function applyFieldValues(
   data: ItemData,
   fields: FieldDefinition[],
   changes: Record<string, unknown>,
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): { data: ItemData } | { invalidFieldIds: string[] } {
   const byId = new Map(fields.map((field) => [field.id, field]))
   const set: ItemData = {}
@@ -85,7 +89,9 @@ export function applyFieldValues(
   const invalidFieldIds: string[] = []
   for (const [id, raw] of Object.entries(changes)) {
     const field = byId.get(id)
-    const value = field ? normalizeFieldValue(field, raw) : undefined
+    const value = field
+      ? normalizeFieldValue(field, raw, maxTextLength)
+      : undefined
     if (value === undefined) invalidFieldIds.push(id)
     else if (value === null) cleared.add(id)
     else set[id] = value

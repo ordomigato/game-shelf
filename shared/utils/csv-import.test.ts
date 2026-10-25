@@ -53,6 +53,10 @@ describe('parseCell', () => {
 
   it('treats empty cells as nothing, and undoes the export formula guard', () => {
     expect(parseCell(field('text'), '   ')).toBeNull()
+    expect(parseCell(field('text'), 'x'.repeat(501))).toBeUndefined()
+    expect(parseCell(field('text'), 'x'.repeat(501), 2000)).toBe(
+      'x'.repeat(501),
+    )
     expect(parseCell(field('text'), "'=1+1")).toBe('=1+1')
   })
 })

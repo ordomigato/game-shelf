@@ -12,5 +12,10 @@ export default defineEventHandler(async (event): Promise<LibraryItem> => {
   const { user } = await authorize(event, 'library.write', itemOf(event))
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const { values } = await readValidatedBody(event, bodySchema.parse)
-  return updateLibraryItemValues(user.id, id, values)
+  return updateLibraryItemValues(
+    user.id,
+    id,
+    values,
+    userLimits(user).textLength,
+  )
 })

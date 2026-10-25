@@ -208,8 +208,9 @@ test('suggests charts for an empty dashboard', async ({ page }) => {
     /Total Price paid/,
     /Games by Status/,
     /Games over time/,
+    /Games by Genre/,
   ])
-  await suggested.getByRole('button', { name: 'Add all 4' }).click()
+  await suggested.getByRole('button', { name: 'Add all 5' }).click()
   await expect(
     page.getByRole('region', { name: 'Games by Status' }),
   ).toBeVisible()
@@ -218,6 +219,7 @@ test('suggests charts for an empty dashboard', async ({ page }) => {
     'number',
     'pie',
     'line',
+    'bar',
   ])
 })
 

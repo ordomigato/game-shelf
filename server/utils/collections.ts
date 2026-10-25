@@ -25,6 +25,8 @@ import {
   chartsFor,
   dataFor,
   fieldsFor,
+  normalizeFieldValue,
+  TEXT_VALUE_MAX_LENGTH,
 } from '../../shared/utils/field-values'
 import {
   can,
@@ -45,6 +47,7 @@ import {
 } from '../db/schema'
 import { assertCan } from './assert-can'
 import { isForeignKeyViolation, isUniqueViolation } from './db-errors'
+import { limitReached } from './limits'
 import { positionBetween } from './positions'
 
 type CollectionRow = typeof collections.$inferSelect
@@ -678,6 +681,7 @@ export async function updateItemValues(
   collectionId: string,
   itemId: string,
   changes: Record<string, unknown>,
+  maxTextLength: number,
 ): Promise<LibraryItem> {
   const db = useDb()
   const [found] = await db
@@ -699,7 +703,13 @@ export async function updateItemValues(
       ),
     )
   if (!found) throw notFound()
-  return saveItemValues(found.item, found.game, found.fields, changes)
+  return saveItemValues(
+    found.item,
+    found.game,
+    found.fields,
+    changes,
+    maxTextLength,
+  )
 }
 
 /**
@@ -710,6 +720,7 @@ export async function updateLibraryItemValues(
   ownerId: string,
   itemId: string,
   changes: Record<string, unknown>,
+  maxTextLength: number,
 ): Promise<LibraryItem> {
   const [found] = await useDb()
     .select({
@@ -722,7 +733,41 @@ export async function updateLibraryItemValues(
     .leftJoin(catalogGames, catalogJoin)
     .where(and(eq(libraryItems.id, itemId), eq(libraryItems.ownerId, ownerId)))
   if (!found) throw notFound()
-  return saveItemValues(found.item, found.game, found.fields, changes)
+  return saveItemValues(
+    found.item,
+    found.game,
+    found.fields,
+    changes,
+    maxTextLength,
+  )
+}
+
+/**
+ * An item's data with `changes` applied. Refuses with 403 when a text value
+ * is only too long for the account's plan, and with 400 and the rejected
+ * field ids for any other value that doesn't fit.
+ */
+export function checkItemValues(
+  data: ItemData,
+  fields: FieldDefinition[],
+  changes: Record<string, unknown>,
+  maxTextLength: number,
+): ItemData {
+  const result = applyFieldValues(data, fields, changes, maxTextLength)
+  if (!('invalidFieldIds' in result)) return result.data
+  const tooLong = result.invalidFieldIds.some((id) => {
+    const field = fields.find((candidate) => candidate.id === id)
+    return (
+      field?.type === 'text' &&
+      normalizeFieldValue(field, changes[id], Infinity) !== undefined
+    )
+  })
+  if (tooLong) limitReached('textLength', maxTextLength)
+  throw createError({
+    statusCode: 400,
+    statusMessage: 'Invalid field values',
+    data: { invalidFieldIds: result.invalidFieldIds },
+  })
 }
 
 async function saveItemValues(
@@ -730,18 +775,12 @@ async function saveItemValues(
   game: CatalogGameRow | null,
   fields: FieldDefinition[],
   changes: Record<string, unknown>,
+  maxTextLength: number,
 ): Promise<LibraryItem> {
-  const result = applyFieldValues(item.data, fields, changes)
-  if ('invalidFieldIds' in result) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Invalid field values',
-      data: { invalidFieldIds: result.invalidFieldIds },
-    })
-  }
+  const data = checkItemValues(item.data, fields, changes, maxTextLength)
   const [updated] = await useDb()
     .update(libraryItems)
-    .set({ data: result.data })
+    .set({ data })
     .where(
       and(eq(libraryItems.id, item.id), eq(libraryItems.ownerId, item.ownerId)),
     )
@@ -828,6 +867,7 @@ async function planFieldChanges(
   before: FieldDefinition[],
   input: FieldDefinition[],
   optionRenames: OptionRenames,
+  maxTextLength: number,
 ): Promise<FieldChangePlan> {
   const fields = cleanFields(input)
   const problem = fieldsProblem(fields)
@@ -872,7 +912,13 @@ async function planFieldChanges(
         )
     : []
   const updates = touchedItems.flatMap((item) => {
-    const data = migrateItemData(item.data, before, fields, renames)
+    const data = migrateItemData(
+      item.data,
+      before,
+      fields,
+      renames,
+      maxTextLength,
+    )
     return data ? [{ id: item.id, data }] : []
   })
   return { before, fields, renames, touchedItems, updates }
@@ -889,9 +935,16 @@ export async function updateUserFields(
   ownerId: string,
   input: FieldDefinition[],
   optionRenames: OptionRenames = {},
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): Promise<FieldDefinition[]> {
   const before = await getUserFields(ownerId)
-  const plan = await planFieldChanges(ownerId, before, input, optionRenames)
+  const plan = await planFieldChanges(
+    ownerId,
+    before,
+    input,
+    optionRenames,
+    maxTextLength,
+  )
   const db = useDb()
   const [[saved]] = await db.batch([
     db
@@ -917,14 +970,22 @@ export async function previewUserFields(
   ownerId: string,
   input: FieldDefinition[],
   optionRenames: OptionRenames = {},
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): Promise<FieldsImpact> {
   const before = await getUserFields(ownerId)
-  const plan = await planFieldChanges(ownerId, before, input, optionRenames)
+  const plan = await planFieldChanges(
+    ownerId,
+    before,
+    input,
+    optionRenames,
+    maxTextLength,
+  )
   const lost = valuesLost(
     plan.touchedItems,
     plan.before,
     plan.fields,
     plan.renames,
+    maxTextLength,
   )
   return {
     lost: plan.before

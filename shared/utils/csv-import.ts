@@ -141,6 +141,7 @@ const unguard = (text: string) =>
 export function parseCell(
   field: FieldDefinition,
   raw: string,
+  maxTextLength?: number,
 ): FieldValue | null | undefined {
   const text = unguard(raw.trim())
   if (!text) return null
@@ -185,7 +186,7 @@ export function parseCell(
       candidate = text
   }
   if (candidate === undefined) return undefined
-  const value = normalizeFieldValue(field, candidate)
+  const value = normalizeFieldValue(field, candidate, maxTextLength)
   return value === undefined ? undefined : value
 }
 
@@ -332,6 +333,7 @@ export function planImport(
   existing: FieldDefinition[],
   newId: () => string = () => crypto.randomUUID(),
   maxFields: number = MAX_FIELDS,
+  maxTextLength?: number,
 ): ImportPlan {
   const fields = existing.map((field) => ({
     ...field,
@@ -434,7 +436,7 @@ export function planImport(
     const values: ItemData = {}
     for (const [index, field] of columnField) {
       const raw = row[index] ?? ''
-      const value = parseCell(field, raw)
+      const value = parseCell(field, raw, maxTextLength)
       if (value === undefined) {
         problems.push({
           row: spreadsheetRow,

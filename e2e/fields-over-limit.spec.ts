@@ -41,14 +41,14 @@ async function openEditor(page: Page, count: number) {
 test('over the field limit, the editor warns and Add is off', async ({
   page,
 }) => {
-  const dialog = await openEditor(page, 8)
+  const dialog = await openEditor(page, 25)
   const alert = dialog.getByRole('alert')
   await expect(alert).toContainText(
-    'You have 8 extra fields. Your plan allows 5.',
+    'You have 25 extra fields. Your plan allows 20.',
   )
-  await expect(alert).toContainText("can't add more until you're down to 5")
+  await expect(alert).toContainText("can't add more until you're down to 20")
   await expect(
-    dialog.getByRole('link', { name: /Pro allows 20/ }),
+    dialog.getByRole('link', { name: 'Need more room? Get in touch.' }),
   ).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Add field' })).toBeDisabled()
 })
@@ -56,8 +56,10 @@ test('over the field limit, the editor warns and Add is off', async ({
 test('at the field limit, there is no warning and Add is off', async ({
   page,
 }) => {
-  const dialog = await openEditor(page, 5)
+  const dialog = await openEditor(page, 20)
   await expect(dialog.getByRole('alert')).toHaveCount(0)
-  await expect(dialog.getByText("You've used all 5 extra fields")).toBeVisible()
+  await expect(
+    dialog.getByText("You've used all 20 extra fields"),
+  ).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Add field' })).toBeDisabled()
 })

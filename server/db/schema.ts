@@ -17,7 +17,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import type { Role } from '../../shared/utils/access'
 import type { ReleasePrecision } from '../../shared/utils/release-date'
-import type { CustomLimits } from '../../shared/utils/plans'
+import type { CustomLimits, StoredPlan } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
 import type { FieldDefinition, ItemData } from '../../shared/types/collection'
 
@@ -56,16 +56,17 @@ export const users = pgTable(
       .$type<Role[]>()
       .notNull()
       .default(sql`'{user}'::text[]`),
-    /** What the account may store (shared/utils/plans.ts). */
-    plan: text('plan')
-      .$type<'free' | 'pro' | 'max'>()
-      .notNull()
-      .default('free'),
-    /** When a paid plan ends; null for free, or a plan that doesn't end. */
+    /**
+     * What the account may store (shared/utils/plans.ts). The app treats
+     * 'max' as Pro. A later migration should map 'max' to 'pro' and tighten
+     * the `users_plan` check.
+     */
+    plan: text('plan').$type<StoredPlan>().notNull().default('free'),
+    /** When a plan ends. Not used: Pro is free and doesn't end, so it stays null. */
     planUntil: timestamp('plan_until', { withTimezone: true }),
     /**
-     * Limits set by hand for this account (Max, or extra room for someone),
-     * on top of the plan's. Null for most people.
+     * Limits set by hand for this account (extra room for someone), on top
+     * of the plan's. Null for most people.
      */
     customLimits: jsonb('custom_limits').$type<CustomLimits>(),
     /**

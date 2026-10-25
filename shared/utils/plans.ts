@@ -2,18 +2,34 @@ import { MAX_CHARTS } from './charts'
 import { MAX_IMPORT_ROWS } from './csv-import'
 import { MAX_FIELDS } from './field-changes'
 
+/** The longest text a field can hold, whatever an account's limits say. */
+const MAX_TEXT_LENGTH = 2000
+
 /**
- * What each plan allows. Free is what everyone has today. Pro is planned
- * (see /pricing) and not on sale yet. Max is custom: limits agreed by
- * email and stored on the account (`users.custom_limits`). The server
+ * What each plan allows. Free is what everyone has. Pro is free too: it is
+ * granted by hand on request, and its limits can be raised further per
+ * account with `users.custom_limits`. Nothing is charged. The server
  * enforces these (server/utils/limits.ts) and the app shows them where
  * they apply, so a limit never comes out of nowhere.
  *
- * Sized so a free shelf stays generous (about 2 MB of database at the
- * most) while one account, or one script, can't fill the free database
- * for everyone.
+ * Free matches Pro on collections, charts, games per collection and
+ * fields. Total games and text length are what bound one account, or one
+ * script, filling the database: at most 3,000 games x 20 fields x 500
+ * characters, about 30 MB. That is why those two stay low.
  */
-export type Plan = 'free' | 'pro' | 'max'
+export type Plan = 'free' | 'pro'
+
+/**
+ * What the `users.plan` column can hold. The `users_plan` check still
+ * allows 'max', which the app treats as Pro (see `normalizePlan`). A later
+ * migration should map 'max' to 'pro' and tighten that check.
+ */
+export type StoredPlan = Plan | 'max'
+
+/** The plan the app works with for a stored value. */
+export function normalizePlan(stored: string | null | undefined): Plan {
+  return stored === 'pro' || stored === 'max' ? 'pro' : 'free'
+}
 
 export interface PlanLimits {
   /** Collections, not counting Owned and the Wishlist. */
@@ -36,16 +52,14 @@ export type CustomLimits = Partial<PlanLimits>
 
 export const PLAN_LIMITS: Record<'free' | 'pro', PlanLimits> = {
   free: {
-    collections: 10,
-    fields: 5,
-    gamesPerCollection: 100,
+    collections: 100,
+    fields: 20,
+    gamesPerCollection: 1000,
     games: 3000,
     textLength: 500,
-    chartsPerCollection: 4,
+    chartsPerCollection: 20,
     importRows: 1000,
   },
-  // Planned. The text limit needs the per-plan check wired through value
-  // validation (shared/utils/field-values.ts) when Pro goes on sale.
   pro: {
     collections: 100,
     fields: 20,
@@ -57,29 +71,28 @@ export const PLAN_LIMITS: Record<'free' | 'pro', PlanLimits> = {
   },
 }
 
-/** Pro is planned and not on sale yet. */
-export const PRO_PRICE_PER_YEAR = 5
-
 /** What the app itself supports, whatever an account's limits say. */
 const APP_MAXIMUMS: Partial<PlanLimits> = {
   fields: MAX_FIELDS,
   // A full collection is sent in one response, which Lambda caps at 6 MB.
   gamesPerCollection: 1000,
   games: 10_000,
+  textLength: MAX_TEXT_LENGTH,
   chartsPerCollection: MAX_CHARTS,
   importRows: MAX_IMPORT_ROWS,
 }
 
 /**
- * An account's limits: its plan's (Max starts from Pro's), overridden by
- * any custom limits set on the account, never past what the app supports.
+ * An account's limits: its plan's, overridden by any custom limits set on
+ * the account, never past what the app supports. A stored 'max' counts as
+ * Pro.
  */
 export function limitsFor(
-  plan: Plan,
+  plan: StoredPlan,
   custom?: CustomLimits | null,
 ): PlanLimits {
   const merged: PlanLimits = {
-    ...PLAN_LIMITS[plan === 'free' ? 'free' : 'pro'],
+    ...PLAN_LIMITS[normalizePlan(plan)],
     ...Object.fromEntries(
       Object.entries(custom ?? {}).filter(
         ([key, value]) =>

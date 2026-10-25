@@ -16,7 +16,6 @@ import {
 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { collectionCsv, FIXED_COLUMNS } from '#shared/utils/csv'
-import { PLAN_LIMITS } from '#shared/utils/plans'
 import { toast } from 'vue-sonner'
 import type {
   CollectionEntry,
@@ -30,9 +29,8 @@ import type {
 
 const NuxtLink = resolveComponent('NuxtLink')
 const route = useRoute()
-const { t, n, locale } = useI18n()
+const { t, n } = useI18n()
 const { limits } = usePlan()
-const proGames = PLAN_LIMITS.pro.gamesPerCollection
 // Over the limit, games can be kept and removed but not added.
 const overGames = computed(
   () => (data.value?.itemCount ?? 0) > limits.value.gamesPerCollection,
@@ -188,9 +186,9 @@ async function saveValue(
       [fieldId]: value,
     })
     setItemData(itemId, saved.data)
-  } catch {
+  } catch (error) {
     setItemData(itemId, before)
-    toast.error(t('table.saveFailed'))
+    toast.error(limitMessage(error, t) ?? t('table.saveFailed'))
   }
 }
 
@@ -568,17 +566,17 @@ async function deleteCollection() {
       >
         <AlertTitle>{{
           $t('limits.overCollection', {
-            used: data.itemCount,
-            limit: limits.gamesPerCollection,
+            used: n(data.itemCount),
+            limit: n(limits.gamesPerCollection),
           })
         }}</AlertTitle>
         <AlertDescription>
-          {{ $t('limits.overGamesHelp', { limit: limits.gamesPerCollection }) }}
-          <NuxtLink v-if="proGames > limits.gamesPerCollection" to="/pricing">{{
-            $t('limits.proAllows', {
-              limit: new Intl.NumberFormat(locale).format(proGames),
+          {{
+            $t('limits.overGamesHelp', {
+              limit: n(limits.gamesPerCollection),
             })
-          }}</NuxtLink>
+          }}
+          <NuxtLink to="/contact">{{ $t('limits.proAllows') }}</NuxtLink>
         </AlertDescription>
       </Alert>
 

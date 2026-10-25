@@ -352,9 +352,9 @@ async function saveValue(
       [fieldId]: value,
     })
     setField(saved.data[fieldId])
-  } catch {
+  } catch (error) {
     setField(before)
-    toast.error(t('table.saveFailed'))
+    toast.error(limitMessage(error, t) ?? t('table.saveFailed'))
   } finally {
     valueSaves -= 1
     valueEdits += 1

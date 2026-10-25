@@ -11,5 +11,10 @@ export default defineEventHandler(async (event): Promise<FieldDefinition[]> => {
     fieldsBodySchema.parse,
   )
   assertFieldRoom(user.fields, fields, userLimits(user))
-  return updateUserFields(user.id, fields as FieldDefinition[], optionRenames)
+  return updateUserFields(
+    user.id,
+    fields as FieldDefinition[],
+    optionRenames,
+    userLimits(user).textLength,
+  )
 })

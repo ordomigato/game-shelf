@@ -307,3 +307,40 @@ describe('fixing fields that were merged into too many', () => {
     ).toBeNull()
   })
 })
+
+describe('text made from a list', () => {
+  const options = Array.from({ length: 50 }, (_, i) =>
+    `${i}`.padStart(2, '0').padEnd(60, 'x'),
+  )
+  const tags: FieldDefinition = {
+    id: 'g',
+    name: 'Tags',
+    type: 'multiselect',
+    options,
+  }
+  const asText: FieldDefinition = { id: 'g', name: 'Tags', type: 'text' }
+
+  it('is dropped when the joined text is past the account’s limit', () => {
+    expect(options.join(', ').length).toBeGreaterThan(2000)
+    expect(carryValue(options, tags, asText, {}, 500)).toBeUndefined()
+    expect(carryValue(options, tags, asText, {}, 2000)).toBeUndefined()
+    const items = [{ data: { g: options } as ItemData }]
+    expect(valuesLost(items, [tags], [asText], {}, 500).get('g')).toBe(1)
+    expect(migrateItemData({ g: options }, [tags], [asText], {}, 500)).toEqual(
+      {},
+    )
+  })
+
+  it('is kept when it fits: 2,000 on Pro but not 500 on Free', () => {
+    const some = options.slice(0, 9)
+    expect(carryValue(some, tags, asText, {}, 500)).toBeUndefined()
+    expect(carryValue(some, tags, asText, {}, 2000)).toBe(some.join(', '))
+  })
+
+  it('keeps a long text value that stays text', () => {
+    const long = 'x'.repeat(1800)
+    const renamed: FieldDefinition = { ...text, name: 'Notes 2' }
+    expect(carryValue(long, text, renamed, {}, 500)).toBe(long)
+    expect(migrateItemData({ t: long }, [text], [renamed], {}, 500)).toBeNull()
+  })
+})

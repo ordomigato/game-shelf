@@ -188,9 +188,9 @@ async function saveValue(
       [fieldId]: value,
     })
     setItemData(itemId, saved.data)
-  } catch {
+  } catch (error) {
     setItemData(itemId, before)
-    toast.error(t('table.saveFailed'))
+    toast.error(limitMessage(error, t) ?? t('table.saveFailed'))
   }
 }
 

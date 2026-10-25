@@ -5,7 +5,7 @@ import type {
   ItemData,
   RatingScale,
 } from '../types/collection'
-import { normalizeFieldValue } from './field-values'
+import { TEXT_VALUE_MAX_LENGTH, normalizeFieldValue } from './field-values'
 
 export const FIELD_TYPES: FieldType[] = [
   'text',
@@ -123,12 +123,15 @@ const NUMERIC: FieldType[] = ['number', 'currency', 'rating', 'progress']
  * between number-like types, text that reads as a number or matches an
  * option, one choice to a list of one and back), or undefined when it no
  * longer fits and will be cleared. A list keeps the choices that survive.
+ * Text made from another type (a list joined into text) must fit
+ * `maxTextLength`. Text that stays text is kept whatever its length.
  */
 export function carryValue(
   value: FieldValue,
   before: FieldDefinition,
   after: FieldDefinition,
   renames: Record<string, string> = {},
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): FieldValue | undefined {
   let candidate: unknown = value
   if (before.type === 'select' && typeof value === 'string') {
@@ -181,9 +184,12 @@ export function carryValue(
     candidate = candidate.trim() && Number.isFinite(number) ? number : undefined
   }
   if (candidate === undefined) return undefined
-  // Stored values already fit the account's text limit, so carrying one
-  // over never shortens it.
-  const normalized = normalizeFieldValue(after, candidate, Infinity)
+  // Text that was already text fit the account's limit when it was stored.
+  const normalized = normalizeFieldValue(
+    after,
+    candidate,
+    before.type === 'text' ? Infinity : maxTextLength,
+  )
   return normalized === null ? undefined : normalized
 }
 
@@ -213,6 +219,7 @@ export function migrateItemData(
   before: FieldDefinition[],
   after: FieldDefinition[],
   renames: OptionRenames = {},
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): ItemData | null {
   const afterById = new Map(after.map((field) => [field.id, field]))
   const updates = new Map<string, FieldValue | undefined>()
@@ -221,7 +228,7 @@ export function migrateItemData(
     const value = data[field.id]!
     const updated = afterById.get(field.id)
     const carried = updated
-      ? carryValue(value, field, updated, renames[field.id])
+      ? carryValue(value, field, updated, renames[field.id], maxTextLength)
       : undefined
     if (!sameValue(carried, value)) updates.set(field.id, carried)
   }
@@ -245,6 +252,7 @@ export function valuesLost(
   before: FieldDefinition[],
   after: FieldDefinition[],
   renames: OptionRenames = {},
+  maxTextLength: number = TEXT_VALUE_MAX_LENGTH,
 ): Map<string, number> {
   const afterById = new Map(after.map((field) => [field.id, field]))
   const lost = new Map<string, number>()
@@ -254,7 +262,7 @@ export function valuesLost(
       if (!(field.id in item.data)) continue
       const value = item.data[field.id]!
       const carried = updated
-        ? carryValue(value, field, updated, renames[field.id])
+        ? carryValue(value, field, updated, renames[field.id], maxTextLength)
         : undefined
       if (isLoss(value, carried)) {
         lost.set(field.id, (lost.get(field.id) ?? 0) + 1)

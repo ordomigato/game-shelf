@@ -65,7 +65,7 @@ function checkOnlyAdds(before: FieldDefinition[], after: FieldDefinition[]) {
 }
 
 /** Only the values that fit their fields, and how many didn't. */
-function validValues(
+export function validValues(
   fields: FieldDefinition[],
   values: ItemData,
   maxTextLength: number,

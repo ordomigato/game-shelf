@@ -13,5 +13,10 @@ export default defineEventHandler(async (event): Promise<FieldsImpact> => {
     event,
     fieldsBodySchema.parse,
   )
-  return previewUserFields(user.id, fields as FieldDefinition[], optionRenames)
+  return previewUserFields(
+    user.id,
+    fields as FieldDefinition[],
+    optionRenames,
+    userLimits(user).textLength,
+  )
 })

@@ -13,10 +13,9 @@ const bodySchema = z.object({
  * catalog, so it can't be renamed (400).
  */
 export default defineEventHandler(async (event): Promise<LibraryItem> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'library.write', itemOf(event))
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
   const body = await readValidatedBody(event, bodySchema.parse)
-  const user = await findOrCreateUser(sub)
   const item = await getOwnedItem(user.id, id)
   if (item.igdbId !== null) {
     throw createError({

@@ -14,10 +14,17 @@ const bodySchema = z
  */
 export default defineEventHandler(
   async (event): Promise<{ collectionIds: string[] }> => {
-    const { sub } = await requireAuth(event)
+    const { user, subject } = await authorize(
+      event,
+      'library.write',
+      itemOf(event),
+    )
     const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
     const change = await readValidatedBody(event, bodySchema.parse)
-    const user = await findOrCreateUser(sub)
+    await assertCanOnCollections(subject, 'collection.update', [
+      ...change.add,
+      ...change.remove,
+    ])
     return {
       collectionIds: await setItemCollections(
         user.id,

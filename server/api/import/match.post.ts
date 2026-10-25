@@ -33,8 +33,7 @@ async function search(name: string): Promise<IgdbGame[]> {
  * choose from instead.
  */
 export default defineEventHandler(async (event): Promise<NameMatch[]> => {
-  const { sub } = await requireAuth(event)
-  const user = await findOrCreateUser(sub)
+  const { user } = await authorize(event, 'library.write')
   // 1,000 names in ten minutes: a big import's worth.
   await rateLimit(event, `match:${user.id}`, { limit: 100, windowSeconds: 600 })
   const { names } = await readValidatedBody(event, bodySchema.parse)

@@ -15,6 +15,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type { Role } from '../../shared/utils/access'
 import type { ReleasePrecision } from '../../shared/utils/release-date'
 import type { CustomLimits } from '../../shared/utils/plans'
 import type { ChartWidget } from '../../shared/types/charts'
@@ -41,10 +42,20 @@ export const users = pgTable(
     username: text('username').unique(),
     displayName: text('display_name'),
     /**
-     * Reviews the barcodes people matched themselves (and may send approved
-     * ones to ScanDex). Set by hand, off for everyone else. Not an admin flag.
+     * Unused: replaced by the `admin` role in `roles`. Kept only so the
+     * release before this one, which still reads it, keeps working while
+     * a deploy is in progress. A later migration drops it.
      */
     reviewsBarcodes: boolean('reviews_barcodes').notNull().default(false),
+    /**
+     * Every account has "user"; others (admin) are set by hand. A new role needs a
+     * migration that widens `users_roles` (see shared/utils/access.ts).
+     */
+    roles: text('roles')
+      .array()
+      .$type<Role[]>()
+      .notNull()
+      .default(sql`'{user}'::text[]`),
     /** What the account may store (shared/utils/plans.ts). */
     plan: text('plan')
       .$type<'free' | 'pro' | 'max'>()
@@ -85,6 +96,10 @@ export const users = pgTable(
       sql`${table.username} ~ '^[a-z0-9_]{3,20}$'`,
     ),
     check('users_plan', sql`${table.plan} in ('free', 'pro', 'max')`),
+    check(
+      'users_roles',
+      sql`${table.roles} <@ array['user','admin']::text[] and 'user' = any(${table.roles})`,
+    ),
   ],
 )
 

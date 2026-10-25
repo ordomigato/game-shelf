@@ -18,7 +18,8 @@ const touching = (column: string) =>
 describe('the barcode review migration', () => {
   it('comes after the user_barcodes migration and drops its table and flag', () => {
     expect(tag).toBe('0026_barcode_review')
-    expect(journal.entries.at(-2)?.tag).toBe('0025_user_barcodes')
+    const at = journal.entries.findIndex((entry) => entry.tag === tag)
+    expect(journal.entries[at - 1]?.tag).toBe('0025_user_barcodes')
     const text = statements.join('\n')
     expect(text).toContain('DROP TABLE "user_barcodes"')
     expect(text).toContain(

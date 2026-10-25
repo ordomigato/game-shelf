@@ -28,12 +28,11 @@ const DAILY_LOOKUPS = 500
  * barcodes get that far. `match` is null when no game has the barcode.
  */
 export default defineEventHandler(async (event): Promise<BarcodeResult> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'barcodes.lookup')
   const { code: parsed } = await getValidatedRouterParams(
     event,
     paramsSchema.parse,
   )
-  const user = await findOrCreateUser(sub)
   return resolveBarcode(user.id, parsed, () =>
     rateLimit(event, `barcode:${user.id}`, {
       limit: DAILY_LOOKUPS,

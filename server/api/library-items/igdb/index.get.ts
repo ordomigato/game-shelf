@@ -18,14 +18,16 @@ const querySchema = z.object({
  */
 export default defineEventHandler(
   async (event): Promise<{ igdbId: number; itemId: string }[]> => {
-    const { sub } = await requireAuth(event)
+    const { user, subject } = await authorize(event, 'library.read')
     const { ids, collection, list } = await getValidatedQuery(
       event,
       querySchema.parse,
     )
-    const user = await findOrCreateUser(sub)
     // An unknown or someone else's collection is a 404, not an empty list.
-    if (collection) await getOwnedCollection(user.id, collection)
+    if (collection) {
+      assertCan(subject, 'library.read', await collectionResource(collection))
+      await getOwnedCollection(user.id, collection)
+    }
     return trackedItems(user.id, ids, { collectionId: collection, list })
   },
 )

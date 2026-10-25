@@ -5,12 +5,11 @@ import type { FieldDefinition } from '../../../../shared/types/collection'
  * new field past the plan's limit is refused.
  */
 export default defineEventHandler(async (event): Promise<FieldDefinition[]> => {
-  const { sub } = await requireAuth(event)
+  const { user } = await authorize(event, 'account.update')
   const { fields, optionRenames } = await readValidatedBody(
     event,
     fieldsBodySchema.parse,
   )
-  const user = await findOrCreateUser(sub)
   assertFieldRoom(user.fields, fields, userLimits(user))
   return updateUserFields(user.id, fields as FieldDefinition[], optionRenames)
 })

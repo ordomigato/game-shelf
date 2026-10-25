@@ -1,6 +1,6 @@
 import type { Me } from '../../shared/types/user'
 
 export default defineEventHandler(async (event): Promise<Me> => {
-  const { sub } = await requireAuth(event)
-  return toMe(await findOrCreateUser(sub))
+  const { user } = await authorize(event, 'account.read')
+  return toMe(user)
 })

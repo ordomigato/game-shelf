@@ -1,6 +1,5 @@
 import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { createError, type H3Event } from 'h3'
 import type {
   BarcodeReviewAction,
   BarcodeReviewGroup,
@@ -23,20 +22,6 @@ export const MAX_REVIEWS = 20
  * the listing says when it cut something off.
  */
 export const MAX_REVIEW_GROUPS = 500
-
-/**
- * The signed-in user, only if they review barcodes (`users.reviews_barcodes`,
- * set by hand). Anyone else gets a 404 before any work, so the feature
- * doesn't show itself to them.
- */
-export async function requireReviewer(event: H3Event) {
-  const { sub } = await requireAuth(event)
-  const user = await findOrCreateUser(sub)
-  if (!user.reviewsBarcodes) {
-    throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  }
-  return user
-}
 
 const groupKey = reviewGroupKey
 

@@ -63,13 +63,7 @@ const pro = PLAN_LIMITS.pro
     <CardHeader>
       <CardTitle>
         <h2 class="text-lg font-semibold">
-          {{
-            plan === 'max'
-              ? $t('limits.planMax')
-              : plan === 'pro'
-                ? $t('limits.planPro')
-                : $t('limits.planFree')
-          }}
+          {{ plan === 'pro' ? $t('limits.planPro') : $t('limits.planFree') }}
         </h2>
       </CardTitle>
       <CardDescription>{{ $t('limits.planDescription') }}</CardDescription>

@@ -19,5 +19,11 @@ export default defineEventHandler(async (event): Promise<LibraryItem> => {
   )
   const { values } = await readValidatedBody(event, bodySchema.parse)
   assertCan(subject, 'library.write', await itemResource(itemId))
-  return updateItemValues(user.id, id, itemId, values)
+  return updateItemValues(
+    user.id,
+    id,
+    itemId,
+    values,
+    userLimits(user).textLength,
+  )
 })

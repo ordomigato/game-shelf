@@ -181,7 +181,9 @@ export function carryValue(
     candidate = candidate.trim() && Number.isFinite(number) ? number : undefined
   }
   if (candidate === undefined) return undefined
-  const normalized = normalizeFieldValue(after, candidate)
+  // Stored values already fit the account's text limit, so carrying one
+  // over never shortens it.
+  const normalized = normalizeFieldValue(after, candidate, Infinity)
   return normalized === null ? undefined : normalized
 }
 

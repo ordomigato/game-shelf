@@ -25,6 +25,7 @@ import {
   chartsFor,
   dataFor,
   fieldsFor,
+  normalizeFieldValue,
 } from '../../shared/utils/field-values'
 import {
   can,
@@ -45,6 +46,7 @@ import {
 } from '../db/schema'
 import { assertCan } from './assert-can'
 import { isForeignKeyViolation, isUniqueViolation } from './db-errors'
+import { limitReached } from './limits'
 import { positionBetween } from './positions'
 
 type CollectionRow = typeof collections.$inferSelect
@@ -678,6 +680,7 @@ export async function updateItemValues(
   collectionId: string,
   itemId: string,
   changes: Record<string, unknown>,
+  maxTextLength: number,
 ): Promise<LibraryItem> {
   const db = useDb()
   const [found] = await db
@@ -699,7 +702,13 @@ export async function updateItemValues(
       ),
     )
   if (!found) throw notFound()
-  return saveItemValues(found.item, found.game, found.fields, changes)
+  return saveItemValues(
+    found.item,
+    found.game,
+    found.fields,
+    changes,
+    maxTextLength,
+  )
 }
 
 /**
@@ -710,6 +719,7 @@ export async function updateLibraryItemValues(
   ownerId: string,
   itemId: string,
   changes: Record<string, unknown>,
+  maxTextLength: number,
 ): Promise<LibraryItem> {
   const [found] = await useDb()
     .select({
@@ -722,7 +732,13 @@ export async function updateLibraryItemValues(
     .leftJoin(catalogGames, catalogJoin)
     .where(and(eq(libraryItems.id, itemId), eq(libraryItems.ownerId, ownerId)))
   if (!found) throw notFound()
-  return saveItemValues(found.item, found.game, found.fields, changes)
+  return saveItemValues(
+    found.item,
+    found.game,
+    found.fields,
+    changes,
+    maxTextLength,
+  )
 }
 
 async function saveItemValues(
@@ -730,9 +746,20 @@ async function saveItemValues(
   game: CatalogGameRow | null,
   fields: FieldDefinition[],
   changes: Record<string, unknown>,
+  maxTextLength: number,
 ): Promise<LibraryItem> {
-  const result = applyFieldValues(item.data, fields, changes)
+  const result = applyFieldValues(item.data, fields, changes, maxTextLength)
   if ('invalidFieldIds' in result) {
+    // Text that is only too long for this account's plan gets the limit
+    // message instead of a plain "invalid".
+    const tooLong = result.invalidFieldIds.some((id) => {
+      const field = fields.find((candidate) => candidate.id === id)
+      return (
+        field?.type === 'text' &&
+        normalizeFieldValue(field, changes[id], Infinity) !== undefined
+      )
+    })
+    if (tooLong) limitReached('textLength', maxTextLength)
     throw createError({
       statusCode: 400,
       statusMessage: 'Invalid field values',

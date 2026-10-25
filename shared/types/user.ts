@@ -8,7 +8,7 @@ export interface Me {
   username: string | null
   displayName: string | null
   createdAt: string
-  /** The plan in effect now (a paid plan that ended counts as free). */
+  /** The plan in effect now (a stored max counts as Pro). */
   plan: Plan
   /** The limits in effect: the plan's, with any custom limits on top. */
   limits: PlanLimits

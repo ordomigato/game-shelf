@@ -18,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [value: FieldValue | null] }>()
 
 const { t, locale } = useI18n()
+// Text is limited to the account's own length.
+const { limits } = usePlan()
 
 const text = computed(() =>
   formatFieldValue(props.field, props.value, locale.value),
@@ -69,7 +71,9 @@ async function startEditing() {
 const parsed = computed((): FieldValue | null | undefined => {
   const raw = String(draft.value).trim()
   if (raw === '') return null
-  if (inputType.value !== 'number') return normalizeFieldValue(props.field, raw)
+  if (inputType.value !== 'number') {
+    return normalizeFieldValue(props.field, raw, limits.value.textLength)
+  }
   const number = Number(raw)
   return Number.isFinite(number)
     ? normalizeFieldValue(props.field, number)
@@ -89,7 +93,7 @@ const hint = computed(() => {
     case 'number':
       return t('table.hints.number')
     default:
-      return t('table.hints.text')
+      return t('table.hints.text', { max: limits.value.textLength })
   }
 })
 
@@ -97,6 +101,9 @@ const hint = computed(() => {
 const suffix = computed(() => {
   if (props.field.type === 'progress') return '%'
   if (props.field.type === 'rating') return `/ ${props.field.scale ?? 5}`
+  if (props.field.type === 'text') {
+    return `${String(draft.value).trim().length} / ${limits.value.textLength}`
+  }
   return ''
 })
 

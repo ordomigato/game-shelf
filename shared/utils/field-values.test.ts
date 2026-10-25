@@ -9,6 +9,7 @@ import {
   fieldsFor,
   normalizeFieldValue,
 } from './field-values'
+import { limitsFor } from './plans'
 
 const asOwner: Viewer = {
   subject: { id: 'owner', roles: ['user'] },
@@ -48,6 +49,47 @@ describe('normalizeFieldValue', () => {
   it('treats null as clearing, and empty text as clearing', () => {
     expect(normalizeFieldValue(field('rating'), null)).toBeNull()
     expect(normalizeFieldValue(field('text'), '   ')).toBeNull()
+  })
+})
+
+describe('normalizeFieldValue text length', () => {
+  const text = (length: number) => 'x'.repeat(length)
+  const free = limitsFor('free').textLength
+  const pro = limitsFor('pro').textLength
+
+  it('refuses 501 characters on Free and takes 500', () => {
+    expect(normalizeFieldValue(field('text'), text(500), free)).toBe(text(500))
+    expect(normalizeFieldValue(field('text'), text(501), free)).toBeUndefined()
+  })
+
+  it('takes 2,000 characters on Pro and refuses 2,001', () => {
+    expect(normalizeFieldValue(field('text'), text(2000), pro)).toBe(text(2000))
+    expect(normalizeFieldValue(field('text'), text(2001), pro)).toBeUndefined()
+  })
+
+  it('follows a custom limit within the app maximum', () => {
+    const raised = limitsFor('free', { textLength: 1200 }).textLength
+    expect(normalizeFieldValue(field('text'), text(1200), raised)).toBe(
+      text(1200),
+    )
+    expect(
+      normalizeFieldValue(field('text'), text(1201), raised),
+    ).toBeUndefined()
+    const capped = limitsFor('pro', { textLength: 9000 }).textLength
+    expect(
+      normalizeFieldValue(field('text'), text(2001), capped),
+    ).toBeUndefined()
+  })
+
+  it('applies the limit when saving several values', () => {
+    const fields = [field('text')]
+    const long = { f: text(600) }
+    expect(applyFieldValues({}, fields, long, free)).toEqual({
+      invalidFieldIds: ['f'],
+    })
+    expect(applyFieldValues({}, fields, long, pro)).toEqual({
+      data: long,
+    })
   })
 })
 

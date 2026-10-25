@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { PLAN_LIMITS, limitsFor } from './plans'
+import { PLAN_LIMITS, limitsFor, normalizePlan } from './plans'
+
+describe('normalizePlan', () => {
+  it('counts a stored max as pro', () => {
+    expect(normalizePlan('max')).toBe('pro')
+    expect(normalizePlan('pro')).toBe('pro')
+    expect(normalizePlan('free')).toBe('free')
+  })
+
+  it('falls back to free for anything else', () => {
+    expect(normalizePlan(null)).toBe('free')
+    expect(normalizePlan(undefined)).toBe('free')
+    expect(normalizePlan('gold')).toBe('free')
+  })
+})
 
 describe('limitsFor', () => {
-  it('gives each plan its limits, with Max starting from Pro', () => {
+  it('gives each plan its limits, and a stored max gets Pro’s', () => {
     expect(limitsFor('free')).toEqual(PLAN_LIMITS.free)
     expect(limitsFor('pro')).toEqual(PLAN_LIMITS.pro)
     expect(limitsFor('max')).toEqual(PLAN_LIMITS.pro)
@@ -54,6 +68,17 @@ describe('limitsFor', () => {
     const custom = { wishlist: 5 } as unknown as { games: number }
     expect(limitsFor('free', custom)).toEqual(PLAN_LIMITS.free)
     expect(limitsFor('max', custom)).not.toHaveProperty('wishlist')
+  })
+
+  it('sizes the text limit per plan and lets custom limits raise it', () => {
+    expect(limitsFor('free').textLength).toBe(500)
+    expect(limitsFor('pro').textLength).toBe(2000)
+    expect(limitsFor('free', { textLength: 800 }).textLength).toBe(800)
+    expect(limitsFor('pro', { textLength: 1200 }).textLength).toBe(1200)
+  })
+
+  it('keeps a hand-set text limit within the app maximum', () => {
+    expect(limitsFor('pro', { textLength: 50_000 }).textLength).toBe(2000)
   })
 
   it('ignores custom values that are not numbers', () => {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Check } from '@lucide/vue'
-import { PLAN_LIMITS, PRO_PRICE_PER_YEAR } from '#shared/utils/plans'
+import { PLAN_LIMITS } from '#shared/utils/plans'
 
 /**
- * Free, the planned Pro, and Max by arrangement, with every limit listed
+ * Free, and Pro (free too, granted on request), with every limit listed
  * from the same numbers the server enforces. Rendered on the server.
  */
 const { t, locale } = useI18n()
@@ -40,11 +40,6 @@ const rows = computed(() =>
 )
 const free = computed(() => rows.value[0]!)
 const pro = computed(() => rows.value[1]!)
-// While Pro's price is still to be decided, don't add "per year" to it.
-const proPrice = computed(() =>
-  t('pricing.proPrice', { price: PRO_PRICE_PER_YEAR }),
-)
-const proPriceDecided = computed(() => /\d/.test(proPrice.value))
 </script>
 
 <template>
@@ -56,7 +51,7 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
       </p>
     </header>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2">
       <section
         class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
         aria-labelledby="plan-free"
@@ -71,6 +66,9 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
         </div>
         <p>
           <span class="text-3xl font-bold">{{ $t('pricing.freePrice') }}</span>
+        </p>
+        <p class="text-sm text-muted-foreground">
+          {{ $t('pricing.freeBlurb') }}
         </p>
         <ul class="flex flex-col gap-2 text-sm">
           <li v-for="item in free.items" :key="item" class="flex gap-2">
@@ -87,7 +85,7 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
       </section>
 
       <section
-        class="flex flex-col gap-4 rounded-xl border border-dashed border-border bg-card/60 p-6"
+        class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
         aria-labelledby="plan-pro"
       >
         <div class="flex items-center justify-between gap-2">
@@ -97,13 +95,12 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
           <Badge v-if="signedIn && plan === 'pro'" variant="secondary">{{
             $t('pricing.yourPlan')
           }}</Badge>
-          <Badge v-else variant="outline">{{ $t('pricing.comingSoon') }}</Badge>
         </div>
-        <p class="flex items-baseline gap-1">
-          <span class="text-3xl font-bold">{{ proPrice }}</span>
-          <span v-if="proPriceDecided" class="text-sm text-muted-foreground">{{
-            $t('pricing.perYear')
-          }}</span>
+        <p>
+          <span class="text-3xl font-bold">{{ $t('pricing.proPrice') }}</span>
+        </p>
+        <p class="text-sm text-muted-foreground">
+          {{ $t('pricing.proBlurb') }}
         </p>
         <ul class="flex flex-col gap-2 text-sm">
           <li v-for="item in pro.items" :key="item" class="flex gap-2">
@@ -114,36 +111,17 @@ const proPriceDecided = computed(() => /\d/.test(proPrice.value))
             {{ item }}
           </li>
         </ul>
-        <Button class="mt-auto" disabled>{{ $t('pricing.comingSoon') }}</Button>
-      </section>
-
-      <section
-        class="flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
-        aria-labelledby="plan-max"
-      >
-        <div class="flex items-center justify-between gap-2">
-          <h2 id="plan-max" class="text-xl font-semibold">
-            {{ $t('pricing.maxName') }}
-          </h2>
-          <Badge v-if="signedIn && plan === 'max'" variant="secondary">{{
-            $t('pricing.yourPlan')
-          }}</Badge>
-        </div>
-        <p>
-          <span class="text-3xl font-bold">{{ $t('pricing.maxPrice') }}</span>
-        </p>
         <p class="text-sm text-muted-foreground">
-          {{ $t('pricing.maxBlurb') }}
+          {{ $t('pricing.proMore') }}
         </p>
         <Button as-child variant="outline" class="mt-auto">
-          <NuxtLink to="/contact">{{ $t('pricing.maxCta') }}</NuxtLink>
+          <NuxtLink to="/contact">{{ $t('pricing.proCta') }}</NuxtLink>
         </Button>
       </section>
     </div>
 
     <ProseSection :title="$t('pricing.whyTitle')">
       <p>{{ $t('pricing.why') }}</p>
-      <p>{{ $t('pricing.whyPro') }}</p>
     </ProseSection>
 
     <ProseSection :title="$t('pricing.limitsTitle')">

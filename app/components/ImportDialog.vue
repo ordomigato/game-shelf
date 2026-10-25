@@ -180,6 +180,7 @@ const plan = computed(() =>
         props.fields,
         undefined,
         limits.value.fields,
+        limits.value.textLength,
       )
     : null,
 )

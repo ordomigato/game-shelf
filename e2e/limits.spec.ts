@@ -136,6 +136,43 @@ test('the Usage tab shows the plan and what is used', async ({ page }) => {
   ).toHaveAttribute('href', '/pricing')
 })
 
+async function signInWithPlan(page: Page, plan: 'free' | 'pro') {
+  await signInAs(page, { username: 'retro_fan' })
+  await page.route('**/api/me', (route) =>
+    route.fulfill({
+      json: {
+        id: '00000000-0000-4000-8000-000000000002',
+        username: 'retro_fan',
+        displayName: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        plan,
+      },
+    }),
+  )
+}
+
+test('Pricing puts "Your plan" on Free for a Free user', async ({ page }) => {
+  await signInWithPlan(page, 'free')
+  await page.goto('/pricing')
+  await expect(
+    page.getByRole('region', { name: 'Free' }).getByText('Your plan'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: 'Pro' }).getByText('Your plan'),
+  ).toHaveCount(0)
+})
+
+test('Pricing puts "Your plan" on Pro for a Pro user', async ({ page }) => {
+  await signInWithPlan(page, 'pro')
+  await page.goto('/pricing')
+  await expect(
+    page.getByRole('region', { name: 'Pro' }).getByText('Your plan'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: 'Free' }).getByText('Your plan'),
+  ).toHaveCount(0)
+})
+
 test('Pricing lists both plans from the real limits', async ({ page }) => {
   await page.goto('/pricing')
   await expect(
@@ -150,16 +187,19 @@ test('Pricing lists both plans from the real limits', async ({ page }) => {
   await expect(
     pro.getByText('100 collections, plus Owned and the Wishlist'),
   ).toBeVisible()
-  await expect(pro.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
-  const max = page.getByRole('region', { name: 'Max' })
-  await expect(max.getByText("Let's talk")).toBeVisible()
-  await expect(max.getByRole('listitem')).toHaveCount(0)
-  await expect(max.getByRole('link', { name: 'Get in touch' })).toHaveAttribute(
+  await expect(
+    pro.getByText('2,000 characters per note or text field'),
+  ).toBeVisible()
+  await expect(pro.getByText("Let's talk")).toBeVisible()
+  await expect(pro.getByText('Pro is free too.')).toBeVisible()
+  await expect(pro.getByRole('link', { name: 'Get in touch' })).toHaveAttribute(
     'href',
     '/contact',
   )
+  await expect(page.getByRole('region', { name: 'Max' })).toHaveCount(0)
+  await expect(page.getByText('Coming soon')).toHaveCount(0)
   await expect(
-    page.getByRole('heading', { name: 'Why a paid plan?' }),
+    page.getByRole('heading', { name: 'Why are there limits at all?' }),
   ).toBeVisible()
   await expect(
     page.getByRole('contentinfo').getByRole('link', { name: 'Pricing' }),

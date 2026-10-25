@@ -3,19 +3,26 @@ import { createError } from 'h3'
 import {
   type CustomLimits,
   limitsFor,
+  normalizePlan,
   type Plan,
   type PlanLimits,
+  type StoredPlan,
 } from '../../shared/utils/plans'
 import { collectionItems, collections, libraryItems, users } from '../db/schema'
 import { assertOwnsCollections, collectionIdsForItem } from './collections'
 
-/** The plan a user has right now: a paid plan that ended counts as free. */
+/**
+ * The plan a user has right now. A stored 'max' counts as Pro. A plan with
+ * an end date that has passed counts as free (`plan_until` is unused for
+ * now and stays null).
+ */
 export function effectivePlan(user: {
-  plan: Plan
+  plan: StoredPlan
   planUntil: Date | null
 }): Plan {
-  if (user.plan === 'free') return 'free'
-  return user.planUntil && user.planUntil < new Date() ? 'free' : user.plan
+  const plan = normalizePlan(user.plan)
+  if (plan === 'free') return 'free'
+  return user.planUntil && user.planUntil < new Date() ? 'free' : plan
 }
 
 /** The account's limits: its plan's, with any custom limits on top. */

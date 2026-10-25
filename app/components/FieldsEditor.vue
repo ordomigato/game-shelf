@@ -2,7 +2,6 @@
 import { GripVertical, Plus, Trash2, X } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { FieldType, RatingScale } from '#shared/types/collection'
-import { limitsFor } from '#shared/utils/plans'
 import { RATING_SCALES } from '#shared/utils/field-changes'
 import { availableSuggestions } from '#shared/utils/suggested-fields'
 import type { FieldDrafts } from '~/composables/useFieldDrafts'
@@ -30,11 +29,6 @@ function add() {
 const used = computed(() => props.editor.drafts.value.length)
 const atLimit = computed(() => used.value >= limits.value.fields)
 const overLimit = computed(() => used.value > limits.value.fields)
-/** What Pro allows, when that is more than this account has. */
-const proFields = computed(() => {
-  const pro = limitsFor('pro').fields
-  return pro > limits.value.fields ? pro : null
-})
 
 /** Suggestions for fields the user doesn't have yet. */
 const suggestions = computed(() =>
@@ -326,9 +320,7 @@ const currencyNames = computed(() => {
       }}</AlertTitle>
       <AlertDescription>
         {{ $t('limits.overFieldsHelp', { limit: limits.fields }) }}
-        <NuxtLink v-if="proFields" to="/contact">{{
-          $t('limits.proAllows')
-        }}</NuxtLink>
+        <NuxtLink to="/contact">{{ $t('limits.proAllows') }}</NuxtLink>
       </AlertDescription>
     </Alert>
 

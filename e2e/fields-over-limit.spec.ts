@@ -47,10 +47,9 @@ test('over the field limit, the editor warns and Add is off', async ({
     'You have 25 extra fields. Your plan allows 20.',
   )
   await expect(alert).toContainText("can't add more until you're down to 20")
-  // Free has what Pro has here, so there is no bigger plan to point to.
   await expect(
     dialog.getByRole('link', { name: 'Need more room? Get in touch.' }),
-  ).toHaveCount(0)
+  ).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Add field' })).toBeDisabled()
 })
 

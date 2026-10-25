@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PlanUsage } from '#shared/types/user'
-import { PLAN_LIMITS } from '#shared/utils/plans'
 
 /** The account's plan and how much of it is used, in Settings. */
 const auth = useAuth()
@@ -55,7 +54,6 @@ const overOf = (labelKey: string) => {
   return meter && meter.used > meter.limit ? meter : null
 }
 const overGames = computed(() => overOf('limits.games'))
-const pro = PLAN_LIMITS.pro
 </script>
 
 <template>
@@ -140,9 +138,7 @@ const pro = PLAN_LIMITS.pro
         }}</AlertTitle>
         <AlertDescription>
           {{ $t('limits.overLibraryHelp', { limit: number(overGames.limit) }) }}
-          <NuxtLink v-if="pro.games > overGames.limit" to="/contact">{{
-            $t('limits.proAllows')
-          }}</NuxtLink>
+          <NuxtLink to="/contact">{{ $t('limits.proAllows') }}</NuxtLink>
         </AlertDescription>
       </Alert>
       <ul class="flex flex-col gap-1 text-sm text-muted-foreground">

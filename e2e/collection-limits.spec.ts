@@ -74,15 +74,14 @@ test('a collection over the limit warns and stops adding', async ({ page }) => {
   await openCollection(page, 1040)
   const alert = page.getByTestId('over-limit')
   await expect(alert).toContainText(
-    'This collection has 1040 games. Your plan allows 1000 per collection.',
+    'This collection has 1,040 games. Your plan allows 1,000 per collection.',
   )
   await expect(alert).toContainText(
-    "You can keep and remove games, but you can't add more until it's down to 1000.",
+    "You can keep and remove games, but you can't add more until it's down to 1,000.",
   )
-  // Free has what Pro has here, so there is no bigger plan to point to.
   await expect(
     alert.getByRole('link', { name: 'Need more room? Get in touch.' }),
-  ).toHaveCount(0)
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add games' })).toBeDisabled()
 })
 

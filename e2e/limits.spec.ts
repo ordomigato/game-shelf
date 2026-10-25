@@ -34,7 +34,7 @@ async function shelfWith(page: Page, collections: unknown[]) {
 
 test('the shelf shows collections used out of the plan', async ({ page }) => {
   await shelfWith(page, [summary('NES Games')])
-  await expect(page.getByText('1 of 10 collections')).toBeVisible()
+  await expect(page.getByText('1 of 100 collections')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'New collection' }),
   ).toBeEnabled()
@@ -43,9 +43,9 @@ test('the shelf shows collections used out of the plan', async ({ page }) => {
 test('at the limit, New collection is off and the sidebar link explains', async ({
   page,
 }) => {
-  const ten = Array.from({ length: 10 }, (_, i) => summary(`Collection ${i}`))
-  await shelfWith(page, [...ten])
-  await expect(page.getByText('10 of 10 collections')).toBeVisible()
+  const full = Array.from({ length: 100 }, (_, i) => summary(`Collection ${i}`))
+  await shelfWith(page, full)
+  await expect(page.getByText('100 of 100 collections')).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'New collection' }),
   ).toBeDisabled()
@@ -53,7 +53,7 @@ test('at the limit, New collection is off and the sidebar link explains', async 
   await page.goto('/u/retro_fan/shelf?new=1')
   await expect(
     page.getByText(
-      "You've reached 10 collections, the most your plan allows. Owned and the Wishlist don't count.",
+      "You've reached 100 collections, the most your plan allows. Owned and the Wishlist don't count.",
     ),
   ).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -88,7 +88,7 @@ test('a refusal from the server says which limit', async ({ page }) => {
         statusCode: 403,
         data: {
           key: 'limits.reached.gamesPerCollection',
-          params: { limit: 100 },
+          params: { limit: 1000 },
         },
       },
     }),
@@ -98,7 +98,7 @@ test('a refusal from the server says which limit', async ({ page }) => {
   await page.getByRole('button', { name: 'Add to collection: Zelda' }).click()
   await page.getByRole('menuitemcheckbox', { name: 'NES Games' }).click()
   await expect(
-    page.getByText('A collection can hold up to 100 games on your plan.'),
+    page.getByText('A collection can hold up to 1000 games on your plan.'),
   ).toBeVisible()
 })
 
@@ -182,14 +182,16 @@ test("Pricing lists Free from the real limits, and Pro as let's talk", async ({
   ).toBeVisible()
   const free = page.getByRole('region', { name: 'Free' })
   await expect(
-    free.getByText('10 collections, plus Owned and the Wishlist'),
+    free.getByText('100 collections, plus Owned and the Wishlist'),
   ).toBeVisible()
   await expect(free.getByText('3,000 games, owned or wishlisted')).toBeVisible()
   const pro = page.getByRole('region', { name: 'Pro' })
   // Pro is worked out per person, so it lists no numbers.
   await expect(pro.getByRole('listitem')).toHaveCount(0)
   await expect(pro.getByText("Let's talk")).toBeVisible()
-  await expect(pro.getByText('Pro is free too.')).toBeVisible()
+  await expect(
+    pro.getByText("Send me an email and I'll sort out what you need."),
+  ).toBeVisible()
   await expect(pro.getByRole('link', { name: 'Get in touch' })).toHaveAttribute(
     'href',
     '/contact',

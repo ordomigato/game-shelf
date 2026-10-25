@@ -12,9 +12,10 @@ const MAX_TEXT_LENGTH = 2000
  * enforces these (server/utils/limits.ts) and the app shows them where
  * they apply, so a limit never comes out of nowhere.
  *
- * Sized so a free shelf stays generous (about 2 MB of database at the
- * most) while one account, or one script, can't fill the free database
- * for everyone.
+ * Free matches Pro on collections, charts, games per collection and
+ * fields. Total games and text length are what bound one account, or one
+ * script, filling the database: at most 3,000 games x 20 fields x 500
+ * characters, about 30 MB. That is why those two stay low.
  */
 export type Plan = 'free' | 'pro'
 
@@ -51,12 +52,12 @@ export type CustomLimits = Partial<PlanLimits>
 
 export const PLAN_LIMITS: Record<'free' | 'pro', PlanLimits> = {
   free: {
-    collections: 10,
-    fields: 5,
-    gamesPerCollection: 100,
+    collections: 100,
+    fields: 20,
+    gamesPerCollection: 1000,
     games: 3000,
     textLength: 500,
-    chartsPerCollection: 4,
+    chartsPerCollection: 20,
     importRows: 1000,
   },
   pro: {

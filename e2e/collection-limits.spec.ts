@@ -71,17 +71,18 @@ async function openCollection(
 }
 
 test('a collection over the limit warns and stops adding', async ({ page }) => {
-  await openCollection(page, 140)
+  await openCollection(page, 1040)
   const alert = page.getByTestId('over-limit')
   await expect(alert).toContainText(
-    'This collection has 140 games. Your plan allows 100 per collection.',
+    'This collection has 1040 games. Your plan allows 1000 per collection.',
   )
   await expect(alert).toContainText(
-    "You can keep and remove games, but you can't add more until it's down to 100.",
+    "You can keep and remove games, but you can't add more until it's down to 1000.",
   )
+  // Free has what Pro has here, so there is no bigger plan to point to.
   await expect(
     alert.getByRole('link', { name: 'Need more room? Get in touch.' }),
-  ).toBeVisible()
+  ).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Add games' })).toBeDisabled()
 })
 
@@ -102,7 +103,7 @@ test('a full collection shows as Full in the Add to menu', async ({ page }) => {
   await signInAs(page, { username: 'retro_fan' })
   const open = { ...collectionOf(40), title: 'Open Shelf', slug: 'open-shelf' }
   await page.route('**/api/collections', (route) =>
-    route.fulfill({ json: [collectionOf(100), open] }),
+    route.fulfill({ json: [collectionOf(1000), open] }),
   )
   await page.route('**/api/lists', (route) =>
     route.fulfill({ json: { owned: 0, wishlist: 0 } }),
@@ -153,7 +154,7 @@ const csvOf = (lines: string[]) => ({
 })
 
 test('the import dialog says how much room is left', async ({ page }) => {
-  await openImport(page, 90)
+  await openImport(page, 990)
   await expect(
     page.getByText('Room for 10 more games in this collection.'),
   ).toBeVisible()
@@ -174,7 +175,7 @@ test('an import that adds more new games than the room left is blocked at the pr
       ),
     }),
   )
-  await openImport(page, 90)
+  await openImport(page, 990)
   const rows = Array.from({ length: 340 }, (_, i) => `New ${i},`)
   await page.getByLabel('Choose a CSV file').setInputFiles(csvOf(rows))
   await page.getByRole('button', { name: 'Review', exact: true }).click()
@@ -212,7 +213,7 @@ test('rows with the same title each need room, so two fit no better than one', a
   page,
 }) => {
   await matchNothing(page)
-  await openImport(page, 99)
+  await openImport(page, 999)
   await page
     .getByLabel('Choose a CSV file')
     .setInputFiles(csvOf(['Same,', 'Same,']))
@@ -305,7 +306,7 @@ test('a refusal partway says how many rows were already imported', async ({
 test('a file that only updates games already there imports into a full collection', async ({
   page,
 }) => {
-  await openImport(page, 100)
+  await openImport(page, 1000)
   // Game 0 to Game 4 are on the page, with IGDB ids 1000 to 1004.
   await page
     .getByLabel('Choose a CSV file')
@@ -318,7 +319,7 @@ test('a file that only updates games already there imports into a full collectio
 test("Pricing shows Free's numbers and none for Pro", async ({ page }) => {
   await page.goto('/pricing')
   const free = page.getByRole('region', { name: 'Free' })
-  await expect(free.getByText('100 games per collection')).toBeVisible()
+  await expect(free.getByText('1,000 games per collection')).toBeVisible()
   await expect(free.getByText('3,000 games, owned or wishlisted')).toBeVisible()
   await expect(free.getByText('games on the Wishlist')).toHaveCount(0)
   // Pro is worked out per person, so it quotes no numbers.

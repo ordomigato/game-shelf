@@ -74,9 +74,13 @@ async function stubFields(
 }
 
 /** Opens the editor on a collection. Returns the bodies sent to save. */
-async function openEditor(page: Page, impact?: Impact) {
+async function openEditor(
+  page: Page,
+  impact?: Impact,
+  start: unknown[] = fields,
+) {
   await signInAs(page, { username: 'retro_fan' })
-  const stub = await stubFields(page, fields, impact)
+  const stub = await stubFields(page, start, impact)
   await page.route('**/api/u/retro_fan/collections/snes-games', (route) =>
     route.fulfill({ json: detail(stub.current()) }),
   )
@@ -294,7 +298,13 @@ test('scores out of 10 edit like numbers and keep their place', async ({
 test('suggests common fields, one click each, while there is room', async ({
   page,
 }) => {
-  const saved = await openEditor(page)
+  // 15 more fields, so the three suggestions run into the limit of 20.
+  const filler = Array.from({ length: 15 }, (_, i) => ({
+    id: `filler${i}`,
+    name: `Filler ${i}`,
+    type: 'text',
+  }))
+  const saved = await openEditor(page, undefined, [...fields, ...filler])
   const dialog = page.getByRole('dialog', { name: 'Fields' })
 
   // Already have Status and Notes, so those aren't offered.
@@ -302,9 +312,9 @@ test('suggests common fields, one click each, while there is room', async ({
     0,
   )
   await dialog.getByRole('button', { name: 'Add Rating' }).click()
-  await expect(dialog.getByText('4 of 5 extra fields per game')).toBeVisible()
+  await expect(dialog.getByText('19 of 20 extra fields per game')).toBeVisible()
   await dialog.getByRole('button', { name: 'Add Progress' }).click()
-  // Full at 5 of 5: suggestions and Add field are off.
+  // Full at 20 of 20: suggestions and Add field are off.
   await expect(
     dialog.getByRole('button', { name: 'Add Region' }),
   ).toBeDisabled()
@@ -315,6 +325,7 @@ test('suggests common fields, one click each, while there is room', async ({
     expect.objectContaining({ id: 'status' }),
     expect.objectContaining({ id: 'price' }),
     expect.objectContaining({ id: 'notes' }),
+    ...filler,
     { id: expect.any(String), name: 'Rating', type: 'rating', scale: 5 },
     { id: expect.any(String), name: 'Progress', type: 'progress' },
   ])
@@ -330,14 +341,14 @@ test('the account page edits the same fields for every game', async ({
   await expect(
     page.getByText('They are the same in all your collections.'),
   ).toBeVisible()
-  await expect(page.getByText('3 of 5 extra fields per game')).toBeVisible()
+  await expect(page.getByText('3 of 20 extra fields per game')).toBeVisible()
 
   await page.getByRole('button', { name: 'Add Region' }).click()
   await page.getByRole('button', { name: 'Save fields' }).click()
   await expect(page.getByText('Fields saved')).toBeVisible()
   expect(saved).toHaveLength(1)
   expect(saved[0]!.fields).toHaveLength(4)
-  await expect(page.getByText('4 of 5 extra fields per game')).toBeVisible()
+  await expect(page.getByText('4 of 20 extra fields per game')).toBeVisible()
 })
 
 test('hides a field from visitors and marks its column', async ({ page }) => {

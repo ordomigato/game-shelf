@@ -224,7 +224,7 @@
     "yourPlan": "Your plan",
     "proName": "Pro",
     "proPrice": "Let's talk",
-    "proBlurb": "Collecting on a bigger scale and running into a limit? Send me an email and we'll work out what you need. Pro is free too.",
+    "proBlurb": "Collecting on a bigger scale and running into a limit? Send me an email and I'll sort out what you need.",
     "proCta": "Get in touch",
     "collections": "{count} collections, plus Owned and the Wishlist",
     "games": "{count} games, owned or wishlisted",
@@ -234,7 +234,7 @@
     "text": "{count} characters per note or text field",
     "importRows": "CSV imports of up to {count} rows at a time",
     "whyTitle": "Why are there limits at all?",
-    "why": "ThisPlayShelf aims to stay free. To keep it that way, there are a few basic limits so costs don't run up. If you turn out to be a power user, we'd be happy to work out what you need.",
+    "why": "ThisPlayShelf aims to stay free. To keep it that way, there are a few basic limits so costs don't run up. If you turn out to be a power user, I'd be happy to work out what you need.",
     "limitsTitle": "What happens at a limit",
     "limits": "You'll see your usage as you go: on your collections page, in each collection and in Settings. At a limit, adding stops with a message saying which one. Nothing you've already added is ever deleted, whatever plan you're on."
   },

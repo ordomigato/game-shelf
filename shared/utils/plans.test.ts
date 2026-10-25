@@ -42,7 +42,7 @@ describe('limitsFor', () => {
   it('sizes games for one collection and the library', () => {
     const { free, pro } = PLAN_LIMITS
     expect([free.gamesPerCollection, pro.gamesPerCollection]).toEqual([
-      100, 1000,
+      1000, 1000,
     ])
     expect([free.games, pro.games]).toEqual([3000, 10_000])
   })

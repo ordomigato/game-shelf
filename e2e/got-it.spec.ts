@@ -137,7 +137,7 @@ async function openCollection(
           statusCode: 403,
           data: {
             key: 'limits.reached.gamesPerCollection',
-            params: { limit: 100 },
+            params: { limit: 1000 },
           },
         },
       })
@@ -247,7 +247,7 @@ test('a collection that is full is named, and nothing is added until it is untic
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
 
   await expect(
-    page.getByText('A collection can hold up to 100 games on your plan.'),
+    page.getByText('A collection can hold up to 1000 games on your plan.'),
   ).toBeVisible()
   // The whole set is refused, so both stay ticked and the dialog stays open.
   await expect(dialog).toBeVisible()
@@ -463,8 +463,8 @@ test.describe('Wishlist games in a collection', () => {
   })
 })
 
-const fullSnes = { ...snes, itemCount: 100 }
-const fullRpg = { ...rpg, itemCount: 100 }
+const fullSnes = { ...snes, itemCount: 1000 }
+const fullRpg = { ...rpg, itemCount: 1000 }
 
 test('the popup shows a full collection as Full and leaves it unticked', async ({
   page,

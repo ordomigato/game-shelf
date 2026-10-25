@@ -315,15 +315,15 @@ test('a file that only updates games already there imports into a full collectio
   await expect(page.getByRole('button', { name: /^Import/ })).toBeEnabled()
 })
 
-test('Pricing and Settings show the new numbers', async ({ page }) => {
+test("Pricing shows Free's numbers and none for Pro", async ({ page }) => {
   await page.goto('/pricing')
   const free = page.getByRole('region', { name: 'Free' })
   await expect(free.getByText('100 games per collection')).toBeVisible()
   await expect(free.getByText('3,000 games, owned or wishlisted')).toBeVisible()
   await expect(free.getByText('games on the Wishlist')).toHaveCount(0)
+  // Pro is worked out per person, so it quotes no numbers.
   const pro = page.getByRole('region', { name: 'Pro' })
-  await expect(pro.getByText('1,000 games per collection')).toBeVisible()
-  await expect(pro.getByText('10,000 games, owned or wishlisted')).toBeVisible()
+  await expect(pro.getByText('games per collection')).toHaveCount(0)
 })
 
 test('Settings warns when the library is over the limit', async ({ page }) => {

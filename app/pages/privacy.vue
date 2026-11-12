@@ -34,13 +34,7 @@ const linkClass =
     </ProseSection>
 
     <ProseSection :title="$t('privacy.followingTitle')">
-      <i18n-t scope="global" keypath="privacy.following" tag="p">
-        <template #settings>
-          <NuxtLink to="/account/settings" :class="linkClass">{{
-            $t('privacy.settingsLink')
-          }}</NuxtLink>
-        </template>
-      </i18n-t>
+      <p>{{ $t('privacy.following') }}</p>
     </ProseSection>
 
     <ProseSection :title="$t('privacy.cookiesTitle')">

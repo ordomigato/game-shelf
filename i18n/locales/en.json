@@ -190,7 +190,7 @@
     "visibleTitle": "Who can see what",
     "visible": "Private collections are visible only to you. Public collections, your username and your display name can be seen by anyone.",
     "followingTitle": "Following",
-    "following": "Anyone can follow your account. Following never shows anyone more than a visitor could already see, so private collections and lists stay private. By default, others can see who you follow and who follows you, and you can turn that off in {settings}. You can remove a follower or block an account, and they aren't told. Deleting your account removes all your follows.",
+    "following": "Anyone can follow your account. Following never shows anyone more than a visitor could already see, so private collections and lists stay private. By default, others can see who you follow and who follows you, and you can turn that off in Settings. You can remove a follower or block an account, and they aren't told. Deleting your account removes all your follows.",
     "cookiesTitle": "Cookies and browser storage",
     "cookies": "A cookie remembers your username so pages draw correctly while they load. Others remember your colour theme and whether the sidebar's collections are folded. Your sign-in is kept in your browser's storage. There are no tracking or advertising cookies.",
     "speedTitle": "Measuring speed",

@@ -28,6 +28,12 @@ vi.mock('./db', () => ({
     }),
   }),
 }))
+const touched: unknown[][] = []
+vi.mock('./list-activity', () => ({
+  touchLists: async (...args: unknown[]) => {
+    touched.push(args)
+  },
+}))
 vi.mock('./collections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./collections')>()),
   getOwnedItem: async () => reads.shift(),
@@ -67,6 +73,7 @@ beforeEach(() => {
   written.length = 0
   deletes = 0
   libraryRooms.length = 0
+  touched.length = 0
 })
 
 describe('changeItemLists', () => {
@@ -77,6 +84,9 @@ describe('changeItemLists', () => {
       await changeItemLists('o', ownedRow.id, [{ type: 'unown' }]),
     ).toBeNull()
     expect(deletes).toBe(1)
+    expect(touched).toEqual([
+      ['o', { owned: true, wishlisted: false, ownedOn: [], wantedOn: [] }],
+    ])
   })
 
   it('does not delete a game that moved to the Wishlist in another tab', async () => {
@@ -91,6 +101,30 @@ describe('changeItemLists', () => {
     expect(written).toEqual([
       { owned: false, wishlisted: true, ownedOn: [], wantedOn: [] },
     ])
+    expect(touched).toHaveLength(1)
+  })
+
+  it('records a change to both lists when a game moves between them', async () => {
+    reads.push(ownedRow)
+    updateResults.push([wishlistedRow])
+    await changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }])
+    expect(touched).toHaveLength(1)
+    const [owner, before, after] = touched[0] as [
+      string,
+      { owned: boolean },
+      { wishlisted: boolean },
+    ]
+    expect(owner).toBe('o')
+    expect(before.owned).toBe(true)
+    expect(after.wishlisted).toBe(true)
+  })
+
+  it('records nothing when the change did not save', async () => {
+    reads.push(ownedRow, ownedRow)
+    await expect(
+      changeItemLists('o', ownedRow.id, [{ type: 'toWishlist' }]),
+    ).rejects.toMatchObject({ statusCode: 409 })
+    expect(touched).toHaveLength(0)
   })
 
   it('answers 409 when the game keeps changing under it', async () => {

@@ -2,10 +2,13 @@
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { CollectionSummary, ListSummary } from '#shared/types/collection'
+import type { FollowCounts, Relationship } from '#shared/types/follows'
 
 const route = useRoute()
 const { t } = useI18n()
 const collections = useCollections()
+const follows = useFollows()
+const auth = useAuth()
 
 const username = computed(() => String(route.params.username).toLowerCase())
 const isMine = computed(() => collections.isMine(username.value))
@@ -53,6 +56,49 @@ const memberSince = computed(() =>
 const shelfOwner = computed(() => profile.value?.displayName || username.value)
 
 const notFound = computed(() => error.value?.statusCode === 404)
+
+// The follow counts, which an account can hide from everyone but itself.
+const { data: counts, refresh: refreshCounts } =
+  useAsyncData<FollowCounts | null>(
+    () => `follow-counts-${username.value}`,
+    () => follows.counts(username.value).catch(() => null),
+    { watch: [username], server: false },
+  )
+
+// How the signed-in viewer stands with this account. Loaded in the browser
+// only, since the profile itself is the same for everyone.
+const relationship = ref<Relationship | null>(null)
+async function loadRelationship() {
+  relationship.value = null
+  await auth.ensureLoaded()
+  if (isMine.value || auth.status.value !== 'signedIn') return
+  try {
+    relationship.value = await follows.relationship(username.value)
+  } catch {
+    relationship.value = null
+  }
+}
+watch([username, () => auth.me.value?.username], loadRelationship, {
+  immediate: true,
+})
+const canFollow = computed(
+  () =>
+    !isMine.value &&
+    (auth.status.value === 'signedOut' ||
+      (relationship.value !== null && !relationship.value.blocking)),
+)
+function setFollowing(following: boolean) {
+  if (relationship.value) relationship.value.following = following
+  void refreshCounts()
+}
+function afterBlock(blocking: boolean) {
+  relationship.value = {
+    following: false,
+    followedBy: false,
+    blocking,
+  }
+  void refreshCounts()
+}
 
 useHead(() => ({
   title: t('app.title', {
@@ -113,6 +159,40 @@ async function onCreated(collection: CollectionSummary) {
           <p v-if="profile" class="text-sm text-muted-foreground">
             @{{ profile.username }} ·
             {{ $t('shelf.memberSince', { date: memberSince }) }}
+            <template v-if="relationship?.followedBy">
+              ·
+              {{
+                relationship.following
+                  ? $t('follows.mutual')
+                  : $t('follows.followsYou')
+              }}
+            </template>
+          </p>
+          <p v-if="counts" class="text-sm text-muted-foreground">
+            <NuxtLink :to="`/u/${username}/following`" class="hover:underline">
+              {{ $t('follows.followingCount', { count: counts.following }) }}
+            </NuxtLink>
+            ·
+            <NuxtLink :to="`/u/${username}/followers`" class="hover:underline">
+              {{
+                $t(
+                  'follows.followersCount',
+                  { count: counts.followers },
+                  counts.followers,
+                )
+              }}
+            </NuxtLink>
+            <Badge
+              v-if="isMine && (auth.me.value?.newFollowers ?? 0) > 0"
+              variant="secondary"
+              class="ml-2"
+            >
+              {{
+                $t('follows.newFollowers', {
+                  count: auth.me.value?.newFollowers ?? 0,
+                })
+              }}
+            </Badge>
           </p>
           <p
             v-if="isMine && data"
@@ -139,6 +219,22 @@ async function onCreated(collection: CollectionSummary) {
                 : $t('shelf.userTitle', { username: shelfOwner })
             "
             is-public
+          />
+          <FollowButton
+            v-if="canFollow"
+            :username="username"
+            :following="relationship?.following ?? false"
+            :follows-you="relationship?.followedBy"
+            @update:following="setFollowing"
+          />
+          <AccountMenu
+            v-if="relationship"
+            :username="username"
+            :can-remove="relationship.followedBy"
+            :blocking="relationship.blocking"
+            @removed="relationship.followedBy = false"
+            @blocked="afterBlock(true)"
+            @unblocked="afterBlock(false)"
           />
           <Button v-if="isMine" :disabled="atLimit" @click="creating = true">
             <Plus />

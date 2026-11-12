@@ -28,5 +28,6 @@ export default defineEventHandler(async (event): Promise<LibraryItem> => {
     .set(body)
     .where(eq(libraryItems.id, id))
     .returning()
+  await touchLists(user.id, updated!)
   return toLibraryItem(updated!, null)
 })

@@ -89,6 +89,19 @@ export const users = pgTable(
      */
     ownedPublic: boolean('owned_public').notNull().default(false),
     wishlistPublic: boolean('wishlist_public').notNull().default(false),
+    /**
+     * Whether others see who this account follows and who follows it. The
+     * owner always sees their own. Turning it off doesn't stop following.
+     */
+    followsPublic: boolean('follows_public').notNull().default(true),
+    /** When the owner last opened their Followers list. Newer follows are new. */
+    followersSeenAt: timestamp('followers_seen_at', { withTimezone: true }),
+    /**
+     * When a game on Owned or the Wishlist was last added, removed or
+     * edited. Null if never. Read by followers' home page.
+     */
+    ownedUpdatedAt: timestamp('owned_updated_at', { withTimezone: true }),
+    wishlistUpdatedAt: timestamp('wishlist_updated_at', { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
@@ -130,6 +143,54 @@ export const collections = pgTable(
   (table) => [
     index('collections_owner_id_idx').on(table.ownerId),
     uniqueIndex('collections_owner_slug_idx').on(table.ownerId, table.slug),
+  ],
+)
+
+/**
+ * One account following another. One way, with no approval. "Mutual" is
+ * two rows, one each way, and is never stored. See `server/utils/follows.ts`.
+ */
+export const follows = pgTable(
+  'follows',
+  {
+    followerId: uuid('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followeeId: uuid('followee_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.followerId, table.followeeId] }),
+    check('follows_not_self', sql`${table.followerId} <> ${table.followeeId}`),
+    index('follows_followee_idx').on(table.followeeId, table.createdAt.desc()),
+  ],
+)
+
+/**
+ * An account the blocker doesn't want following them. Silent: the blocked
+ * account is never told. Blocking deletes the follows between the pair.
+ */
+export const blocks = pgTable(
+  'blocks',
+  {
+    blockerId: uuid('blocker_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blockedId: uuid('blocked_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blockerId, table.blockedId] }),
+    check('blocks_not_self', sql`${table.blockerId} <> ${table.blockedId}`),
+    index('blocks_blocked_idx').on(table.blockedId),
   ],
 )
 

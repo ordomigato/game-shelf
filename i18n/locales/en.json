@@ -189,6 +189,8 @@
     "stored": "Your username and display name, your collections and everything you put in them, and when things were created. These live in a Postgres database run by Neon on Amazon's servers in the United States. Your email address isn't kept there.",
     "visibleTitle": "Who can see what",
     "visible": "Private collections are visible only to you. Public collections, your username and your display name can be seen by anyone.",
+    "followingTitle": "Following",
+    "following": "Anyone can follow your account. Following never shows anyone more than a visitor could already see, so private collections and lists stay private. By default, others can see who you follow and who follows you, and you can turn that off in {settings}. You can remove a follower or block an account, and they aren't told. Deleting your account removes all your follows.",
     "cookiesTitle": "Cookies and browser storage",
     "cookies": "A cookie remembers your username so pages draw correctly while they load. Others remember your colour theme and whether the sidebar's collections are folded. Your sign-in is kept in your browser's storage. There are no tracking or advertising cookies.",
     "speedTitle": "Measuring speed",
@@ -202,7 +204,7 @@
     "settingsLink": "Settings",
     "questionsTitle": "Questions",
     "questions": "Email {email}.",
-    "updated": "Last updated October 21, 2026."
+    "updated": "Last updated November 12, 2026."
   },
   "contact": {
     "title": "Contact",
@@ -496,7 +498,13 @@
       "confirmBody": "Your account, collections and everything in them will be deleted. This can't be undone.",
       "keep": "Keep my account",
       "deleteFailed": "We couldn't delete your account. Try again.",
-      "exportTooSoon": "You've exported a few times just now. Try again in a few minutes."
+      "exportTooSoon": "You've exported a few times just now. Try again in a few minutes.",
+      "followsTitle": "Who you follow",
+      "followsDescription": "By default, others can see how many accounts you follow and who follows you, and open both lists. Turn this off to keep them to yourself. Anyone can still follow you.",
+      "followsPublic": "Show who I follow and who follows me",
+      "followsFailed": "Couldn't save that. Try again.",
+      "blockedTitle": "Blocked accounts",
+      "blockedDescription": "Blocked accounts can't follow you, and they aren't told. Unblocking doesn't bring back any follows."
     }
   },
   "common": {
@@ -576,6 +584,43 @@
     "wishlist": "Wishlist",
     "owned": "Owned",
     "memberSince": "Member since {date}"
+  },
+  "follows": {
+    "follow": "Follow",
+    "followBack": "Follow back",
+    "following": "Following",
+    "mutual": "Mutual",
+    "followsYou": "Follows you",
+    "followingCount": "{count} following",
+    "followersCount": "{count} followers | {count} follower | {count} followers",
+    "newFollowers": "{count} new",
+    "accountActions": "Actions for {username}",
+    "removeFollower": "Remove follower",
+    "block": "Block",
+    "unblock": "Unblock",
+    "blockTitle": "Block {username}?",
+    "blockBody": "They aren't told. You stop following each other, and they can't follow you again unless you unblock them.",
+    "cancel": "Cancel",
+    "followingTitle": "Accounts {username} follows",
+    "followersTitle": "Followers of {username}",
+    "hiddenTitle": "This list isn't shown",
+    "hiddenBody": "This account keeps who it follows and who follows it to itself.",
+    "loadFailed": "Couldn't load this. Try again.",
+    "emptyFollowingMine": "You aren't following anyone yet. Open someone's collections and tap Follow.",
+    "emptyFollowing": "{username} isn't following anyone yet.",
+    "emptyFollowersMine": "No one follows you yet.",
+    "emptyFollowers": "No one follows {username} yet.",
+    "updatesTitle": "From accounts you follow",
+    "updatesEmpty": "Nothing new in the last 30 days.",
+    "updatedCollection": "updated {title}",
+    "updatedOwned": "updated Owned",
+    "updatedWishlist": "updated Wishlist",
+    "noBlocked": "You haven't blocked anyone.",
+    "failed": "Something went wrong. Try again.",
+    "tooMany": "You've followed a lot of accounts just now. Try again in a while.",
+    "unblockFirst": "You blocked this account. Unblock it to follow it.",
+    "limitReached": "You can follow up to {limit} accounts.",
+    "blockLimitReached": "You can block up to {limit} accounts."
   },
   "collection": {
     "back": "Back to {shelf}",
@@ -964,7 +1009,9 @@
       "genre": "Genre",
       "platforms": "Platforms",
       "wishlistPlatforms": "Wishlist platforms",
-      "list": "List"
+      "list": "List",
+      "username": "Username",
+      "followingSince": "Since"
     }
   },
   "import": {

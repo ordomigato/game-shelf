@@ -13,6 +13,7 @@ import { MAX_PENDING_PICKS, normalizeBarcode } from '../../shared/utils/barcode'
 import { barcodeLookups, collectionItems, libraryItems } from '../db/schema'
 import { ensureCatalogGames } from './catalog'
 import { assertOwnsCollections, lastPositions } from './collections'
+import { touchLists } from './list-activity'
 
 /** 403 saying how many more games fit, for the browser to show. */
 function noRoomFor(where: keyof typeof BULK_NO_ROOM, fit: number): never {
@@ -298,6 +299,7 @@ export async function bulkAdd(
   if (statements.length) {
     await db.batch(statements as [(typeof statements)[0]])
   }
+  await touchLists(ownerId, ...plan.writes.map((write) => write.state))
 
   return {
     added: plan.added,

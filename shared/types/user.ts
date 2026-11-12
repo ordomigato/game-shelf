@@ -14,6 +14,10 @@ export interface Me {
   limits: PlanLimits
   /** The roles this account holds (always including "user"). Never on public data. */
   roles: Role[]
+  /** Followers who arrived since the owner last opened their Followers list. */
+  newFollowers: number
+  /** Whether others can see who this account follows and who follows it. */
+  followsPublic: boolean
 }
 
 /** How much of their plan a user has used, for Settings. */

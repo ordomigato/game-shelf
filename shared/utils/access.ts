@@ -56,6 +56,10 @@ export const ACTIONS = [
   'export.read',
   'barcodes.lookup',
   'barcodes.review',
+  'follow.write',
+  'follower.remove',
+  'block.write',
+  'follows.read',
 ] as const
 export type Action = (typeof ACTIONS)[number]
 
@@ -115,6 +119,15 @@ const RULES: Partial<Record<Action, Rule>> = {
     (ownerOnly(subject, resource) || !resource.hidden),
   'export.read': ownData,
   'barcodes.lookup': signedIn,
+  // Following grants nothing, so it only needs an account. The route refuses
+  // yourself and handles blocked pairs.
+  'follow.write': signedIn,
+  // Only your own followers. A route passes no resource for its own data.
+  'follower.remove': ownData,
+  'block.write': signedIn,
+  // Whose follow lists may be read: the owner's always, anyone else's when
+  // the owner shows them (`visibility` is `public` when `follows_public`).
+  'follows.read': ownerOrPublic,
 }
 
 /** Whether the subject (null for a visitor) may do this. Refuses by default. */

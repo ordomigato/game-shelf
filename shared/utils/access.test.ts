@@ -90,6 +90,13 @@ const table: [Action, string, Resource | undefined, Record<Who, boolean>][] = [
   ['export.read', "someone's library", mine, ownerOnly],
   ['barcodes.lookup', 'anything', undefined, signedIn],
   ['barcodes.review', 'anything', undefined, allow(false, false, false, true)],
+  ['follow.write', 'anything', undefined, signedIn],
+  ['block.write', 'anything', undefined, signedIn],
+  ['follower.remove', 'own followers', undefined, signedIn],
+  ['follower.remove', "someone's followers", mine, ownerOnly],
+  ['follows.read', 'shown', publicOf('owner'), everyone],
+  ['follows.read', 'hidden', privateOf('owner'), ownerOnly],
+  ['follows.read', 'no attributes', undefined, nobody],
 ]
 
 describe('can', () => {

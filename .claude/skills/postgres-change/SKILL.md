@@ -82,6 +82,16 @@ values are matched by id.
   is capped at the per-collection game limit (`assertListRoom`), and Owned
   only by the library's.
 
+- `follows` and `blocks`: one row per account pair (`follower_id`,
+  `followee_id` and `blocker_id`, `blocked_id`, both cascade on delete).
+  "Mutual" is two follow rows and is never stored. Blocking deletes the
+  follows between the pair in one batch. `users.follows_public` hides an
+  account's counts and lists from everyone else (and its rows on their
+  lists), `users.followers_seen_at` drives the "new followers" count, and
+  `owned_updated_at` / `wishlist_updated_at` are set by `touchLists`
+  (`server/utils/list-activity.ts`) wherever a game on that list is added,
+  removed or edited. The queries are in `server/utils/follows.ts`.
+
 Every query on these tables is scoped to the owner from `requireAuth`.
 Helpers live in `server/utils/collections.ts`. Use them rather than
 querying in routes, and keep the owner filter in every new one.

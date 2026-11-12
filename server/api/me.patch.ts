@@ -19,9 +19,13 @@ const bodySchema = z
       .transform((value) => value || null)
       .nullable()
       .optional(),
+    followsPublic: z.boolean().optional(),
   })
   .refine(
-    (body) => body.username !== undefined || body.displayName !== undefined,
+    (body) =>
+      body.username !== undefined ||
+      body.displayName !== undefined ||
+      body.followsPublic !== undefined,
   )
 
 export default defineEventHandler(async (event): Promise<Me> => {
@@ -36,11 +40,14 @@ export default defineEventHandler(async (event): Promise<Me> => {
         ...(body.displayName !== undefined && {
           displayName: body.displayName,
         }),
+        ...(body.followsPublic !== undefined && {
+          followsPublic: body.followsPublic,
+        }),
       })
       .where(eq(users.cognitoSub, claims.sub))
       .returning()
     if (!updated) throw new Error('User row missing during update')
-    return toMe(updated)
+    return toMe(updated, await countNewFollowers(updated))
   } catch (error) {
     if (isUniqueViolation(error)) {
       throw createError({ statusCode: 409, statusMessage: 'Username taken' })

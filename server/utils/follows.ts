@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, isNotNull, lt, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
 import { createError } from 'h3'
 import type { Resource } from '../../shared/utils/access'
 import type {
@@ -20,13 +20,39 @@ export const FOLLOW_PAGE_SIZE = 50
 export const UPDATES_LIMIT = 10
 export const UPDATES_DAYS = 30
 
-/**
- * The timestamp of a follow row as Postgres prints it, which keeps the
- * microseconds a JavaScript date would lose. A page's `next` cursor is the
- * last row's, and the next page starts before it.
- */
-export const CURSOR_PATTERN =
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?[+-]\d{2}(:\d{2})?$/
+
+/** Where a list page starts: after this follow time, and this account on a tie. */
+export interface FollowCursor {
+  /** The follow's timestamp as Postgres prints it, keeping the microseconds. */
+  since: string
+  rowId: string
+}
+
+/** The cursor as an opaque string, so the browser never reads an account id. */
+export function encodeCursor(cursor: FollowCursor): string {
+  return Buffer.from(`${cursor.since}|${cursor.rowId}`).toString('base64url')
+}
+
+/** A cursor from `encodeCursor`, or a 400 for anything else. */
+export function decodeCursor(value: string): FollowCursor {
+  const [since, rowId, ...rest] = Buffer.from(value, 'base64url')
+    .toString()
+    .split('|')
+  if (
+    rest.length ||
+    !since ||
+    !rowId ||
+    !TIMESTAMP_PATTERN.test(since) ||
+    !UUID_PATTERN.test(rowId)
+  ) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid cursor' })
+  }
+  return { since, rowId }
+}
 
 /** What the policy needs to decide who may read an account's follow lists. */
 export function followsResource(
@@ -116,11 +142,27 @@ export async function followUser(
       data: { key: 'follows.limitReached', params: { limit: MAX_FOLLOWING } },
     })
   }
-  await useDb()
-    .insert(follows)
-    .values({ followerId, followeeId: targetId })
-    .onConflictDoNothing()
-  return 'followed'
+  const inserted = await useDb().execute(followInsert(followerId, targetId))
+  // Nothing inserted means a block (or the follow itself) landed since the
+  // read above, and looks the same to the follower as a stored follow.
+  return inserted.rows.length ? 'followed' : 'ignored'
+}
+
+/**
+ * Stores a follow only if neither account has blocked the other, decided in
+ * the same statement as the insert, so a block that lands between the
+ * earlier read and this write can't leave a follow behind.
+ */
+export function followInsert(followerId: string, targetId: string) {
+  return sql`
+    insert into follows (follower_id, followee_id)
+    select ${followerId}::uuid, ${targetId}::uuid
+    where not exists (
+      select 1 from blocks as b
+      where (b.blocker_id = ${targetId}::uuid and b.blocked_id = ${followerId}::uuid)
+        or (b.blocker_id = ${followerId}::uuid and b.blocked_id = ${targetId}::uuid))
+    on conflict do nothing
+    returning follower_id`
 }
 
 /** Stops following. Idempotent. */
@@ -238,7 +280,7 @@ export function followRowsQuery(input: {
   ownerId: string
   viewerId: string | null
   showHidden: boolean
-  cursor: string | null
+  cursor: FollowCursor | null
 }) {
   const { owner, row } = columnsOf(input.kind)
   const viewer = input.viewerId
@@ -247,6 +289,7 @@ export function followRowsQuery(input: {
       username: users.username,
       displayName: users.displayName,
       since: sql<string>`${follows.createdAt}::text`,
+      rowId: users.id,
       viewerFollows: viewer
         ? sql<boolean>`exists (select 1 from follows as vf
             where vf.follower_id = ${viewer}::uuid and vf.followee_id = users.id)`
@@ -267,11 +310,11 @@ export function followRowsQuery(input: {
         isNotNull(users.username),
         input.showHidden ? undefined : eq(users.followsPublic, true),
         input.cursor
-          ? lt(follows.createdAt, sql`${input.cursor}::timestamptz`)
+          ? sql`(follows.created_at, users.id) < (${input.cursor.since}::timestamptz, ${input.cursor.rowId}::uuid)`
           : undefined,
       ),
     )
-    .orderBy(desc(follows.createdAt))
+    .orderBy(desc(follows.createdAt), desc(users.id))
     .limit(FOLLOW_PAGE_SIZE + 1)
 }
 
@@ -287,7 +330,7 @@ export async function followPage(input: {
     ownerId: input.owner.id,
     viewerId: input.viewerId,
     showHidden: input.viewerId === input.owner.id,
-    cursor: input.cursor,
+    cursor: input.cursor ? decodeCursor(input.cursor) : null,
   })
   const page = rows.slice(0, FOLLOW_PAGE_SIZE)
   return {
@@ -299,7 +342,13 @@ export async function followPage(input: {
       mutual: row.viewerFollows && row.followsViewer,
       isYou: row.isYou,
     })),
-    next: rows.length > FOLLOW_PAGE_SIZE ? page[page.length - 1]!.since : null,
+    next:
+      rows.length > FOLLOW_PAGE_SIZE
+        ? encodeCursor({
+            since: page[page.length - 1]!.since,
+            rowId: page[page.length - 1]!.rowId,
+          })
+        : null,
   }
 }
 

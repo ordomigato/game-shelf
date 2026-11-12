@@ -87,8 +87,19 @@ export async function setListVisibility(
     .update(users)
     .set(
       list === 'owned'
-        ? { ownedPublic: visibility === 'public' }
-        : { wishlistPublic: visibility === 'public' },
+        ? {
+            ownedPublic: visibility === 'public',
+            ...(visibility === 'public' && {
+              // Going public is a change followers see.
+              ownedUpdatedAt: sql`case when owned_public then owned_updated_at else now() end`,
+            }),
+          }
+        : {
+            wishlistPublic: visibility === 'public',
+            ...(visibility === 'public' && {
+              wishlistUpdatedAt: sql`case when wishlist_public then wishlist_updated_at else now() end`,
+            }),
+          },
     )
     .where(eq(users.id, ownerId))
 }

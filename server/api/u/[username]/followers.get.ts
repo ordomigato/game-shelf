@@ -3,7 +3,7 @@ import type { FollowPage } from '../../../../shared/types/follows'
 
 const paramsSchema = z.object({ username: z.string().max(20) })
 const querySchema = z.object({
-  cursor: z.string().regex(CURSOR_PATTERN).optional(),
+  cursor: z.string().max(200).optional(),
 })
 
 /**

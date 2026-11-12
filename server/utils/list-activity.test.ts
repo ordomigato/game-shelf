@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sets: Record<string, unknown>[] = []
@@ -18,6 +19,18 @@ beforeEach(() => {
 })
 
 describe('touchLists', () => {
+  it('moves a list’s time only while that list is public', async () => {
+    await touchLists('u', { owned: true, wishlisted: true })
+    const text = (name: string) =>
+      new PgDialect().sqlToQuery(sets[0]![name] as never).sql
+    expect(text('ownedUpdatedAt')).toBe(
+      'case when owned_public then now() else owned_updated_at end',
+    )
+    expect(text('wishlistUpdatedAt')).toBe(
+      'case when wishlist_public then now() else wishlist_updated_at end',
+    )
+  })
+
   it('touches Owned for a game on Owned', async () => {
     await touchLists('u', { owned: true, wishlisted: false })
     expect(Object.keys(sets[0]!)).toEqual(['ownedUpdatedAt'])

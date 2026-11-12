@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { users } from '../db/schema'
 
 /** The lists a game is on, which is all `touchLists` needs to know. */
@@ -20,12 +20,16 @@ export async function touchLists(
   const owned = states.some((state) => state.owned)
   const wishlist = states.some((state) => state.wishlisted)
   if (!owned && !wishlist) return
-  const now = new Date()
   await useDb()
     .update(users)
     .set({
-      ...(owned && { ownedUpdatedAt: now }),
-      ...(wishlist && { wishlistUpdatedAt: now }),
+      // Only a public list moves, so edits made in private reveal no timing.
+      ...(owned && {
+        ownedUpdatedAt: sql`case when owned_public then now() else owned_updated_at end`,
+      }),
+      ...(wishlist && {
+        wishlistUpdatedAt: sql`case when wishlist_public then now() else wishlist_updated_at end`,
+      }),
     })
     .where(eq(users.id, ownerId))
 }

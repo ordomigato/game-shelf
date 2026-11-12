@@ -6,6 +6,8 @@ import { blocks, follows } from '../db/schema'
 const ME = '00000000-0000-4000-8000-000000000001'
 const THEM = '00000000-0000-4000-8000-000000000002'
 
+const dialect = new PgDialect()
+
 /** A real query builder, which never runs a query: for reading the SQL it makes. */
 const builder = drizzle.mock()
 
@@ -16,6 +18,8 @@ let counted: number
 const writes: { table: unknown; values?: unknown; where?: unknown }[] = []
 const batches: unknown[][] = []
 let useBuilder = false
+const executed: Parameters<PgDialect['sqlToQuery']>[0][] = []
+let insertedRows: unknown[] = [{ follower_id: 'x' }]
 
 function chain(rows: () => unknown) {
   const self: Record<string, unknown> = {}
@@ -27,7 +31,14 @@ function chain(rows: () => unknown) {
 }
 
 const fake = {
-  execute: async () => ({ rows: [relation] }),
+  execute: async (query: Parameters<PgDialect['sqlToQuery']>[0]) => {
+    const { sql } = dialect.sqlToQuery(query)
+    if (sql.includes('insert into follows')) {
+      executed.push(query)
+      return { rows: insertedRows }
+    }
+    return { rows: [relation] }
+  },
   select: (fields: Record<string, unknown>) =>
     chain(() => ('n' in fields ? [{ n: counted }] : selectRows)),
   insert: (table: unknown) => ({
@@ -53,7 +64,10 @@ vi.stubGlobal('useDb', () => (useBuilder ? builder : fake))
 const {
   MAX_FOLLOWING,
   blockUser,
+  decodeCursor,
+  encodeCursor,
   followCounts,
+  followInsert,
   followPage,
   followRowsQuery,
   followUser,
@@ -61,8 +75,6 @@ const {
   unfollowUser,
   updatesQuery,
 } = await import('./follows')
-
-const dialect = new PgDialect()
 
 beforeEach(() => {
   useBuilder = false
@@ -77,14 +89,36 @@ beforeEach(() => {
   counted = 0
   writes.length = 0
   batches.length = 0
+  executed.length = 0
+  insertedRows = [{ follower_id: 'x' }]
 })
 
 describe('followUser', () => {
   it('stores a follow', async () => {
     expect(await followUser(ME, THEM)).toBe('followed')
-    expect(writes).toHaveLength(1)
-    expect(writes[0]!.table).toBe(follows)
-    expect(writes[0]!.values).toEqual({ followerId: ME, followeeId: THEM })
+    expect(executed).toHaveLength(1)
+    expect(dialect.sqlToQuery(executed[0]!).params).toEqual([
+      ME,
+      THEM,
+      THEM,
+      ME,
+      ME,
+      THEM,
+    ])
+  })
+
+  it('stores the follow only if neither has blocked the other, in the same statement', () => {
+    const { sql } = dialect.sqlToQuery(followInsert(ME, THEM))
+    expect(sql).toContain('insert into follows')
+    expect(sql).toContain('where not exists')
+    expect(sql).toContain('from blocks as b')
+    expect(sql).toContain(' or ')
+    expect(sql).toContain('on conflict do nothing')
+  })
+
+  it('looks the same but is ignored when a block landed after the read', async () => {
+    insertedRows = []
+    expect(await followUser(ME, THEM)).toBe('ignored')
   })
 
   it('refuses yourself with a 400, before touching the database', async () => {
@@ -206,12 +240,39 @@ describe('follow lists', () => {
     const { sql, params } = followRowsQuery({
       ...input,
       showHidden: false,
-      cursor: '2026-11-01 10:00:00.123456+00',
+      cursor: { since: '2026-11-01 10:00:00.123456+00', rowId: THEM },
     }).toSQL()
-    expect(sql).toContain('"follows"."created_at" < ')
-    expect(sql).toContain('order by "follows"."created_at" desc')
+    expect(sql).toContain('(follows.created_at, users.id) < (')
+    expect(sql).toContain(
+      'order by "follows"."created_at" desc, "users"."id" desc',
+    )
     expect(params).toContain('2026-11-01 10:00:00.123456+00')
+    expect(params).toContain(THEM)
     expect(params).toContain(51)
+  })
+
+  it('hands out an opaque cursor that reads back to the same pair', () => {
+    const cursor = { since: '2026-11-01 10:00:00.123456+00', rowId: THEM }
+    const encoded = encodeCursor(cursor)
+    expect(encoded).not.toContain(THEM)
+    expect(encoded).toMatch(/^[\w-]+$/)
+    expect(decodeCursor(encoded)).toEqual(cursor)
+  })
+
+  it('refuses a cursor that is not one of ours with a 400', () => {
+    const bad = [
+      'nonsense',
+      '',
+      Buffer.from('2026-11-01 10:00:00+00').toString('base64url'),
+      Buffer.from(`not a time|${THEM}`).toString('base64url'),
+      Buffer.from('2026-11-01 10:00:00+00|nope').toString('base64url'),
+      Buffer.from(`2026-11-01 10:00:00+00|${THEM}|x`).toString('base64url'),
+    ]
+    for (const value of bad) {
+      expect(() => decodeCursor(value)).toThrow(
+        expect.objectContaining({ statusCode: 400 }),
+      )
+    }
   })
 
   it('shows the owner every row and others only the rows the query let through', async () => {
@@ -251,6 +312,7 @@ describe('follow lists', () => {
       username: `user_${index}`,
       displayName: null,
       since: `2026-11-01 10:00:${String(59 - (index % 60)).padStart(2, '0')}+00`,
+      rowId: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
       viewerFollows: false,
       followsViewer: false,
       isYou: false,
@@ -262,7 +324,10 @@ describe('follow lists', () => {
       cursor: null,
     })
     expect(page.items).toHaveLength(50)
-    expect((selectRows[49] as { since: string }).since).toBe(page.next)
+    expect(decodeCursor(page.next!)).toEqual({
+      since: (selectRows[49] as { since: string }).since,
+      rowId: (selectRows[49] as { rowId: string }).rowId,
+    })
   })
 })
 

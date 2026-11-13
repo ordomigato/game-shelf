@@ -44,6 +44,31 @@ const collections = computed(() => [
   ...more.value,
 ])
 
+// "Find an account": a full username only, so nobody can list accounts. The
+// profile route answers 404 for a name nobody has.
+const lookup = ref('')
+const lookupProblem = ref<'notFound' | 'failed' | null>(null)
+const looking = ref(false)
+
+async function findAccount() {
+  const name = usernameToFind(lookup.value)
+  lookupProblem.value = null
+  if (!name) {
+    lookupProblem.value = 'notFound'
+    return
+  }
+  looking.value = true
+  try {
+    await $fetch(`/api/u/${name}`)
+    await navigateTo(`/u/${name}/shelf`)
+  } catch (e) {
+    lookupProblem.value =
+      (e as { statusCode?: number }).statusCode === 404 ? 'notFound' : 'failed'
+  } finally {
+    looking.value = false
+  }
+}
+
 async function loadMore() {
   loadingMore.value = true
   try {
@@ -67,6 +92,44 @@ async function loadMore() {
         {{ $t('explore.description') }}
       </p>
     </div>
+
+    <form class="flex flex-col gap-2" @submit.prevent="findAccount">
+      <label for="find-account" class="text-sm font-medium">
+        {{ $t('explore.findAccount') }}
+      </label>
+      <div class="flex max-w-md gap-2">
+        <Input
+          id="find-account"
+          v-model="lookup"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          :placeholder="$t('explore.findAccountPlaceholder')"
+          :aria-describedby="
+            lookupProblem ? 'find-account-problem' : 'find-account-hint'
+          "
+          @input="lookupProblem = null"
+        />
+        <Button type="submit" :disabled="looking">
+          {{ $t('explore.findAccountButton') }}
+        </Button>
+      </div>
+      <p
+        v-if="lookupProblem"
+        id="find-account-problem"
+        role="alert"
+        class="text-sm text-destructive"
+      >
+        {{
+          lookupProblem === 'notFound'
+            ? $t('explore.findAccountNotFound')
+            : $t('explore.findAccountFailed')
+        }}
+      </p>
+      <p v-else id="find-account-hint" class="text-sm text-muted-foreground">
+        {{ $t('explore.findAccountHint') }}
+      </p>
+    </form>
 
     <div
       v-if="status === 'pending' && !data"

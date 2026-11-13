@@ -5,6 +5,8 @@ import { LogOut } from '@lucide/vue'
 const auth = useAuth()
 const { username, shelfPath } = useViewer()
 
+const newFollowers = computed(() => auth.me.value?.newFollowers ?? 0)
+
 const initial = computed(() => (username.value ?? '?').charAt(0).toUpperCase())
 const avatarStyle = computed(() => {
   const { from, to } = generatedCoverColors(username.value ?? '')
@@ -38,6 +40,14 @@ async function signOut() {
       </DropdownMenuLabel>
       <DropdownMenuItem v-if="shelfPath" as-child>
         <NuxtLink :to="shelfPath">{{ $t('header.myCollections') }}</NuxtLink>
+      </DropdownMenuItem>
+      <DropdownMenuItem v-if="username" as-child>
+        <NuxtLink :to="`/u/${username}/following`">
+          {{ $t('header.following') }}
+          <Badge v-if="newFollowers > 0" variant="secondary" class="ml-auto">
+            {{ $t('follows.newFollowers', { count: newFollowers }) }}
+          </Badge>
+        </NuxtLink>
       </DropdownMenuItem>
       <DropdownMenuItem as-child>
         <NuxtLink to="/account">{{ $t('header.account') }}</NuxtLink>

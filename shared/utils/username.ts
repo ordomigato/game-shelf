@@ -10,6 +10,16 @@ export function normalizeUsername(value: string): string {
   return value.trim().toLowerCase()
 }
 
+/**
+ * What someone typed into "Find an account", as a username to look up, or
+ * null when it can't be one. Allows one leading `@`. Only exact usernames are
+ * ever looked up, so the box can't be used to list accounts.
+ */
+export function usernameToFind(value: string): string | null {
+  const name = normalizeUsername(value).replace(/^@/, '')
+  return USERNAME_PATTERN.test(name) ? name : null
+}
+
 /** Why a (normalized) username can't be used, or null when it's fine. */
 export function usernameProblem(username: string): Message | null {
   if (username.length < USERNAME_MIN_LENGTH) {

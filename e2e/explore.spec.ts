@@ -62,3 +62,65 @@ test('says so when there is nothing to explore yet', async ({ page }) => {
   await openExplore(page)
   await expect(page.getByText('No public collections yet.')).toBeVisible()
 })
+
+test.describe('find an account', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/explore**', (route) =>
+      route.fulfill({ json: { collections: [], hasMore: false } }),
+    )
+  })
+
+  test('opens the shelf for a full username, signed out', async ({ page }) => {
+    await page.route('**/api/u/**', (route) => {
+      const path = new URL(route.request().url()).pathname
+      if (path === '/api/u/retro_fan') {
+        return route.fulfill({
+          json: {
+            username: 'retro_fan',
+            displayName: null,
+            memberSince: '2026-01-01T00:00:00.000Z',
+          },
+        })
+      }
+      if (path === '/api/u/retro_fan/collections') {
+        return route.fulfill({ json: [] })
+      }
+      return route.fulfill({
+        status: 404,
+        json: { statusMessage: 'Not found' },
+      })
+    })
+    await openExplore(page)
+    await page.getByLabel('Find an account').fill('  @Retro_Fan ')
+    await page.getByRole('button', { name: 'Find', exact: true }).click()
+    await expect(page).toHaveURL(/\/u\/retro_fan\/shelf$/)
+  })
+
+  test('says so when no one has that username', async ({ page }) => {
+    await page.route('**/api/u/nobody_here', (route) =>
+      route.fulfill({ status: 404, json: { statusMessage: 'Not found' } }),
+    )
+    await openExplore(page)
+    await page.getByLabel('Find an account').fill('nobody_here')
+    await page.getByRole('button', { name: 'Find', exact: true }).click()
+    await expect(page.getByText('No one has that username.')).toBeVisible()
+    await expect(page).toHaveURL(/\/explore$/)
+  })
+
+  test('a malformed name gets the same answer without asking the server', async ({
+    page,
+  }) => {
+    let asked = 0
+    await page.route('**/api/u/**', (route) => {
+      asked += 1
+      return route.fulfill({ status: 404, json: {} })
+    })
+    await openExplore(page)
+    for (const bad of ['ab', 'no spaces', 'a/b', 'x'.repeat(21)]) {
+      await page.getByLabel('Find an account').fill(bad)
+      await page.getByRole('button', { name: 'Find', exact: true }).click()
+      await expect(page.getByText('No one has that username.')).toBeVisible()
+    }
+    expect(asked).toBe(0)
+  })
+})

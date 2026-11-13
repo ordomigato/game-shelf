@@ -123,6 +123,7 @@
     "account": "Account",
     "signOut": "Sign out",
     "myCollections": "My collections",
+    "following": "Following",
     "explore": "Explore",
     "search": "Search",
     "searchLabel": "Search games",
@@ -904,7 +905,13 @@
     "by": "by {owner}",
     "empty": "No public collections yet. Make one of yours public to be the first.",
     "loadFailed": "Couldn't load collections. Try again.",
-    "loadMoreFailed": "Couldn't load more collections. Try again."
+    "loadMoreFailed": "Couldn't load more collections. Try again.",
+    "findAccount": "Find an account",
+    "findAccountHint": "Type someone's full username.",
+    "findAccountPlaceholder": "Username",
+    "findAccountButton": "Find",
+    "findAccountNotFound": "No one has that username.",
+    "findAccountFailed": "Couldn't look that up. Try again."
   },
   "charts": {
     "add": "Add chart",

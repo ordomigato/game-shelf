@@ -403,3 +403,41 @@ test('the privacy page explains following', async ({ page }) => {
     page.getByText('Following never shows anyone more than a visitor'),
   ).toBeVisible()
 })
+
+test.describe('the account menu', () => {
+  test('links to who you follow, with the new followers badge', async ({
+    page,
+  }) => {
+    await signInAs(page, { username: 'retro_fan' })
+    await page.route('**/api/me', (route) =>
+      route.fulfill({ json: me({ newFollowers: 3 }) }),
+    )
+    await page.goto('/about')
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    const link = page.getByRole('menuitem', { name: /^Following/ })
+    await expect(link).toHaveAttribute('href', '/u/retro_fan/following')
+    await expect(link.getByText('3 new')).toBeVisible()
+  })
+
+  test('has no badge when nothing is new', async ({ page }) => {
+    await signInAs(page, { username: 'retro_fan' })
+    await page.route('**/api/me', (route) => route.fulfill({ json: me() }))
+    await page.goto('/about')
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    await expect(
+      page.getByRole('menuitem', { name: 'Following' }),
+    ).toBeVisible()
+    await expect(page.getByText(/\d+ new/)).toBeHidden()
+  })
+
+  test('hides Following until there is a username', async ({ page }) => {
+    await signInAs(page, { username: null })
+    await page.route('**/api/me', (route) =>
+      route.fulfill({ json: me({ username: null }) }),
+    )
+    await page.goto('/about')
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Account' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: /Following/ })).toBeHidden()
+  })
+})

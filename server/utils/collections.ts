@@ -48,6 +48,7 @@ import {
 import { assertCan } from './assert-can'
 import { isForeignKeyViolation, isUniqueViolation } from './db-errors'
 import { limitReached } from './limits'
+import { touchLists } from './list-activity'
 import { positionBetween } from './positions'
 
 type CollectionRow = typeof collections.$inferSelect
@@ -517,7 +518,10 @@ export async function findOrCreateItem(
     .values({ ownerId, ...input, ...state })
     .onConflictDoNothing()
     .returning()
-  if (created) return created
+  if (created) {
+    await touchLists(ownerId, state)
+    return created
+  }
   // Created by a concurrent request between the check and the insert.
   const [raced] = await db
     .select()
@@ -785,6 +789,7 @@ async function saveItemValues(
       and(eq(libraryItems.id, item.id), eq(libraryItems.ownerId, item.ownerId)),
     )
     .returning()
+  await touchLists(item.ownerId, item)
   return toLibraryItem(updated!, game)
 }
 

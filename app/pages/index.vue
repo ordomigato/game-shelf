@@ -223,6 +223,8 @@ const resultsLabel = computed(() => {
       <SearchFilters v-model="filters" class="mt-4" />
     </section>
 
+    <FollowingUpdates v-if="!isSearchable" class="mb-12" />
+
     <p class="sr-only" aria-live="polite">{{ resultsLabel }}</p>
 
     <div

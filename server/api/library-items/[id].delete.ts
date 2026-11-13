@@ -8,8 +8,9 @@ const paramsSchema = z.object({ id: z.uuid() })
 export default defineEventHandler(async (event) => {
   const { user } = await authorize(event, 'library.write', itemOf(event))
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
-  await getOwnedItem(user.id, id)
+  const item = await getOwnedItem(user.id, id)
   await useDb().delete(libraryItems).where(eq(libraryItems.id, id))
+  await touchLists(user.id, item)
   setResponseStatus(event, 204)
   return null
 })

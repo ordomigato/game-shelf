@@ -33,6 +33,10 @@ const linkClass =
       <p>{{ $t('privacy.visible') }}</p>
     </ProseSection>
 
+    <ProseSection :title="$t('privacy.followingTitle')">
+      <p>{{ $t('privacy.following') }}</p>
+    </ProseSection>
+
     <ProseSection :title="$t('privacy.cookiesTitle')">
       <p>{{ $t('privacy.cookies') }}</p>
     </ProseSection>

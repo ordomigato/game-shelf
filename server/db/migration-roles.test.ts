@@ -17,7 +17,9 @@ const indexOf = (text: string) =>
 describe('the roles migration', () => {
   it('comes right after the barcode review migration', () => {
     expect(tag).toBe('0027_user_roles')
-    expect(journal.entries.at(-2)?.tag).toBe('0026_barcode_review')
+    expect(journal.entries.find((entry) => entry.idx === 26)?.tag).toBe(
+      '0026_barcode_review',
+    )
   })
 
   it('adds roles as a list that holds user for everyone', () => {

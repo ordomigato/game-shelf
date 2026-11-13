@@ -24,6 +24,12 @@ export const FIXED_COLUMNS: Message[] = [
   { key: 'export.columns.list' },
 ]
 
+/** The columns of `following.csv` in a full export. */
+export const FOLLOWING_COLUMNS: Message[] = [
+  { key: 'export.columns.username' },
+  { key: 'export.columns.followingSince' },
+]
+
 /** Joins a multiple-choice value in a cell. Choices can contain commas. */
 export const CHOICE_SEPARATOR = '; '
 

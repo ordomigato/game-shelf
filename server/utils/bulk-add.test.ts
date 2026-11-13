@@ -11,6 +11,8 @@ const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 const assertOwnsCollections = vi.fn()
 vi.mock('./catalog', () => ({ ensureCatalogGames }))
+const touchLists = vi.fn()
+vi.mock('./list-activity', () => ({ touchLists }))
 vi.mock('./collections', () => ({
   assertOwnsCollections,
   lastPositions: async () => new Map([['c1', 5]]),
@@ -83,6 +85,7 @@ const game = (igdbId: number) => ({
 })
 
 beforeEach(() => {
+  touchLists.mockClear()
   fake = {
     existing: [],
     libraryCount: 0,
@@ -122,6 +125,15 @@ describe('bulkAdd', () => {
     expect(reads).toEqual(['library items', 'library count'])
     const [upsert] = batches[0] as { values: { igdbId: number }[] }[]
     expect(upsert!.values).toHaveLength(40)
+    // The owner's Owned list changed, and the Wishlist did not.
+    expect(touchLists).toHaveBeenCalledOnce()
+    const [owner, ...states] = touchLists.mock.calls[0] as [
+      string,
+      ...{ owned: boolean; wishlisted: boolean }[],
+    ]
+    expect(owner).toBe('u1')
+    expect(states).toHaveLength(40)
+    expect(states.every((state) => state.owned && !state.wishlisted)).toBe(true)
   })
 
   it('adds the games to the collection in the same batch', async () => {

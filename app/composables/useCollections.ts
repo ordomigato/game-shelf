@@ -74,9 +74,9 @@ export function useCollections() {
     isMine: (username: string) =>
       auth.me.value?.username === username.toLowerCase(),
 
-    /** What anyone can see about a user. */
+    /** What the viewer can see about a user, with their follow counts and relationship. */
     profile: (username: string) =>
-      $fetch<PublicProfile>(`/api/u/${encodeURIComponent(username)}`),
+      viewerFetch<PublicProfile>(`/api/u/${encodeURIComponent(username)}`),
 
     list: (username: string) =>
       viewerFetch<CollectionSummary[]>(userPath(username)),

@@ -33,6 +33,23 @@ async function exportEverything() {
     exporting.value = false
   }
 }
+
+const followsError = ref('')
+const savingFollows = ref(false)
+
+/** Shows or hides the counts and lists of who follows whom, saved at once. */
+async function setFollowsPublic(value: boolean) {
+  followsError.value = ''
+  savingFollows.value = true
+  try {
+    await auth.updateProfile({ followsPublic: value })
+  } catch {
+    followsError.value = t('account.settings.followsFailed')
+  } finally {
+    savingFollows.value = false
+  }
+}
+
 const deleting = ref(false)
 
 async function deleteAccount() {
@@ -64,6 +81,47 @@ async function deleteAccount() {
       </CardHeader>
       <CardContent>
         <ThemeSwitcher show-labels />
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2 class="text-lg font-semibold">
+            {{ $t('account.settings.followsTitle') }}
+          </h2>
+        </CardTitle>
+        <CardDescription>{{
+          $t('account.settings.followsDescription')
+        }}</CardDescription>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-4">
+        <FormMessage v-if="followsError">{{ followsError }}</FormMessage>
+        <div class="flex items-center gap-2">
+          <Checkbox
+            id="follows-public"
+            :model-value="auth.me.value?.followsPublic ?? true"
+            :disabled="savingFollows"
+            @update:model-value="setFollowsPublic($event === true)"
+          />
+          <Label for="follows-public">{{
+            $t('account.settings.followsPublic')
+          }}</Label>
+        </div>
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h2 class="text-lg font-semibold">
+            {{ $t('account.settings.blockedTitle') }}
+          </h2>
+        </CardTitle>
+        <CardDescription>{{
+          $t('account.settings.blockedDescription')
+        }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <BlockedAccounts />
       </CardContent>
     </Card>
     <Card>

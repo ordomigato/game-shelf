@@ -61,6 +61,10 @@ async function loadMore() {
 
 <template>
   <div class="flex flex-col gap-6">
+    <div class="flex justify-end">
+      <FindAccountDialog />
+    </div>
+
     <div>
       <h1 class="text-3xl font-bold">{{ $t('explore.title') }}</h1>
       <p class="mt-1 text-muted-foreground">

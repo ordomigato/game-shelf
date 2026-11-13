@@ -209,6 +209,7 @@ export function useAuth() {
     async updateProfile(changes: {
       username?: string
       displayName?: string | null
+      followsPublic?: boolean
     }) {
       setSignedIn(
         await apiFetch<Me>('/api/me', { method: 'PATCH', body: changes }),

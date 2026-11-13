@@ -43,7 +43,10 @@ export async function findUserByUsername(
   return user
 }
 
-export function toPublicProfile(user: UserRow): PublicProfile {
+/** The profile's fixed part. The route adds what depends on the viewer. */
+export function toPublicProfile(
+  user: UserRow,
+): Omit<PublicProfile, 'counts' | 'relationship'> {
   return {
     username: user.username!,
     displayName: user.displayName,
@@ -51,7 +54,7 @@ export function toPublicProfile(user: UserRow): PublicProfile {
   }
 }
 
-export function toMe(user: UserRow): Me {
+export function toMe(user: UserRow, newFollowers = 0): Me {
   return {
     id: user.id,
     username: user.username,
@@ -60,5 +63,7 @@ export function toMe(user: UserRow): Me {
     plan: effectivePlan(user),
     limits: userLimits(user),
     roles: user.roles,
+    newFollowers,
+    followsPublic: user.followsPublic,
   }
 }

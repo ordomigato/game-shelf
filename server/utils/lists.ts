@@ -49,6 +49,7 @@ import {
   toCollectionEntry,
   toLibraryItem,
 } from './collections'
+import { touchLists } from './list-activity'
 import { isFiltered, listOrder, listWhere, type ListQuery } from './list-query'
 
 type ItemRow = typeof libraryItems.$inferSelect
@@ -86,8 +87,19 @@ export async function setListVisibility(
     .update(users)
     .set(
       list === 'owned'
-        ? { ownedPublic: visibility === 'public' }
-        : { wishlistPublic: visibility === 'public' },
+        ? {
+            ownedPublic: visibility === 'public',
+            ...(visibility === 'public' && {
+              // Going public is a change followers see.
+              ownedUpdatedAt: sql`case when owned_public then owned_updated_at else now() end`,
+            }),
+          }
+        : {
+            wishlistPublic: visibility === 'public',
+            ...(visibility === 'public' && {
+              wishlistUpdatedAt: sql`case when wishlist_public then wishlist_updated_at else now() end`,
+            }),
+          },
     )
     .where(eq(users.id, ownerId))
 }
@@ -478,7 +490,10 @@ export async function changeItemLists(
         .delete(libraryItems)
         .where(stillIn(row.id, ownerId, before))
         .returning({ id: libraryItems.id })
-      if (deleted.length) return null
+      if (deleted.length) {
+        await touchLists(ownerId, before)
+        return null
+      }
       continue
     }
     const [updated] = await db
@@ -487,6 +502,7 @@ export async function changeItemLists(
       .where(stillIn(row.id, ownerId, before))
       .returning()
     if (!updated) continue
+    await touchLists(ownerId, before, state)
     const [game] = row.igdbId
       ? await db
           .select()

@@ -6,6 +6,7 @@ import { cleanFields, fieldsProblem } from '../../shared/utils/field-changes'
 import { normalizeFieldValue } from '../../shared/utils/field-values'
 import { importedListState } from '../../shared/utils/lists'
 import { planPlatforms } from './import-platforms'
+import { touchLists } from './list-activity'
 import {
   collectionItems,
   collections,
@@ -205,6 +206,8 @@ export async function importIntoCollection(
   }[] = []
   // The library item each row ends up as, filled in below, in file order.
   const order: (string | { pending: number })[] = []
+  // Where each added or changed game stands, for the lists' change times.
+  const touched: { owned: boolean; wishlisted: boolean }[] = []
   const sorted = (ids: Iterable<number>) => [...ids].sort((a, b) => a - b)
 
   for (const row of rows) {
@@ -244,6 +247,7 @@ export async function importIntoCollection(
           wantedOn,
           wishlisted,
         })
+        touched.push({ owned: have.owned, wishlisted })
       }
       order.push(have.id)
     } else {
@@ -255,6 +259,7 @@ export async function importIntoCollection(
       // The List cell and the platforms decide where a new game goes.
       const lists = importedListState(row.list, ownedOn, wantedOn)
       if (lists.conflict) listConflicts.push(row.row ?? 0)
+      touched.push({ owned: lists.owned, wishlisted: lists.wishlisted })
       toInsert.push({
         ownerId,
         igdbId: known(row) ? row.igdbId : null,
@@ -313,6 +318,7 @@ export async function importIntoCollection(
       where item.id = changed.id and item.owner_id = ${ownerId}
     `)
   }
+  await touchLists(ownerId, ...touched)
   const itemIds = order.map((entry) =>
     typeof entry === 'string' ? entry : inserted[entry.pending]!.id,
   )

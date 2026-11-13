@@ -71,6 +71,8 @@ export default defineNuxtConfig({
     '/forgot-password': { ssr: false, headers: noindex },
     // Rendered in the browser until public shelves get server rendering.
     '/u/**': { ssr: false },
+    '/u/*/following': { headers: noindex },
+    '/u/*/followers': { headers: noindex },
   },
   runtimeConfig: {
     // Per-client request limits (server/middleware/rate-limit.ts). The e2e

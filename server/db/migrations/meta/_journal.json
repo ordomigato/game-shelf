@@ -197,6 +197,13 @@
       "when": 1792704271716,
       "tag": "0027_user_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794519109044,
+      "tag": "0028_follows",
+      "breakpoints": true
     }
   ]
 }

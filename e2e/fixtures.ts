@@ -8,6 +8,8 @@ const BACKGROUND_CALLS = [
   '**/api/explore**',
   '**/api/u/*',
   '**/api/u/*/lists',
+  '**/api/me/following/updates',
+  '**/api/blocks',
 ]
 
 /**

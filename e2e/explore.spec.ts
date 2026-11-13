@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
+import { signInAs } from './support/session'
 
 /**
  * The page renders on the server, out of reach of browser stubs, so get
@@ -61,4 +62,143 @@ test('says so when there is nothing to explore yet', async ({ page }) => {
   )
   await openExplore(page)
   await expect(page.getByText('No public collections yet.')).toBeVisible()
+})
+
+test.describe('find an account', () => {
+  const profile = (
+    username: string,
+    displayName: string | null,
+    relationship: Record<string, boolean> | null = null,
+  ) => ({
+    username,
+    displayName,
+    memberSince: '2026-01-01T00:00:00.000Z',
+    counts: null,
+    relationship,
+  })
+
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/explore**', (route) =>
+      route.fulfill({ json: { collections: [], hasMore: false } }),
+    )
+  })
+
+  async function openDialog(page: Page) {
+    await openExplore(page)
+    await page.getByRole('button', { name: 'Find an account' }).click()
+    await expect(
+      page.getByRole('dialog', { name: 'Find an account' }),
+    ).toBeVisible()
+  }
+  const find = async (page: Page, name: string) => {
+    await page.getByRole('dialog').getByRole('textbox').fill(name)
+    await page.getByRole('button', { name: 'Find', exact: true }).click()
+  }
+
+  test('shows the account without leaving the page, signed out', async ({
+    page,
+  }) => {
+    await page.route('**/api/u/retro_fan', (route) =>
+      route.fulfill({ json: profile('retro_fan', 'Retro Fan') }),
+    )
+    await page.route('**/api/u/retro_fan/collections', (route) =>
+      route.fulfill({ json: [] }),
+    )
+    await openDialog(page)
+    await find(page, '  @Retro_Fan ')
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Retro Fan')).toBeVisible()
+    await expect(dialog.getByText('@retro_fan')).toBeVisible()
+    await expect(page).toHaveURL(/\/explore$/)
+    await expect(dialog.getByRole('button', { name: /Follow/ })).toHaveCount(0)
+    await dialog.getByRole('link', { name: 'View shelf' }).click()
+    await expect(page).toHaveURL(/\/u\/retro_fan\/shelf$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('offers Follow when signed in', async ({ page }) => {
+    await signInAs(page, { username: 'sam_k' })
+    await page.route('**/api/me', (route) =>
+      route.fulfill({
+        json: {
+          id: '00000000-0000-4000-8000-000000000002',
+          username: 'sam_k',
+          displayName: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          plan: 'free',
+          roles: ['user'],
+          newFollowers: 0,
+          followsPublic: true,
+        },
+      }),
+    )
+    await page.route('**/api/u/retro_fan', (route) =>
+      route.fulfill({
+        json: profile('retro_fan', null, {
+          following: false,
+          followedBy: false,
+          blocking: false,
+        }),
+      }),
+    )
+    await page.route('**/api/follows/retro_fan', (route) =>
+      route.fulfill({ status: 204 }),
+    )
+    await openDialog(page)
+    await find(page, 'retro_fan')
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Follow', exact: true }).click()
+    await expect(
+      dialog.getByRole('button', { name: 'Following' }),
+    ).toBeVisible()
+    await expect(dialog.getByRole('link', { name: 'View shelf' })).toBeVisible()
+  })
+
+  test('says so when no one has that username', async ({ page }) => {
+    await page.route('**/api/u/nobody_here', (route) =>
+      route.fulfill({ status: 404, json: { statusMessage: 'Not found' } }),
+    )
+    await openDialog(page)
+    await find(page, 'nobody_here')
+    await expect(page.getByText('No one has that username.')).toBeVisible()
+    await expect(page).toHaveURL(/\/explore$/)
+  })
+
+  test('a malformed name gets the same answer without asking the server', async ({
+    page,
+  }) => {
+    let asked = 0
+    await page.route('**/api/u/**', (route) => {
+      asked += 1
+      return route.fulfill({ status: 404, json: {} })
+    })
+    await openDialog(page)
+    for (const bad of ['ab', 'no spaces', 'a/b', 'x'.repeat(21)]) {
+      await find(page, bad)
+      await expect(page.getByText('No one has that username.')).toBeVisible()
+    }
+    expect(asked).toBe(0)
+  })
+
+  test('editing clears the result, and closing resets the dialog', async ({
+    page,
+  }) => {
+    await page.route('**/api/u/retro_fan', (route) =>
+      route.fulfill({ json: profile('retro_fan', null) }),
+    )
+    await openDialog(page)
+    await find(page, 'retro_fan')
+    const dialog = page.getByRole('dialog')
+    const view = dialog.getByRole('link', { name: 'View shelf' })
+    await expect(view).toBeVisible()
+    await dialog.getByRole('textbox').fill('retro_fa')
+    await expect(view).toHaveCount(0)
+    await find(page, 'retro_fan')
+    await expect(view).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await page.getByRole('button', { name: 'Find an account' }).click()
+    await expect(page.getByRole('dialog').getByRole('textbox')).toHaveValue('')
+    await expect(view).toHaveCount(0)
+  })
 })

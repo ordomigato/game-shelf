@@ -70,6 +70,11 @@ rules.
   couldn't use. The server still decides. `/api/me` returns the user's own
   `roles`, and public profile data never does.
 
+Following has four actions: `follow.write` and `block.write` (any signed-in
+account), `follower.remove` (your own followers) and `follows.read`, whose
+resource takes its visibility from `users.follows_public`. Following grants
+no access, so `collection.read`, `list.read` and `field.read` ignore it.
+
 To add an action: add it to `ACTIONS` and give it a rule in `RULES` (or list
 it under a role in `ROLE_ACTIONS`), add its row to the table in
 `access.test.ts`, then call `authorize` with it from the route.

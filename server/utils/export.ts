@@ -1,8 +1,14 @@
 import { asc, eq } from 'drizzle-orm'
 import { strToU8, zipSync } from 'fflate'
-import { collectionCsv, FIXED_COLUMNS } from '../../shared/utils/csv'
+import {
+  collectionCsv,
+  FIXED_COLUMNS,
+  FOLLOWING_COLUMNS,
+  toCsv,
+} from '../../shared/utils/csv'
 import { collectionItems, collections, games, libraryItems } from '../db/schema'
 import { catalogJoin, getUserFields, itemName } from './collections'
+import { followingForExport } from './follows'
 import { exportItemsOf, listForExport } from './lists'
 
 /** The first eight column names of an export, in English. */
@@ -12,7 +18,8 @@ export const exportColumns = () =>
 /**
  * Everything the user has as CSV files in one zip: every collection, built
  * the same way as a single collection's export in the browser, plus
- * `owned.csv` and `wishlist.csv`. Every file has the name, IGDB id, date
+ * `owned.csv` and `wishlist.csv`, and `following.csv` (who the user follows
+ * and since when). Every collection and list file has the name, IGDB id, date
  * added, release date, genres, platforms and list, then a column per field
  * the user keeps.
  */
@@ -63,5 +70,17 @@ export async function exportEverything(ownerId: string): Promise<Buffer> {
     )
     files[`${collection.slug}.csv`] = strToU8(csv)
   }
+  // A collection's address can be "following", so this file steps aside.
+  const followingFile =
+    'following.csv' in files ? 'following-accounts.csv' : 'following.csv'
+  files[followingFile] = strToU8(
+    toCsv([
+      FOLLOWING_COLUMNS.map((column) => translate(column)),
+      ...(await followingForExport(ownerId)).map((row) => [
+        row.username,
+        row.since,
+      ]),
+    ]),
+  )
   return Buffer.from(zipSync(files, { level: 6 }))
 }

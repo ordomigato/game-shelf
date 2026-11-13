@@ -9,7 +9,7 @@ import type { PublicProfile } from '#shared/types/user'
  * to follow or open.
  */
 const auth = useAuth()
-const follows = useFollows()
+const collections = useCollections()
 
 const open = ref(false)
 const lookup = ref('')
@@ -61,14 +61,10 @@ async function find() {
   const mine = attempt
   looking.value = true
   try {
-    const profile = await $fetch<PublicProfile>(`/api/u/${name}`)
+    const profile = await collections.profile(name)
     if (mine !== attempt) return
     found.value = profile
-    await auth.ensureLoaded()
-    if (auth.status.value === 'signedIn' && auth.me.value?.username !== name) {
-      const next = await follows.relationship(name).catch(() => null)
-      if (mine === attempt) relationship.value = next
-    }
+    relationship.value = profile.relationship ?? null
   } catch (e) {
     if (mine !== attempt) return
     problem.value =

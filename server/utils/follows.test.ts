@@ -70,6 +70,7 @@ const {
   followInsert,
   followPage,
   followRowsQuery,
+  followState,
   followUser,
   removeFollower,
   unfollowUser,
@@ -338,6 +339,41 @@ describe('followCounts', () => {
       following: 3,
       followers: 3,
     })
+  })
+})
+
+describe('followState', () => {
+  const viewer = { id: ME, roles: ['user' as const] }
+  const owner = (followsPublic: boolean) => ({ id: THEM, followsPublic })
+
+  it('shows the counts and the relationship to a signed-in viewer', async () => {
+    counted = 3
+    relation = { ...relation, following: true, blocking: true }
+    expect(await followState(owner(true), viewer)).toEqual({
+      counts: { following: 3, followers: 3 },
+      relationship: { following: true, followedBy: false, blocking: true },
+    })
+  })
+
+  it('hides the counts from everyone but the owner when the lists are private', async () => {
+    counted = 3
+    expect((await followState(owner(false), viewer)).counts).toBeNull()
+    expect((await followState(owner(false), null)).counts).toBeNull()
+    const self = { id: THEM, roles: ['user' as const] }
+    expect((await followState(owner(false), self)).counts).toEqual({
+      following: 3,
+      followers: 3,
+    })
+  })
+
+  it('has no relationship for a visitor or on the viewer’s own account', async () => {
+    counted = 1
+    expect(await followState(owner(true), null)).toEqual({
+      counts: { following: 1, followers: 1 },
+      relationship: null,
+    })
+    const self = { id: THEM, roles: ['user' as const] }
+    expect((await followState(owner(true), self)).relationship).toBeNull()
   })
 })
 

@@ -1,13 +1,11 @@
 import type {
   BlockedAccount,
-  FollowCounts,
   FollowPage,
   FollowUpdates,
-  Relationship,
 } from '#shared/types/follows'
 
 /**
- * Following, followers and blocks. Reads of an account's lists and counts
+ * Following, followers and blocks. Reads of an account's lists
  * send the access token when signed in, so the owner sees their own and
  * everyone else sees what the account shows.
  */
@@ -30,10 +28,6 @@ export function useFollows() {
     `${base}/${encodeURIComponent(username)}`
 
   return {
-    /** The counts an account shows the viewer. A 404 when it hides them. */
-    counts: (username: string) =>
-      viewerFetch<FollowCounts>(`${userPath(username)}/follow-counts`),
-
     /** One page of an account's Following or Followers list. */
     page: (
       username: string,
@@ -43,9 +37,6 @@ export function useFollows() {
       viewerFetch<FollowPage>(`${userPath(username)}/${kind}`, {
         cursor: cursor ?? undefined,
       }),
-
-    relationship: (username: string) =>
-      auth.apiFetch<Relationship>(`${userPath(username)}/relationship`),
 
     follow: (username: string) =>
       auth.apiFetch(named('/api/follows', username), { method: 'PUT' }),

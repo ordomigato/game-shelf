@@ -14,13 +14,30 @@ const me = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 })
 
-async function stubShelfOf(page: Page, username: string) {
+interface Relation {
+  following: boolean
+  followedBy: boolean
+  blocking: boolean
+}
+
+/** The shelf owner's profile, which carries the counts and the viewer's relationship. */
+async function stubShelfOf(
+  page: Page,
+  username: string,
+  state: {
+    counts?: { following: number; followers: number } | null
+    relationship?: Relation | null
+  } = {},
+) {
   await page.route(`**/api/u/${username}`, (route) =>
     route.fulfill({
       json: {
         username,
         displayName: 'Sam K.',
         memberSince: '2026-01-01T00:00:00.000Z',
+        counts: { following: 12, followers: 34 },
+        relationship: null,
+        ...state,
       },
     }),
   )
@@ -42,9 +59,6 @@ const row = (username: string, extra: Record<string, unknown> = {}) => ({
 test.describe('on a shelf', () => {
   test.beforeEach(async ({ page }) => {
     await stubShelfOf(page, 'sam_k')
-    await page.route('**/api/u/sam_k/follow-counts', (route) =>
-      route.fulfill({ json: { following: 12, followers: 34 } }),
-    )
   })
 
   test('a visitor sees the counts, and Follow sends them to sign in', async ({
@@ -67,9 +81,7 @@ test.describe('on a shelf', () => {
   test('hides the counts when the account keeps its lists to itself', async ({
     page,
   }) => {
-    await page.route('**/api/u/sam_k/follow-counts', (route) =>
-      route.fulfill({ status: 404, json: { statusMessage: 'Not found' } }),
-    )
+    await stubShelfOf(page, 'sam_k', { counts: null })
     await page.goto('/u/sam_k/shelf')
     await expect(
       page.getByRole('heading', { level: 1, name: "Sam K.'s collections" }),
@@ -81,11 +93,9 @@ test.describe('on a shelf', () => {
   test('follows back and unfollows, and labels a mutual', async ({ page }) => {
     await signInAs(page, { username: 'retro_fan' })
     await page.route('**/api/me', (route) => route.fulfill({ json: me() }))
-    await page.route('**/api/u/sam_k/relationship', (route) =>
-      route.fulfill({
-        json: { following: false, followedBy: true, blocking: false },
-      }),
-    )
+    await stubShelfOf(page, 'sam_k', {
+      relationship: { following: false, followedBy: true, blocking: false },
+    })
     const calls: string[] = []
     await page.route('**/api/follows/sam_k', (route) => {
       calls.push(route.request().method())
@@ -107,11 +117,9 @@ test.describe('on a shelf', () => {
   test('puts the button back when following fails', async ({ page }) => {
     await signInAs(page, { username: 'retro_fan' })
     await page.route('**/api/me', (route) => route.fulfill({ json: me() }))
-    await page.route('**/api/u/sam_k/relationship', (route) =>
-      route.fulfill({
-        json: { following: false, followedBy: false, blocking: false },
-      }),
-    )
+    await stubShelfOf(page, 'sam_k', {
+      relationship: { following: false, followedBy: false, blocking: false },
+    })
     await page.route('**/api/follows/sam_k', (route) =>
       route.fulfill({
         status: 403,
@@ -134,11 +142,9 @@ test.describe('on a shelf', () => {
   test('blocks after a confirmation, and can unblock', async ({ page }) => {
     await signInAs(page, { username: 'retro_fan' })
     await page.route('**/api/me', (route) => route.fulfill({ json: me() }))
-    await page.route('**/api/u/sam_k/relationship', (route) =>
-      route.fulfill({
-        json: { following: true, followedBy: true, blocking: false },
-      }),
-    )
+    await stubShelfOf(page, 'sam_k', {
+      relationship: { following: true, followedBy: true, blocking: false },
+    })
     const calls: string[] = []
     await page.route('**/api/blocks/sam_k', (route) => {
       calls.push(route.request().method())
@@ -178,10 +184,9 @@ test('your own shelf shows no Follow button, and a dot for new followers', async
   await page.route('**/api/me', (route) =>
     route.fulfill({ json: me({ newFollowers: 3 }) }),
   )
-  await stubShelfOf(page, 'retro_fan')
-  await page.route('**/api/u/retro_fan/follow-counts', (route) =>
-    route.fulfill({ json: { following: 2, followers: 5 } }),
-  )
+  await stubShelfOf(page, 'retro_fan', {
+    counts: { following: 2, followers: 5 },
+  })
   await page.goto('/u/retro_fan/shelf')
   await expect(page.getByRole('link', { name: '5 followers' })).toBeVisible()
   await expect(page.getByText('3 new')).toBeVisible()

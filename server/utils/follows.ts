@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
 import { createError } from 'h3'
-import type { Resource } from '../../shared/utils/access'
+import { can, type Resource, type Subject } from '../../shared/utils/access'
 import type {
   BlockedAccount,
   FollowCounts,
@@ -382,6 +382,26 @@ export async function followCounts(
     countOf('followers'),
   ])
   return { following, followers }
+}
+
+/**
+ * The follow parts of a profile for this viewer: the counts (null when the
+ * owner keeps their lists private from this viewer) and how the viewer
+ * stands with the owner (null for a visitor, or on their own account).
+ */
+export async function followState(
+  owner: Pick<UserRow, 'id' | 'followsPublic'>,
+  viewer: Subject | null,
+): Promise<{ counts: FollowCounts | null; relationship: Relationship | null }> {
+  const [counts, relationship] = await Promise.all([
+    can(viewer, 'follows.read', followsResource(owner))
+      ? followCounts(owner, viewer?.id ?? null)
+      : null,
+    viewer && viewer.id !== owner.id
+      ? relationshipWith(viewer.id, owner.id)
+      : null,
+  ])
+  return { counts, relationship }
 }
 
 /** Followers who arrived since the owner last opened their Followers list. */

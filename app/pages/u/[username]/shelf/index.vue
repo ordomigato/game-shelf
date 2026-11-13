@@ -7,7 +7,6 @@ import type { FollowCounts, Relationship } from '#shared/types/follows'
 const route = useRoute()
 const { t } = useI18n()
 const collections = useCollections()
-const follows = useFollows()
 const auth = useAuth()
 
 const username = computed(() => String(route.params.username).toLowerCase())
@@ -39,7 +38,7 @@ const listCards = computed<CollectionSummary[]>(() =>
   })),
 )
 
-const { data: profile } = useAsyncData(
+const { data: profile, refresh: refreshProfile } = useAsyncData(
   () => `profile-${username.value}`,
   () => collections.profile(username.value),
   { watch: [username] },
@@ -57,30 +56,34 @@ const shelfOwner = computed(() => profile.value?.displayName || username.value)
 
 const notFound = computed(() => error.value?.statusCode === 404)
 
-// The follow counts, which an account can hide from everyone but itself.
-const { data: counts, refresh: refreshCounts } =
-  useAsyncData<FollowCounts | null>(
-    () => `follow-counts-${username.value}`,
-    () => follows.counts(username.value).catch(() => null),
-    { watch: [username], server: false },
-  )
-
-// How the signed-in viewer stands with this account. Loaded in the browser
-// only, since the profile itself is the same for everyone.
+// The profile answers for this viewer, so the page asks for it once. The
+// server render has no sign-in, so a signed-in viewer asks again in the
+// browser. Counts and relationship are kept locally, so a follow or a block
+// shows at once.
+const counts = ref<FollowCounts | null>(null)
 const relationship = ref<Relationship | null>(null)
-async function loadRelationship() {
-  relationship.value = null
+watch(
+  profile,
+  (loaded) => {
+    counts.value = loaded?.counts ?? null
+    relationship.value = loaded?.relationship ?? null
+  },
+  { immediate: true },
+)
+const renderedOnServer = useNuxtApp().isHydrating
+onMounted(async () => {
+  if (!renderedOnServer) return
   await auth.ensureLoaded()
-  if (isMine.value || auth.status.value !== 'signedIn') return
+  if (auth.status.value === 'signedIn') await refreshProfile()
+})
+/** Asks for the counts again after the viewer follows, unfollows or blocks. */
+async function refreshCounts() {
   try {
-    relationship.value = await follows.relationship(username.value)
+    counts.value = (await collections.profile(username.value)).counts
   } catch {
-    relationship.value = null
+    // Keep the counts shown.
   }
 }
-watch([username, () => auth.me.value?.username], loadRelationship, {
-  immediate: true,
-})
 const canFollow = computed(
   () =>
     !isMine.value &&

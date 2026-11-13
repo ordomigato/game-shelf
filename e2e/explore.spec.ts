@@ -65,10 +65,16 @@ test('says so when there is nothing to explore yet', async ({ page }) => {
 })
 
 test.describe('find an account', () => {
-  const profile = (username: string, displayName: string | null) => ({
+  const profile = (
+    username: string,
+    displayName: string | null,
+    relationship: Record<string, boolean> | null = null,
+  ) => ({
     username,
     displayName,
     memberSince: '2026-01-01T00:00:00.000Z',
+    counts: null,
+    relationship,
   })
 
   test.beforeEach(async ({ page }) => {
@@ -127,11 +133,12 @@ test.describe('find an account', () => {
       }),
     )
     await page.route('**/api/u/retro_fan', (route) =>
-      route.fulfill({ json: profile('retro_fan', null) }),
-    )
-    await page.route('**/api/u/retro_fan/relationship', (route) =>
       route.fulfill({
-        json: { following: false, followedBy: false, blocking: false },
+        json: profile('retro_fan', null, {
+          following: false,
+          followedBy: false,
+          blocking: false,
+        }),
       }),
     )
     await page.route('**/api/follows/retro_fan', (route) =>

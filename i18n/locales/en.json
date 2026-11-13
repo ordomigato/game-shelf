@@ -907,11 +907,12 @@
     "loadFailed": "Couldn't load collections. Try again.",
     "loadMoreFailed": "Couldn't load more collections. Try again.",
     "findAccount": "Find an account",
-    "findAccountHint": "Type someone's full username.",
-    "findAccountPlaceholder": "Username",
+    "findAccountHint": "Type their full username.",
+    "findAccountPlaceholder": "username",
     "findAccountButton": "Find",
     "findAccountNotFound": "No one has that username.",
-    "findAccountFailed": "Couldn't look that up. Try again."
+    "findAccountFailed": "Couldn't look that up. Try again.",
+    "viewShelf": "View shelf"
   },
   "charts": {
     "add": "Add chart",

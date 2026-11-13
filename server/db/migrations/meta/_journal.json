@@ -204,6 +204,13 @@
       "when": 1794519109044,
       "tag": "0028_follows",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794534568182,
+      "tag": "0029_drop_reviews_barcodes",
+      "breakpoints": true
     }
   ]
 }
